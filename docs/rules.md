@@ -131,7 +131,7 @@ a link target, or in an HTML entity such as `&nbsp;`.
 
 The tool replaces these spans with spaces before it applies the rules:
 
-- fenced code blocks (``` and ~~~)
+- fenced code blocks (```` ``` ```` and `~~~`)
 - indented code blocks (4 or more spaces after an empty line)
 - inline code
 - link targets, autolinks, and bare URLs

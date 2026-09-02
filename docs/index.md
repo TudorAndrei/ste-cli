@@ -196,7 +196,7 @@ A GitHub Actions step:
 The tool replaces these spans with spaces before it applies the rules, thus
 it does not report a violation in your code examples:
 
-- fenced code blocks (``` and ~~~)
+- fenced code blocks (```` ``` ```` and `~~~`)
 - indented code blocks (4 or more spaces after an empty line)
 - inline code
 - link targets, autolinks, and bare URLs
