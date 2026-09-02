@@ -1,0 +1,22 @@
+[tools]
+go = "1.27.1"
+
+[tasks.fmt]
+description = "Format the Go sources"
+run = "gofmt -w ."
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks.vet]
+description = "Run the Go static checks"
+run = "go vet ./..."
+
+[tasks.check]
+description = "Format, vet, and test"
+depends = ["fmt", "vet", "test"]
+
+[tasks.build]
+description = "Build the ste binary"
+run = "go build -o bin/ste ./cmd/ste"
