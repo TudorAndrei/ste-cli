@@ -1,0 +1,11 @@
+{
+  "mode": "flavored",
+  "expect": [
+    { "rule_id": "STE-8.1", "text": ";" },
+    { "rule_id": "STE-4.2", "text": "isn't" },
+    { "rule_id": "STE-4.2", "text": "can't" },
+    { "rule_id": "STE-1.1", "text": "Utilize" },
+    { "rule_id": "STE-1.1", "text": "in order to" },
+    { "rule_id": "STE-5.1" }
+  ]
+}

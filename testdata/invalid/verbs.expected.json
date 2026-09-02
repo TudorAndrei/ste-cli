@@ -1,0 +1,14 @@
+{
+  "mode": "flavored",
+  "expect": [
+    { "rule_id": "STE-3.1", "text": "has been sent" },
+    { "rule_id": "STE-3.5", "text": "is still running" },
+    { "rule_id": "STE-3.2", "text": "was approved" },
+    { "rule_id": "STE-3.1", "text": "had gone" },
+    { "rule_id": "STE-1.4", "text": "carried out" },
+    { "rule_id": "STE-3.5", "text": "is carrying" },
+    { "rule_id": "STE-1.4", "text": "carrying out" },
+    { "rule_id": "STE-1.4", "text": "Shut down" },
+    { "rule_id": "STE-1.4", "text": "get rid of" }
+  ]
+}
