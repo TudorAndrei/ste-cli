@@ -145,21 +145,35 @@ func TestLintDirectory(t *testing.T) {
 	}
 }
 
-func TestStrictModeUsesTheShorterLimit(t *testing.T) {
+func TestTheSentenceTypeSelectsTheLimit(t *testing.T) {
 	dir := t.TempDir()
-	// The sentence has 22 words.
-	text := "one two three four five six seven eight nine ten one two three four five six seven eight nine ten one two.\n"
-	path := writeFile(t, dir, "long.md", text)
+	// The sentence has 22 words: correct as descriptive text (limit 25),
+	// too long as an instruction in a procedure (limit 20).
+	words := "one two three four five six seven eight nine ten one two three four five six seven eight nine ten one two.\n"
+	prose := writeFile(t, dir, "prose.md", words)
+	step := writeFile(t, dir, "step.md", "1. "+words)
 
-	if code, stdout, _ := runCLI(t, "", "lint", "--no-config", path); !strings.Contains(stdout, "0 findings") || code != 0 {
-		t.Fatalf("flavored mode: exit %d, stdout %q", code, stdout)
+	if code, stdout, _ := runCLI(t, "", "lint", "--no-config", prose); !strings.Contains(stdout, "0 findings") || code != 0 {
+		t.Fatalf("descriptive text: exit %d, stdout %q", code, stdout)
 	}
-	_, stdout, _ := runCLI(t, "", "lint", "--no-config", "--mode", "strict", path)
+	if _, stdout, _ := runCLI(t, "", "lint", "--no-config", "--mode", "strict", prose); !strings.Contains(stdout, "0 findings") {
+		t.Fatalf("the mode must not change the limit: %q", stdout)
+	}
+	_, stdout, _ := runCLI(t, "", "lint", "--no-config", step)
 	if !strings.Contains(stdout, "STE-5.1") {
-		t.Fatalf("strict mode gave no length finding: %q", stdout)
+		t.Fatalf("the numbered step gave no length finding: %q", stdout)
 	}
-	if !strings.Contains(stdout, "error [STE-5.1]") {
-		t.Fatalf("strict mode did not raise the severity: %q", stdout)
+}
+
+func TestMaxWordsFlagReplacesTheLimit(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, "short.md", "The pump gives pressure to the system.\n")
+	if code, stdout, _ := runCLI(t, "", "lint", "--no-config", path); !strings.Contains(stdout, "0 findings") || code != 0 {
+		t.Fatalf("exit %d, stdout %q", code, stdout)
+	}
+	_, stdout, _ := runCLI(t, "", "lint", "--no-config", "--max-words", "5", path)
+	if !strings.Contains(stdout, "STE-5.1") {
+		t.Fatalf("--max-words did not apply: %q", stdout)
 	}
 }
 

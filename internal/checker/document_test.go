@@ -35,8 +35,8 @@ func TestTheSameTextInProseGivesAFinding(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("got %d findings, want 1: %+v", len(got), got)
 	}
-	if got[0].RuleID != "STE-3.1" {
-		t.Fatalf("rule %s, want STE-3.1", got[0].RuleID)
+	if got[0].RuleID != "STE-3.4" {
+		t.Fatalf("rule %s, want STE-3.4", got[0].RuleID)
 	}
 }
 
@@ -138,6 +138,28 @@ func TestTableCellsAreSeparateSentences(t *testing.T) {
 	}
 }
 
+func TestAListItemKeepsItsWrappedLines(t *testing.T) {
+	// A step that continues on the next line is one instruction, thus its
+	// full length is checked against the 20-word limit.
+	src := "1. Open the valve one two three four five six seven eight nine ten and\n   then start the pump one two three four five six seven.\n"
+	doc := checker.Parse(src)
+	if len(doc.Sentences) != 1 {
+		t.Fatalf("got %d sentences, want 1: %+v", len(doc.Sentences), doc.Sentences)
+	}
+	got := checker.Lint(src, checker.Options{})
+	if len(got) != 1 || got[0].RuleID != "STE-5.1" {
+		t.Fatalf("got %+v, want one STE-5.1 finding", got)
+	}
+}
+
+func TestTwoListItemsStaySeparate(t *testing.T) {
+	src := "1. Open the valve.\n2. Start the pump.\n"
+	doc := checker.Parse(src)
+	if len(doc.Sentences) != 2 {
+		t.Fatalf("got %d sentences, want 2: %+v", len(doc.Sentences), doc.Sentences)
+	}
+}
+
 func TestInlineCodeDoesNotHideASentenceStart(t *testing.T) {
 	// The masked inline code must not join the two sentences.
 	src := "The tool checks the text. `ste` gives a report of the findings.\n"
@@ -147,9 +169,82 @@ func TestInlineCodeDoesNotHideASentenceStart(t *testing.T) {
 	}
 }
 
+func TestADigitBeforeAPeriodEndsASentence(t *testing.T) {
+	// "Issue 9." is the end of a sentence. A single letter, as in an
+	// initial, is not.
+	doc := checker.Parse("The tool obeys Issue 9. The rules agree with it.\n")
+	if len(doc.Sentences) != 2 {
+		t.Fatalf("got %d sentences, want 2: %+v", len(doc.Sentences), doc.Sentences)
+	}
+	doc = checker.Parse("The author is J. Smith of the group.\n")
+	if len(doc.Sentences) != 1 {
+		t.Fatalf("got %d sentences, want 1: %+v", len(doc.Sentences), doc.Sentences)
+	}
+}
+
+func TestAClosingMarkDoesNotStopASentenceEnd(t *testing.T) {
+	// The bold mark after the period must not join the two sentences.
+	doc := checker.Parse("**Open the valve.** Then start the pump.\n")
+	if len(doc.Sentences) != 2 {
+		t.Fatalf("got %d sentences, want 2: %+v", len(doc.Sentences), doc.Sentences)
+	}
+}
+
 func TestWordCount(t *testing.T) {
 	doc := checker.Parse("Open the valve. Start the pump.\n")
 	if doc.WordCount() != 6 {
 		t.Fatalf("word count %d, want 6", doc.WordCount())
+	}
+}
+
+// Section 8 gives the count rules. A quantity with its unit, a quoted
+// string, and text in parentheses each count as one word.
+func TestWordCountFollowsTheCountRules(t *testing.T) {
+	cases := []struct {
+		name string
+		text string
+		want int
+	}{
+		{"plain", "Set the pressure of the pump.", 6},
+		{"quantity and unit", "Set the pressure to 30 psi.", 5},
+		{"quantity and unit in a longer sentence",
+			"Set the pressure to 30 psi before you start the test.", 10},
+		{"quoted string is one word", "Push the \"EMER PWR\" switch.", 4},
+		{"parentheses are one word", "Start the pump (the second pump on the left).", 4},
+		{"hyphenated word is one word", "Install the quick-release fastener.", 4},
+		{"a number alone is one word", "Remove the 4 bolts.", 4},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := checker.Parse(tc.text)
+			if got := doc.WordCount(); got != tc.want {
+				t.Errorf("word count %d, want %d for %q", got, tc.want, tc.text)
+			}
+		})
+	}
+}
+
+func TestSentenceTypeAnnotation(t *testing.T) {
+	src := "Start the pump.\n\n1. Open the valve.\n2. NOTE: The pump needs pressure.\n\n- Open the valve.\n"
+	doc := checker.Parse(src)
+	if len(doc.Sentences) != 4 {
+		t.Fatalf("got %d sentences, want 4: %+v", len(doc.Sentences), doc.Sentences)
+	}
+	want := []struct {
+		procedural bool
+		note       bool
+		limit      int
+	}{
+		{false, false, 25}, // plain prose
+		{true, false, 20},  // a numbered step is an instruction
+		{true, true, 25},   // a note keeps the longer limit
+		{false, false, 25}, // a bulleted item is not a step
+	}
+	for i, w := range want {
+		s := doc.Sentences[i]
+		if s.Procedural != w.procedural || s.Note != w.note || s.Limit() != w.limit {
+			t.Errorf("sentence %d (%q): procedural=%v note=%v limit=%d, want %v/%v/%d",
+				i, s.Text, s.Procedural, s.Note, s.Limit(), w.procedural, w.note, w.limit)
+		}
 	}
 }

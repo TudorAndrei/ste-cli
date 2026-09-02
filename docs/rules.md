@@ -1,35 +1,39 @@
 ---
 title: Rules
-description: The 8 rules, their confidence values, and their limits.
+description: The 11 rules, their confidence values, and their limits.
 ---
 
 # Rules
 
 [Back to the start page](index.md)
 
-This tool has 8 rules. It does not have the 53 rules of ASD-STE100.
+This tool has 11 checks. ASD-STE100 Issue 9 has 53 rules and a dictionary of
+approved words. This tool does not have the dictionary.
 
-The identifiers follow the section numbers of ASD-STE100 approximately. They
-are stable identifiers for this tool. They are not a statement of certified
-compliance. See "Limits" at the end of this page.
+The rule numbers are the rule numbers of Issue 9. A check with the `GR`
+prefix is a general recommendation of the standard. A general
+recommendation is advice and not a rule. Thus this tool gives it the `info`
+severity, and strict mode does not make it an error.
 
 ## Summary
 
-| Rule | Name | Mode | Confidence | Severity (flavored) |
-|---|---|---|---|---|
-| `STE-1.1` | Unapproved word or word group | all | 0.90 | warning |
-| `STE-1.4` | Phrasal verb | all | 0.85 | warning |
-| `STE-3.1` | Perfect tense | all | 0.90, or 0.55 | warning |
-| `STE-3.2` | Passive voice | all | 0.95, 0.85, or 0.70 | warning |
-| `STE-3.5` | Progressive "-ing" form | all | 0.90 | warning |
-| `STE-4.2` | Contraction | all | 0.98 | warning |
-| `STE-5.1` | Sentence too long | all | 1.00 | warning |
-| `STE-8.1` | Semicolon | all | 1.00 | warning |
+| Rule | Name | Confidence | Severity (flavored) |
+|---|---|---|---|
+| `STE-1.1` | Unapproved word or word group | 0.90 | warning |
+| `STE-1.14` | British spelling | 0.90 | warning |
+| `STE-3.4` | Complex verb construction (perfect tense) | 0.90, or 0.55 | warning |
+| `STE-3.5` | Progressive "-ing" form | 0.90 | warning |
+| `STE-3.6` | Passive voice | 0.95, 0.85, or 0.70 | warning |
+| `STE-3.7` | A noun for an action | 0.90 | warning |
+| `STE-4.2` | Contraction | 0.98 | warning |
+| `STE-5.1` | Sentence too long | 0.90 | warning |
+| `STE-8.1` | Semicolon | 1.00 | warning |
+| `STE-9.3` | Phrasal verb | 0.85 | warning |
+| `STE-GR-6` | Latin abbreviation | 0.90 | info |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
-than 0.60. In `strict` mode, it keeps all findings and it makes each
-severity one step stronger: `info` becomes `warning`, and `warning` becomes
-`error`.
+than 0.60. In `strict` mode, it keeps all findings and it makes the severity
+of a rule one step stronger. The mode does **not** change a word limit.
 
 ## STE-1.1 Unapproved word or word group
 
@@ -38,29 +42,28 @@ example "utilize" and "in order to".
 
 **Limits.** The list is written by hand. It is not the ASD-STE100
 approved-word dictionary, and this tool cannot tell you if a word is in that
-dictionary. See [upstream-audit.md](upstream-audit.md).
+dictionary. Rule 1.1 also has parts that need the dictionary: the approved
+part of speech (rule 1.2) and the approved meaning (rule 1.3). This tool
+checks neither. See [upstream-audit.md](upstream-audit.md).
 
 **Control.** `allow.nouns` and `allow.verbs` in the glossary remove a term
-from this rule.
+from this rule. Rule 1.8 tells writers to use the technical nouns of their
+company or industry, thus a project glossary agrees with the standard.
 
-## STE-1.4 Phrasal verb
+## STE-1.14 British spelling
 
-Reports 24 phrasal verbs in all their forms: the base form, the third-person
-form, the past form, and the "-ing" form. Example: "carry out", "carries
-out", "carried out", "carrying out".
+Reports 54 British spellings that have one American form, for example
+"colour" and "centre". Rule 1.14 tells you to use American English spelling.
 
-**Limits.**
+**Limits.** The list keeps out each pair that needs a part of speech. Three
+examples are "licence", "practise", and "programme". A different official
+directive can replace rule 1.14. Use `disable_rules` for that.
 
-- The verb and its particle must touch. The tool does not find a separated
-  form, such as "turn the pump on".
-- The list is short on purpose. Each entry must be a phrasal verb in almost
-  all contexts.
-
-## STE-3.1 Perfect tense
+## STE-3.4 Complex verb construction
 
 Reports "has", "have", or "had", and then a past participle. An adverb or
-"not" can come between the two words. Example: "has been sent", "had gone",
-"have not written".
+"not" can come between the two words. Example: "has been sent", "had gone".
+Rule 3.4 does not permit an auxiliary verb that makes a complex construction.
 
 **Limits.**
 
@@ -68,9 +71,23 @@ Reports "has", "have", or "had", and then a past participle. An adverb or
 - "has been" and then a word that is not a participle gets a confidence of
   0.55. Only `strict` mode shows it.
 
-## STE-3.2 Passive voice
+## STE-3.5 Progressive "-ing" form
 
-Reports a form of "to be" and then a past participle.
+Reports a form of "to be" and then a verb that ends with "-ing". Example:
+"is running", "is still running", "was not reading". Rule 3.5 permits the
+"-ing" form only as a technical noun or as a modifier in a technical noun.
+
+**Limits.** The tool has a list of "-ing" words that are adjectives or
+nouns, such as "missing" and "existing". It does not report them. It does
+not report "is being", because that is the passive voice and rule 3.6
+reports it. The tool does not find the other parts of rule 3.5. An example
+is an "-ing" clause at the start of a sentence, which needs a parser.
+
+## STE-3.6 Passive voice
+
+Reports a form of "to be" and then a past participle. Rule 3.6 tells you to
+use the active voice. It permits the passive voice only in descriptive
+writing, and only when the agent is unknown.
 
 | Condition | Confidence |
 |---|---|
@@ -80,52 +97,100 @@ Reports a form of "to be" and then a past participle.
 
 **Limits.**
 
-- Grammar alone cannot separate a passive verb from an adjective. The tool
-  has a list of 36 participles that are usually adjectives, such as
-  "configured", "enabled", and "closed". It does not report them, but it
-  does report them when a "by" agent follows.
+- Rule 3.3 makes a past participle an adjective when the dictionary gives it
+  as an adjective. This tool has no dictionary, thus it uses a list of 35
+  participles that are usually adjectives, such as "configured" and
+  "enabled". It does not report them, but it does report them when a "by"
+  agent follows. The "by" test is the test that the standard itself gives.
+- The tool thus does not find a passive sentence with no agent when the
+  participle is in that list. This is a known miss.
 - A hyphenated form, such as "MIT-licensed", is an adjective for this tool.
-- When the same words also give a perfect-tense finding, and no "by" agent
+- When the same words also give an `STE-3.4` finding, and no "by" agent
   follows, the tool removes the passive finding. One message for one problem
   is enough.
 
-## STE-3.5 Progressive "-ing" form
+## STE-3.7 A noun for an action
 
-Reports a form of "to be" and then a verb that ends with "-ing". An adverb
-or "not" can come between the two words. Example: "is running", "is still
-running", "was not reading".
+Reports 17 word groups that use a noun for an action, for example "do a
+check of". Rule 3.7 tells you to use an approved verb.
 
-**Limits.** The tool has a list of "-ing" words that are adjectives or
-nouns, such as "missing", "existing", and "nothing". It does not report
-them. A determiner between the two words, as in "is a warning", stops the
-rule.
+**Limits.** The list is literal and narrow. The tool cannot find a
+nominalization that is not in the list, because it cannot make a verb from a
+noun without a dictionary.
 
 ## STE-4.2 Contraction
 
 Reports "n't", "'re", "'ve", "'ll", "'m", "'d", and the known "'s" forms,
-such as "it's" and "let's".
+such as "it's".
 
-**Limits.** The tool does not report a possessive form, such as "the
-parser's output". ASD-STE100 also has limits on the possessive form. This
-tool does not check that.
+**Limits.** Rule 4.2 also tells you not to omit a noun, a verb, a subject,
+or an article. The tool checks **only** the contraction part. An omitted
+word needs a parser. The tool does not report a possessive form, such as
+"the parser's output".
 
 ## STE-5.1 Sentence too long
 
-Reports a sentence with more words than the limit. The limit is 25 words in
-`flavored` mode and 20 words in `strict` mode. `max_words` in the glossary,
-or `--max-words`, replaces the limit.
+Reports a sentence that is longer than its limit. The standard selects the
+limit from the type of the sentence, and **not** from the mode:
 
-**Limits.** ASD-STE100 gives 20 words for a procedural sentence and 25 words
-for a descriptive sentence. This tool does not know which sentence is a
-procedure, thus the mode makes the decision.
+| Sentence | Limit | Rule |
+|---|---|---|
+| An instruction in a procedure | 20 words | 5.1 |
+| A note | 25 words | 5.5 |
+| Descriptive text | 25 words | 6.3 |
+
+The tool has no part-of-speech tagger, thus it uses the structure of the
+Markdown: **a numbered list item is an instruction in a procedure.** A
+bulleted list is not, because a bulleted list is usually a list of items and
+not a sequence of steps. A line that starts with "NOTE:" is a note, and it
+keeps the longer limit. `max_words` or `--max-words` replaces both limits.
+
+**How the tool counts a word.** Section 8 gives the count rules. The tool
+obeys these:
+
+| Element | Words |
+|---|---|
+| A hyphenated word (rule 8.7) | 1 |
+| A quantity and its unit (rule 8.6) | 1 |
+| A quoted string (rule 8.6) | 1 |
+| Text in parentheses (rule 8.5) | 1 |
+| The number of a step (rule 8.6) | 0 |
+
+**Limits.** Rule 8.6 also makes a multi-word title, a multi-word proper
+noun, and a multi-word alphanumeric identifier one word. The tool cannot
+find these without a dictionary, thus it counts each of their words. The
+count can therefore be too high for a sentence that has a long title or a
+long name. Rule 8.5 also makes the text in parentheses a separate sentence
+with its own limit. The tool does not check that sentence.
 
 ## STE-8.1 Semicolon
 
-Reports each semicolon in prose. ASD-STE100 permits the comma, the period,
-the colon, the hyphen, the parentheses, and the slash.
+Reports each semicolon in prose. Rule 8.1 permits all the standard English
+punctuation marks, but not the semicolon. It is a ban of one mark, and not a
+list of permitted marks.
 
 **Limits.** The tool does not report a semicolon in code, in inline code, in
 a link target, or in an HTML entity such as `&nbsp;`.
+
+## STE-9.3 Phrasal verb
+
+Reports 24 phrasal verbs in all their forms: the base form, the third-person
+form, the past form, and the "-ing" form. Example: "carry out", "carries
+out", "carried out", "carrying out". Rule 9.3 tells you not to make a
+phrasal verb from two words.
+
+**Limits.**
+
+- The verb and its particle must touch. The tool does not find a separated
+  form, such as "turn the pump on".
+- The list is short on purpose. The dictionary gives single words, not
+  combinations, thus a hand-written list is the only method.
+
+## STE-GR-6 Latin abbreviation
+
+Reports "e.g.", "i.e.", "etc.", and 5 more Latin abbreviations. GR-6 is a general
+recommendation, thus the severity is `info` and strict mode does not make it
+an error.
 
 ## What the tool does not examine
 
@@ -136,13 +201,39 @@ The tool replaces these spans with spaces before it applies the rules:
 - inline code
 - link targets, autolinks, and bare URLs
 
-Each cell of a table row is a different sentence. A heading, a list item, and
-an empty line are sentence boundaries.
+A heading, an empty line, and the start of a list item are sentence
+boundaries. A list item keeps the lines that continue it. Each cell of a
+table row is a different sentence. This is a decision of this tool, and not
+a rule of the standard.
+
+## Rules that this tool does not check
+
+An audit of Issue 9 found these rules to be not mechanically checkable
+without a part-of-speech tagger, a parser, or the dictionary. The tool does
+not try to check them, because a guess would only make noise:
+
+| Rule | Subject | Why not |
+|---|---|---|
+| 1.2, 1.3 | Approved part of speech and meaning | Needs the dictionary |
+| 1.5, 1.6, 1.8, 1.12 | Technical noun and verb categories | A judgment about the subject field |
+| 1.9, 1.10 | Short, clear, no slang | A human judgment |
+| 2.1, 2.2 | Multi-word nouns of 3 words maximum | Needs a part of speech to find where the noun starts |
+| 3.1 | The verb forms of the dictionary | Needs the dictionary |
+| 4.2 (part) | Omitted words | Needs a parser |
+| 4.3 | Vertical list construction | Possible later. Not built |
+| 4.5 | Articles and demonstrative adjectives | The exceptions of the standard make a check too noisy |
+| 5.2 | One instruction for each sentence | Cannot separate simultaneous actions |
+| 5.3 | The imperative form | Needs a verb list |
+| 5.4 | The condition before the instruction | Possible later, as info. Not built |
+| 6.1, 6.2, 6.5 | Key words, one topic for each paragraph | Needs semantics |
+| 6.6 | 6 sentences maximum in a paragraph | Too many false reports in software documentation |
+| 7.1, 7.2, 7.3 | Safety instructions | Possible later for admonition blocks. Not built |
+| 9.1, 9.2, 9.4 | Consistent style | Needs semantics |
 
 ## Limits of the tool
 
 - The tool has no part-of-speech tagger. It uses word lists and short word
-  sequences. Thus it cannot find all violations, and some findings are
+  sequences. Thus it does not find all violations, and some findings are
   wrong.
 - The tool does not have the ASD-STE100 dictionary. It cannot tell you if
   the standard approves a word.

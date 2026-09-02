@@ -3,7 +3,7 @@ package rules
 // VerbDataVersion identifies this verb data set. Increase it when the tables
 // below change, because the fixtures and the measured precision refer to a
 // specific version.
-const VerbDataVersion = "1.0.0"
+const VerbDataVersion = "1.1.0"
 
 // beForms are the forms of the verb "to be".
 var beForms = map[string]bool{
@@ -46,17 +46,21 @@ var irregularParticiples = map[string]bool{
 // adjectivalParticiples are the past participles that usually work as
 // adjectives after "to be". The passive rule does not report them, unless a
 // "by" agent follows.
+// Rule 3.3 makes a participle an adjective when the dictionary gives it as
+// an adjective. This tool has no dictionary, thus this list is a stand-in.
+// "damaged" and "permitted" are in the list because Issue 9 gives them as
+// examples in rule 3.3.
 var adjectivalParticiples = map[string]bool{
 	"allowed": true, "authorized": true, "based": true, "called": true,
-	"closed": true, "complete": true, "connected": true, "configured": true,
-	"deprecated": true, "disabled": true, "disconnected": true,
-	"documented": true, "enabled": true, "expected": true, "finished": true,
-	"gone": true, "installed": true, "intended": true, "involved": true,
-	"known": true, "limited": true, "located": true, "locked": true,
-	"named": true, "needed": true, "open": true, "prepared": true,
-	"protected": true, "ready": true, "related": true, "required": true,
-	"reserved": true, "restricted": true, "supported": true, "unlocked": true,
-	"used": true,
+	"closed": true, "connected": true, "configured": true,
+	"damaged": true, "deprecated": true, "disabled": true,
+	"disconnected": true, "documented": true, "enabled": true,
+	"expected": true, "finished": true, "gone": true, "installed": true,
+	"intended": true, "involved": true, "known": true, "limited": true,
+	"located": true, "locked": true, "named": true, "needed": true,
+	"permitted": true, "prepared": true, "protected": true, "related": true,
+	"required": true, "reserved": true, "restricted": true,
+	"supported": true, "unlocked": true, "used": true,
 }
 
 // adjectivalIng are the "-ing" words that work as adjectives or nouns after

@@ -1,0 +1,10 @@
+{
+  "mode": "flavored",
+  "expect": [
+    { "rule_id": "STE-1.14", "text": "colour" },
+    { "rule_id": "STE-1.14", "text": "centre" },
+    { "rule_id": "STE-3.7", "text": "Do a check of" },
+    { "rule_id": "STE-GR-6", "text": "e.g" },
+    { "rule_id": "STE-5.1" }
+  ]
+}

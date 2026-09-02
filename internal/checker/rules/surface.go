@@ -8,8 +8,9 @@ const (
 	RuleContraction = "STE-4.2"
 )
 
-// Semicolons reports each semicolon in prose. ASD-STE100 permits only the
-// comma, the period, the colon, the hyphen, the parentheses, and the slash.
+// Semicolons reports each semicolon in prose. Rule 8.1 permits all the
+// standard English punctuation marks, but not the semicolon. It is a ban of
+// one mark, and not a list of permitted marks.
 func Semicolons(doc Document, opts Options) []Diagnostic {
 	out := []Diagnostic{}
 	for _, s := range doc.Sentences {
@@ -22,7 +23,7 @@ func Semicolons(doc Document, opts Options) []Diagnostic {
 			}
 			out = append(out, Diagnostic{
 				RuleID:     RuleSemicolon,
-				Message:    "The semicolon is not an approved punctuation mark.",
+				Message:    "The semicolon is the one punctuation mark that ASD-STE100 does not approve.",
 				Severity:   SeverityWarning,
 				Confidence: 1.0,
 				Start:      i,

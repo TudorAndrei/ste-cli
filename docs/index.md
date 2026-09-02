@@ -12,9 +12,12 @@ It is one Go binary with no dependencies. It gives you the rule identifier,
 the exact character range, a message, a severity, and a confidence value for
 each finding. A person or a machine can then make the correction.
 
-**It is an aid for a writer. It is not an ASD-certified checker.** It has 8
-rules, not the 53 rules of the specification, and it does not contain the
-approved-word dictionary. Read [the limits](#limits) before you use it.
+The rule numbers agree with ASD-STE100 Issue 9.
+
+**It is an aid for a writer. It is not an ASD-certified checker.** It has 11
+checks. The specification has 53 rules and a dictionary of approved words,
+and this tool does not contain that dictionary. Read
+[the limits](#limits) before you use it.
 
 - [Source code](https://github.com/TudorAndrei/ste-cli)
 - [The rules and their limits](rules.md)
@@ -77,7 +80,7 @@ A directory gives all `.md`, `.markdown`, and `.txt` files below it.
 The text output has one line for each finding, and then a summary:
 
 ```text
-draft.md:3:15: warning [STE-8.1] The semicolon is not an approved punctuation mark.
+draft.md:3:15: warning [STE-8.1] The semicolon is the one punctuation mark that ASD-STE100 does not approve.
     Write two sentences, or use a list.
 draft.md:3:48: warning [STE-4.2] The contraction "isn't" is not approved.
     Write "is not".
@@ -89,10 +92,10 @@ The last number is the score: the number of findings for each 100 words.
 
 ## Modes
 
-| Mode | Sentence limit | Findings | Severity |
-|---|---|---|---|
-| `flavored` (default) | 25 words | Confidence of 0.60 or more | as given by the rule |
-| `strict` | 20 words | all | one step stronger |
+| Mode | Findings | Severity |
+|---|---|---|
+| `flavored` (default) | Confidence of 0.60 or more | as given by the rule |
+| `strict` | all | one step stronger |
 
 ```bash
 ste lint --mode strict procedures/
@@ -100,6 +103,17 @@ ste lint --mode strict procedures/
 
 Use `flavored` for a README or a design document. Use `strict` for a
 procedure, where a wrong instruction has a cost.
+
+The mode does **not** change the sentence limit. ASD-STE100 selects the
+limit from the type of the sentence:
+
+| Sentence | Limit | Rule |
+|---|---|---|
+| An instruction in a procedure (a numbered list item) | 20 words | 5.1 |
+| A note (a line that starts with "NOTE:") | 25 words | 5.5 |
+| Descriptive text | 25 words | 6.3 |
+
+`--max-words` replaces both limits.
 
 ## The glossary
 
@@ -121,7 +135,7 @@ disable_rules: [STE-1.1]
 | Key | Function |
 |---|---|
 | `mode` | `flavored` or `strict` |
-| `max_words` | An optional sentence limit that replaces the mode default |
+| `max_words` | An optional sentence limit that replaces both limits |
 | `allow.nouns` | The technical nouns of the project |
 | `allow.verbs` | The technical verbs of the project |
 | `disable_rules` | The rule identifiers to remove from the results |
@@ -152,7 +166,7 @@ ste lint --format json docs/
       "findings": [
         {
           "rule_id": "STE-8.1",
-          "message": "The semicolon is not an approved punctuation mark.",
+          "message": "The semicolon is the one punctuation mark that ASD-STE100 does not approve.",
           "severity": "warning",
           "confidence": 1,
           "start": 23,
@@ -201,21 +215,33 @@ it does not report a violation in your code examples:
 - inline code
 - link targets, autolinks, and bare URLs
 
-Each cell of a table row is a different sentence. A heading, a list item,
-and an empty line are sentence boundaries.
+A heading, an empty line, and the start of a list item are sentence
+boundaries. A list item keeps the lines that continue it. Each cell of a
+table row is a different sentence.
+
+The tool counts a word with the rules of section 8. A hyphenated word, a
+quantity with its unit, a quoted string, and text in parentheses each count
+as one word.
 
 ## The rules
 
 | Rule | Name | Example that it reports |
 |---|---|---|
 | `STE-1.1` | Unapproved word or word group | "Utilize the tool in order to start" |
-| `STE-1.4` | Phrasal verb | "carry out the test" |
-| `STE-3.1` | Perfect tense | "has been sent" |
-| `STE-3.2` | Passive voice | "was approved by the manager" |
+| `STE-1.14` | British spelling | "colour", "centre" |
+| `STE-3.4` | Complex verb construction | "has been sent" |
 | `STE-3.5` | Progressive "-ing" form | "is still running" |
+| `STE-3.6` | Passive voice | "was approved by the manager" |
+| `STE-3.7` | A noun for an action | "do a check of" |
 | `STE-4.2` | Contraction | "isn't" |
-| `STE-5.1` | Sentence too long | a 34-word sentence |
+| `STE-5.1` | Sentence too long | a 26-word sentence |
 | `STE-8.1` | Semicolon | "Open the valve; then start the pump" |
+| `STE-9.3` | Phrasal verb | "carry out the test" |
+| `STE-GR-6` | Latin abbreviation | "e.g." |
+
+A check with the `GR` prefix is a general recommendation of the standard. A
+general recommendation is advice and not a rule. Thus this tool gives it
+the `info` severity.
 
 [rules.md](rules.md) gives each rule, its confidence values, and its known
 limits.
@@ -234,7 +260,7 @@ ste help                      Print the usage
 | `--mode` | `flavored` (default) or `strict` |
 | `--format` | `text` (default) or `json` |
 | `--fail-over` | Exit with code 1 when the score is more than this value |
-| `--max-words` | Replace the sentence limit of the mode |
+| `--max-words` | Replace the sentence limit of both sentence types |
 | `--config` | Path of the glossary file |
 | `--no-config` | Do not read a glossary file |
 
@@ -254,8 +280,8 @@ ste eval testdata
 ```text
 rule          tp    fp    fn  precision   recall
 STE-1.1        2     0     0       1.00     1.00
-STE-3.2        1     0     0       1.00     1.00
-all           15     0     0       1.00     1.00
+STE-3.6        1     0     0       1.00     1.00
+all           20     0     0       1.00     1.00
 ```
 
 [evaluation.md](evaluation.md) gives the measurements and says why the
@@ -269,7 +295,8 @@ number on a self-written corpus is weak.
 - The tool does **not** have the ASD-STE100 approved-word dictionary. It
   cannot tell you if the standard approves a word.
   [upstream-audit.md](upstream-audit.md) gives the reason.
-- Recall on new text is low, because the tool has 8 rules of 53.
+- Recall on new text is low, because the tool has 11 checks and the
+  standard has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not
   contain the specification.

@@ -26,10 +26,13 @@ const (
 	ModeStrict Mode = "strict"
 )
 
-// Default sentence limits, in words.
+// Sentence limits, in words. ASD-STE100 selects the limit by the type of
+// sentence, and not by a mode: rule 5.1 gives 20 words for an instruction in
+// a procedure, and rules 5.5 and 6.3 give 25 words for a note and for
+// descriptive text.
 const (
-	DefaultMaxWordsFlavored = 25
-	DefaultMaxWordsStrict   = 20
+	MaxWordsProcedural  = 20
+	MaxWordsDescriptive = 25
 )
 
 // MinConfidenceFlavored is the confidence limit below which the flavored mode
@@ -64,18 +67,13 @@ type Options struct {
 	DisableRules []string
 }
 
-// Normalized returns a copy of the options with all defaults applied.
+// Normalized returns a copy of the options with all defaults applied. It
+// does not give MaxWords a value: a value of 0 tells the length rule to
+// select the limit from the type of each sentence.
 func (o Options) Normalized() Options {
 	out := o
 	if out.Mode != ModeStrict {
 		out.Mode = ModeFlavored
-	}
-	if out.MaxWords <= 0 {
-		if out.Mode == ModeStrict {
-			out.MaxWords = DefaultMaxWordsStrict
-		} else {
-			out.MaxWords = DefaultMaxWordsFlavored
-		}
 	}
 	return out
 }
@@ -109,6 +107,24 @@ type Sentence struct {
 	Start  int
 	End    int
 	Tokens []Token
+	// Words is the number of words by the count rules of section 8. It is
+	// not always len(Tokens): a quantity with its unit, a quoted string,
+	// and text in parentheses each count as one word.
+	Words int
+	// Procedural is true when the sentence is an instruction in a
+	// procedure. A numbered list item is the signal that this tool uses.
+	Procedural bool
+	// Note is true when the sentence is in a note. A note gives
+	// information only, thus it keeps the longer limit.
+	Note bool
+}
+
+// Limit gives the word limit for this sentence.
+func (s Sentence) Limit() int {
+	if s.Procedural && !s.Note {
+		return MaxWordsProcedural
+	}
+	return MaxWordsDescriptive
 }
 
 // Document is the input for all rules.
@@ -128,7 +144,7 @@ type Document struct {
 func (d Document) WordCount() int {
 	n := 0
 	for _, s := range d.Sentences {
-		n += len(s.Tokens)
+		n += s.Words
 	}
 	return n
 }
@@ -144,6 +160,9 @@ func All() []Rule {
 		Contractions,
 		Verbs,
 		Terms,
+		Spelling,
+		Nominalizations,
+		LatinAbbreviations,
 	}
 }
 

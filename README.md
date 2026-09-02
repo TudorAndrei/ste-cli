@@ -3,9 +3,9 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go program with no dependencies. It has 8 rules, not the 53 rules
-of the standard. It is an aid for a writer. **It is not an ASD-certified
-checker.**
+It is one Go program with no dependencies. It has 11 checks. The standard
+has 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue
+9. It is an aid for a writer. **It is not an ASD-certified checker.**
 
 Documentation: <https://tudorandrei.github.io/ste-cli/>
 
@@ -76,7 +76,7 @@ A path can be a file or a directory. A directory gives all `.md`,
 | `--mode` | `flavored` (default) or `strict` |
 | `--format` | `text` (default) or `json` |
 | `--fail-over` | Exit with code 1 when the score is more than this value |
-| `--max-words` | Replace the sentence limit of the mode |
+| `--max-words` | Replace the sentence limit of both sentence types |
 | `--config` | Path of the glossary file |
 | `--no-config` | Do not read a glossary file |
 
@@ -92,10 +92,16 @@ The score is the number of findings for each 100 words.
 
 ## Modes
 
-| Mode | Sentence limit | Findings | Severity |
-|---|---|---|---|
-| `flavored` | 25 words | Confidence of 0.60 or more | as given by the rule |
-| `strict` | 20 words | all | one step stronger |
+| Mode | Findings | Severity |
+|---|---|---|
+| `flavored` | Confidence of 0.60 or more | as given by the rule |
+| `strict` | all | one step stronger |
+
+The mode does **not** change the sentence limit. ASD-STE100 selects the
+limit from the type of the sentence. An instruction in a procedure gets 20
+words (rule 5.1). A note and descriptive text get 25 words (rules 5.5 and
+6.3). The tool reads the structure of the Markdown: a numbered list item is
+an instruction. `--max-words` replaces both limits.
 
 ## Glossary
 
@@ -120,7 +126,7 @@ lists, comments, and one level of nested keys.
 The text format gives one line for each finding, and then a summary:
 
 ```text
-draft.md:3:15: warning [STE-8.1] The semicolon is not an approved punctuation mark.
+draft.md:3:15: warning [STE-8.1] The semicolon is the one punctuation mark that ASD-STE100 does not approve.
     Write two sentences, or use a list.
 
 1 finding in 42 words of 1 file (2.38 for each 100 words)
@@ -132,19 +138,22 @@ A CI job can read it.
 
 ## Rules
 
-See [docs/rules.md](docs/rules.md) for the 8 rules, their confidence values,
-and their limits.
+See [docs/rules.md](docs/rules.md) for each check, its confidence values,
+and its limits. The numbers are the rule numbers of Issue 9.
 
 | Rule | Name |
 |---|---|
 | `STE-1.1` | Unapproved word or word group |
-| `STE-1.4` | Phrasal verb |
-| `STE-3.1` | Perfect tense |
-| `STE-3.2` | Passive voice |
+| `STE-1.14` | British spelling |
+| `STE-3.4` | Complex verb construction (perfect tense) |
 | `STE-3.5` | Progressive "-ing" form |
+| `STE-3.6` | Passive voice |
+| `STE-3.7` | A noun for an action |
 | `STE-4.2` | Contraction |
 | `STE-5.1` | Sentence too long |
 | `STE-8.1` | Semicolon |
+| `STE-9.3` | Phrasal verb |
+| `STE-GR-6` | Latin abbreviation (a general recommendation, not a rule) |
 
 ## Structure
 
@@ -198,7 +207,8 @@ without that flag says `dev`.
   cannot tell you if the standard approves a word. See
   [docs/upstream-audit.md](docs/upstream-audit.md) for the reason.
 - Precision and recall are in [docs/evaluation.md](docs/evaluation.md).
-  Recall on new text is low, because the tool has 8 rules of 53.
+  Recall on new text is low, because the tool has 11 checks and the standard
+  has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not
   contain the specification.

@@ -13,7 +13,88 @@ func Parse(src string) Document {
 	masked, blockLines, blankLines, lineStarts := mask(src)
 	doc := Document{Source: src, Masked: masked}
 	doc.Sentences = split(src, masked, blockLines, blankLines, lineStarts)
+	annotate(src, doc.Sentences)
 	return doc
+}
+
+// annotate marks each sentence as procedural or as a note. ASD-STE100
+// selects the word limit from the type of the sentence: rule 5.1 gives 20
+// words for an instruction in a procedure, and rules 5.5 and 6.3 give 25
+// words for a note and for descriptive text.
+//
+// This tool has no part-of-speech tagger, thus it uses the structure of the
+// Markdown: a numbered list item is an instruction in a procedure. A
+// bulleted list is not, because a bulleted list is usually a list of items
+// and not a sequence of steps.
+func annotate(src string, sentences []Sentence) {
+	for i := range sentences {
+		line := lineAt(src, sentences[i].Start)
+		sentences[i].Procedural = startsOrderedItem(line)
+		sentences[i].Note = startsNote(line)
+	}
+}
+
+// lineAt gives the line that contains the offset.
+func lineAt(src string, offset int) string {
+	if offset > len(src) {
+		offset = len(src)
+	}
+	start := strings.LastIndexByte(src[:offset], '\n') + 1
+	end := strings.IndexByte(src[start:], '\n')
+	if end < 0 {
+		return src[start:]
+	}
+	return src[start : start+end]
+}
+
+// isHeadingLine tells if the line is a Markdown heading.
+func isHeadingLine(src string, start, end int) bool {
+	if end > len(src) {
+		end = len(src)
+	}
+	i := start
+	for i < end && (src[i] == ' ' || src[i] == '\t') {
+		i++
+	}
+	return i < end && src[i] == '#'
+}
+
+// startsOrderedItem tells if the line starts a numbered list item.
+func startsOrderedItem(line string) bool {
+	i := 0
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	n := 0
+	for i+n < len(line) && line[i+n] >= '0' && line[i+n] <= '9' {
+		n++
+	}
+	if n == 0 {
+		return false
+	}
+	j := i + n
+	return j+1 < len(line) && (line[j] == '.' || line[j] == ')') && line[j+1] == ' '
+}
+
+// startsNote tells if the line starts a note. A note gives information
+// only, thus rule 5.5 gives it the longer limit.
+func startsNote(line string) bool {
+	trimmed := strings.TrimLeft(line, " \t>*-+#")
+	// A note can be a step of a procedure, as in "2. NOTE: ...".
+	if startsOrderedItem(trimmed) {
+		if i := strings.IndexAny(trimmed, ".)"); i >= 0 && i+1 < len(trimmed) {
+			trimmed = strings.TrimLeft(trimmed[i+1:], " \t")
+		}
+	}
+	for _, prefix := range []string{"NOTE", "Note", "note"} {
+		if strings.HasPrefix(trimmed, prefix) {
+			rest := trimmed[len(prefix):]
+			if strings.HasPrefix(rest, ":") || strings.HasPrefix(rest, "s:") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // mask replaces every non-prose span with spaces. It returns the masked text,
@@ -333,11 +414,16 @@ func split(src, masked string, blockLines, blankLines []bool, lineStarts []int) 
 		if i+1 < len(lineStarts) {
 			lineEnd = lineStarts[i+1] - 1
 		}
-		if blankLines[i] || blockLines[i] {
-			boundary[ls] = true
-			if lineEnd <= len(masked) {
-				boundary[lineEnd] = true
-			}
+		if !blankLines[i] && !blockLines[i] {
+			continue
+		}
+		boundary[ls] = true
+		// A list item can continue on the lines that follow it, thus the
+		// end of the line is not a boundary. The start of the next block
+		// line or of the next empty line closes the item. A heading does
+		// not continue, thus it keeps its end boundary.
+		if lineEnd <= len(masked) && (blankLines[i] || isHeadingLine(src, ls, lineEnd)) {
+			boundary[lineEnd] = true
 		}
 	}
 
@@ -369,7 +455,13 @@ func split(src, masked string, blockLines, blankLines []bool, lineStarts []int) 
 		for j < len(masked) && (masked[j] == '.' || masked[j] == '!' || masked[j] == '?') {
 			j++
 		}
-		if j < len(masked) && !isSpaceByte(masked[j]) {
+		// A closing mark can follow the punctuation, as in the bold text
+		// "**Do this.**" or in a quotation. It stays with the sentence.
+		k := j
+		for k < len(masked) && isClosingMark(masked[k]) {
+			k++
+		}
+		if k < len(masked) && !isSpaceByte(masked[k]) {
 			i = j - 1
 			continue
 		}
@@ -377,8 +469,8 @@ func split(src, masked string, blockLines, blankLines []bool, lineStarts []int) 
 			i = j - 1
 			continue
 		}
-		flush(j)
-		i = j - 1
+		flush(k)
+		i = k - 1
 	}
 	if segStart < len(masked) {
 		flush(len(masked))
@@ -414,8 +506,10 @@ func endsSentence(src, masked string, pos int) bool {
 	if word == "" {
 		return true
 	}
-	if len(word) == 1 {
-		// A single letter is an initial; a single digit is a list number.
+	if len(word) == 1 && word[0] >= 'a' && word[0] <= 'z' {
+		// A single letter is an initial, as in "J. Smith". A single digit
+		// is not: "Issue 9." is the end of a sentence, and a list number
+		// is already masked.
 		return false
 	}
 	return !abbreviations[word]
@@ -448,7 +542,153 @@ func makeSentence(src, masked string, start, end int) (Sentence, bool) {
 	if len(s.Tokens) == 0 {
 		return Sentence{}, false
 	}
+	s.Words = countWords(masked, start, end)
 	return s, true
+}
+
+// units are the measurement units that make one word with the number before
+// them. Rule 8.6 counts a quantity and its unit as one word.
+var units = map[string]bool{
+	"mm": true, "cm": true, "m": true, "km": true, "in": true, "ft": true,
+	"mg": true, "g": true, "kg": true, "lb": true, "lbs": true,
+	"ml": true, "l": true, "gal": true,
+	"ms": true, "s": true, "sec": true, "min": true, "h": true, "hr": true,
+	"hrs": true, "day": true, "days": true, "week": true, "weeks": true,
+	"month": true, "months": true, "year": true, "years": true,
+	"hz": true, "khz": true, "mhz": true, "ghz": true,
+	"b": true, "kb": true, "mb": true, "gb": true, "tb": true,
+	"kib": true, "mib": true, "gib": true, "tib": true,
+	"bit": true, "bits": true, "byte": true, "bytes": true,
+	"v": true, "a": true, "ma": true, "w": true, "kw": true,
+	"psi": true, "bar": true, "kpa": true, "mpa": true, "n": true, "nm": true,
+	"px": true, "pt": true, "em": true, "rem": true, "dpi": true,
+	"rpm": true, "c": true, "f": true, "k": true, "%": true,
+}
+
+// countWords counts the words of a span with the count rules of section 8.
+// A quantity with its unit, a quoted string, and text in parentheses each
+// count as one word. Rule 8.6 also makes a multi-word title or a multi-word
+// proper noun one word; this tool cannot find those without a dictionary,
+// thus it counts them as separate words. See docs/rules.md.
+func countWords(masked string, start, end int) int {
+	n := 0
+	i := start
+	for i < end {
+		r, size := utf8.DecodeRuneInString(masked[i:])
+		if unicode.IsSpace(r) {
+			i += size
+			continue
+		}
+		// Text in parentheses counts as one word.
+		if r == '(' {
+			if close := matchDelimiter(masked, i, end, '(', ')'); close > i {
+				n++
+				i = close
+				continue
+			}
+		}
+		// A quoted string counts as one word.
+		if isOpenQuote(r) {
+			if close := matchQuote(masked, i, end, r); close > i {
+				n++
+				i = close
+				continue
+			}
+		}
+		if !isWordRune(r) {
+			i += size
+			continue
+		}
+		wordStart := i
+		i = endOfWord(masked, i, end)
+		n++
+		// A quantity and its unit make one word.
+		if isAllDigits(masked[wordStart:i]) {
+			if next := skipSpaces(masked, i, end); next > i && next < end {
+				unitEnd := endOfWord(masked, next, end)
+				if unitEnd > next && units[strings.ToLower(masked[next:unitEnd])] {
+					i = unitEnd
+				}
+			}
+		}
+	}
+	return n
+}
+
+func endOfWord(masked string, i, end int) int {
+	for i < end {
+		r, size := utf8.DecodeRuneInString(masked[i:])
+		if isWordRune(r) {
+			i += size
+			continue
+		}
+		if isJoinRune(r) && i+size < end {
+			next, _ := utf8.DecodeRuneInString(masked[i+size:])
+			if isWordRune(next) {
+				i += size
+				continue
+			}
+		}
+		break
+	}
+	return i
+}
+
+func skipSpaces(masked string, i, end int) int {
+	for i < end && (masked[i] == ' ' || masked[i] == '\t' || masked[i] == '\n' || masked[i] == '\r') {
+		i++
+	}
+	return i
+}
+
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if (s[i] < '0' || s[i] > '9') && s[i] != '.' && s[i] != ',' {
+			return false
+		}
+	}
+	return true
+}
+
+// matchDelimiter gives the offset after the closing delimiter.
+func matchDelimiter(masked string, i, end int, open, close byte) int {
+	depth := 0
+	for j := i; j < end; j++ {
+		switch masked[j] {
+		case open:
+			depth++
+		case close:
+			depth--
+			if depth == 0 {
+				return j + 1
+			}
+		}
+	}
+	return i
+}
+
+func isOpenQuote(r rune) bool {
+	return r == '"' || r == '“'
+}
+
+// matchQuote gives the offset after the closing quotation mark.
+func matchQuote(masked string, i, end int, open rune) int {
+	closeRune := '"'
+	if open == '“' {
+		closeRune = '”'
+	}
+	_, size := utf8.DecodeRuneInString(masked[i:])
+	for j := i + size; j < end; {
+		r, s := utf8.DecodeRuneInString(masked[j:])
+		if r == closeRune {
+			return j + s
+		}
+		j += s
+	}
+	return i
 }
 
 // tokenize returns the words of a span. A word can hold an internal
@@ -508,6 +748,16 @@ func isJoinRune(r rune) bool {
 
 func isWordByte(c byte) bool {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '_'
+}
+
+// isClosingMark tells if the byte is a mark that can follow the end
+// punctuation of a sentence.
+func isClosingMark(c byte) bool {
+	switch c {
+	case '*', '_', ')', ']', '"', '\'', '`':
+		return true
+	}
+	return false
 }
 
 func isSpaceByte(c byte) bool {

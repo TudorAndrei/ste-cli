@@ -1,25 +1,25 @@
 {
-  "data_version": "1.0.0",
+  "data_version": "1.1.0",
   "cases": [
     {
       "name": "perfect/present-perfect-passive",
       "text": "The file has been sent to the server.",
       "expect": [
-        { "rule_id": "STE-3.1", "text": "has been sent" }
+        { "rule_id": "STE-3.4", "text": "has been sent" }
       ]
     },
     {
       "name": "perfect/past-perfect",
       "text": "The task had gone to the queue.",
       "expect": [
-        { "rule_id": "STE-3.1", "text": "had gone" }
+        { "rule_id": "STE-3.4", "text": "had gone" }
       ]
     },
     {
       "name": "perfect/present-perfect",
       "text": "We have written the report.",
       "expect": [
-        { "rule_id": "STE-3.1", "text": "have written" }
+        { "rule_id": "STE-3.4", "text": "have written" }
       ]
     },
     {
@@ -57,22 +57,22 @@
       "name": "passive/with-agent",
       "text": "The file was sent by the parser.",
       "expect": [
-        { "rule_id": "STE-3.2", "text": "was sent" }
+        { "rule_id": "STE-3.6", "text": "was sent" }
       ]
     },
     {
       "name": "passive/perfect-with-agent",
       "text": "The file has been read by the parser.",
       "expect": [
-        { "rule_id": "STE-3.1", "text": "has been read" },
-        { "rule_id": "STE-3.2", "text": "been read" }
+        { "rule_id": "STE-3.4", "text": "has been read" },
+        { "rule_id": "STE-3.6", "text": "been read" }
       ]
     },
     {
       "name": "passive/regular-participle",
       "text": "The report was approved.",
       "expect": [
-        { "rule_id": "STE-3.2", "text": "was approved" }
+        { "rule_id": "STE-3.6", "text": "was approved" }
       ]
     },
     {
@@ -94,28 +94,28 @@
       "name": "adjectival/agent-makes-it-passive",
       "text": "The valve is closed by the operator.",
       "expect": [
-        { "rule_id": "STE-3.2", "text": "is closed" }
+        { "rule_id": "STE-3.6", "text": "is closed" }
       ]
     },
     {
       "name": "phrasal/base-form",
       "text": "Carry out the test.",
       "expect": [
-        { "rule_id": "STE-1.4", "text": "Carry out" }
+        { "rule_id": "STE-9.3", "text": "Carry out" }
       ]
     },
     {
       "name": "phrasal/third-person",
       "text": "The system carries out the test.",
       "expect": [
-        { "rule_id": "STE-1.4", "text": "carries out" }
+        { "rule_id": "STE-9.3", "text": "carries out" }
       ]
     },
     {
       "name": "phrasal/past-form",
       "text": "The operator carried out the test.",
       "expect": [
-        { "rule_id": "STE-1.4", "text": "carried out" }
+        { "rule_id": "STE-9.3", "text": "carried out" }
       ]
     },
     {
@@ -123,21 +123,21 @@
       "text": "The operator is carrying out the test.",
       "expect": [
         { "rule_id": "STE-3.5", "text": "is carrying" },
-        { "rule_id": "STE-1.4", "text": "carrying out" }
+        { "rule_id": "STE-9.3", "text": "carrying out" }
       ]
     },
     {
       "name": "phrasal/two-word-particle",
       "text": "Get rid of the old file.",
       "expect": [
-        { "rule_id": "STE-1.4", "text": "Get rid of" }
+        { "rule_id": "STE-9.3", "text": "Get rid of" }
       ]
     },
     {
       "name": "phrasal/shut-down",
       "text": "Shut down the computer.",
       "expect": [
-        { "rule_id": "STE-1.4", "text": "Shut down" }
+        { "rule_id": "STE-9.3", "text": "Shut down" }
       ]
     },
     {

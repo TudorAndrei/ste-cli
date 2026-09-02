@@ -148,12 +148,42 @@ Kept as an idea only: a technical noun and a technical verb need different
 project configuration. `docs/glossary.yml` has the two lists `allow.nouns`
 and `allow.verbs` for this reason.
 
+## The specification itself
+
+The owner of this repository has a licensed copy of ASD-STE100 Issue 9. On
+2026-09-02, a review of that copy corrected the rule numbers of this tool.
+The review also found which rules a deterministic checker can check. The
+result is in [rules.md](rules.md) and in [evaluation.md](evaluation.md).
+
+What entered this repository from that work:
+
+- **Rule numbers and the subject of each rule.** A rule number is a fact
+  about the specification. It is not the text of the specification.
+- **Numeric limits**, such as the 20-word and 25-word sentence limits, and
+  the count rules of section 8.
+- **Statements in our own words** about what each rule requires.
+
+What did **not** enter this repository:
+
+- The text of the specification, its tables, and its example sentences.
+- **The dictionary of part 2.** Part 2 gives approximately 2000 words in a
+  form that a program can parse. It is the largest and most valuable part of
+  the specification, and it stays out of this repository.
+
+The local copy and its Markdown conversion are in `.standard/`, which
+`.gitignore` excludes. This repository is public, thus git must never see
+that directory.
+
+A future dictionary rule must read a copy that **the user** supplies from
+their own licensed copy. This tool must not ship the dictionary.
+
 ## Data in this project
 
 | File | Source | Risk |
 |---|---|---|
 | `internal/checker/rules/verbdata.go` | Written by hand. English irregular participles, auxiliary verbs, and a list of 24 phrasal verbs. | Low. English grammar is not under copyright. |
 | `internal/checker/rules/terms.go` | Written by hand. 27 words and 11 word groups that have a shorter replacement. | Low. It is not the ASD-STE100 dictionary and it does not come from it. |
+| `internal/checker/rules/spelling.go` | Written by hand. 54 British spellings, 17 word groups that use a noun for an action, and 8 Latin abbreviations. | Low. The lists are examples of the rule, and not the dictionary. |
 | `docs/glossary.yml` | Written by hand for this repository. | None. |
 
 This tool does not ship the ASD-STE100 approved-word dictionary. It cannot

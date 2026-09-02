@@ -2,12 +2,20 @@ package rules
 
 import "strings"
 
-// Identifiers of the verb rules.
+// Identifiers of the verb rules. The numbers are the rule numbers of
+// ASD-STE100 Issue 9.
 const (
-	RulePerfectTense = "STE-3.1"
-	RulePassiveVoice = "STE-3.2"
-	RuleProgressive  = "STE-3.5"
-	RulePhrasalVerb  = "STE-1.4"
+	// RulePerfectTense is rule 3.4: do not use auxiliary verbs to make
+	// complex verb constructions.
+	RulePerfectTense = "STE-3.4"
+	// RulePassiveVoice is rule 3.6: use the active voice.
+	RulePassiveVoice = "STE-3.6"
+	// RuleProgressive is rule 3.5: use the "-ing" form only as a technical
+	// noun or as a modifier in a technical noun.
+	RuleProgressive = "STE-3.5"
+	// RulePhrasalVerb is rule 9.3: when you use two words together, do not
+	// make phrasal verbs.
+	RulePhrasalVerb = "STE-9.3"
 )
 
 // Verbs finds the verb forms that ASD-STE100 does not approve: the perfect
@@ -140,6 +148,11 @@ func matchProgressive(s Sentence, i int, opts Options) (Diagnostic, bool) {
 	}
 	w := s.Tokens[j].Lower
 	if !isIngForm(w) || adjectivalIng[w] || opts.Allowed(w) {
+		return Diagnostic{}, false
+	}
+	// "is being adjusted" is a passive construction. The passive rule
+	// reports it, thus a progressive finding for "is being" is wrong.
+	if w == "being" {
 		return Diagnostic{}, false
 	}
 	return Diagnostic{
