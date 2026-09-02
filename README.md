@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 3 dependencies. It has 11 checks. The standard has
+It is one Go binary with 4 dependencies. It has 11 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -18,7 +18,7 @@ GitHub releases of this repository:
 
 ```bash
 mise use -g github:TudorAndrei/ste-cli        # the newest release
-mise use -g github:TudorAndrei/ste-cli@0.5.0  # one version
+mise use -g github:TudorAndrei/ste-cli@0.6.0  # one version
 ste version
 ```
 
@@ -32,7 +32,7 @@ project:
 
 mise finds the correct asset for your platform without an option. The
 archive names use the words that its asset matcher knows, for example
-`ste-0.5.0-darwin-arm64.tar.gz` and `ste-0.5.0-linux-x64.tar.gz`. Each
+`ste-0.6.0-darwin-arm64.tar.gz` and `ste-0.6.0-linux-x64.tar.gz`. Each
 release also has a `checksums.txt` file, thus mise can verify the download
 and write it to `mise.lock`.
 
@@ -319,8 +319,9 @@ and its limits. The numbers are the rule numbers of Issue 9.
 | [goldmark](https://github.com/yuin/goldmark) | MIT | Reads the Markdown. It follows CommonMark 0.31.2, and its syntax tree keeps the byte offsets that each finding needs. |
 | [go-yaml](https://github.com/goccy/go-yaml) | MIT | Reads the glossary file. |
 | [pflag](https://github.com/spf13/pflag) | BSD-3-Clause | Reads the command flags. |
+| [xdg](https://github.com/adrg/xdg) | MIT | Gives the data directory of the user for each system. |
 
-All 3 are pure Go, thus the build needs no C compiler and it stays one
+All 4 are pure Go, thus the build needs no C compiler and it stays one
 binary for each platform.
 
 ## Structure
@@ -354,8 +355,8 @@ archives for the 5 platforms, and makes the GitHub release with a
 `checksums.txt` file.
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
 To make the same archives on your computer:
@@ -365,7 +366,7 @@ mise run dist       # writes dist/
 ```
 
 The version in the binary comes from the tag:
-`go build -ldflags "-X main.Version=0.5.0"`. A build from the source
+`go build -ldflags "-X main.Version=0.6.0"`. A build from the source
 without that flag says `dev`.
 
 ## Limits

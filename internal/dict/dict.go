@@ -14,9 +14,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/adrg/xdg"
 )
 
 // Version is the format version of the index file.
@@ -274,42 +275,17 @@ func isUpper(s string) bool {
 //
 // The index is data, and not a cache: this tool cannot make it again
 // without the copy of the user. Thus it goes in the data directory of the
-// XDG specification, and not in the cache directory.
-//
-//	$STE_DICT                            an explicit path
-//	$XDG_DATA_HOME/ste/dictionary.json   when the variable is set
-//	~/.local/share/ste/dictionary.json   Linux and BSD
-//	~/Library/Application Support/...    macOS
-//	%AppData%\ste\dictionary.json         Windows
+// XDG specification. The xdg package gives the correct directory for each
+// system, such as ~/.local/share on Linux and ~/Library/Application Support
+// on macOS. $STE_DICT replaces it.
 func DefaultPath() string {
 	if path := os.Getenv("STE_DICT"); path != "" {
 		return path
 	}
-	base, err := dataDir()
-	if err != nil {
-		return ".ste-dictionary.json"
-	}
-	return filepath.Join(base, "ste", "dictionary.json")
-}
-
-// dataDir gives the directory for the data of a user.
-func dataDir() (string, error) {
-	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
-		return dir, nil
-	}
-	switch runtime.GOOS {
-	case "windows", "darwin", "ios", "plan9":
-		// os.UserConfigDir gives the correct directory for these
-		// systems: %AppData% and ~/Library/Application Support.
-		return os.UserConfigDir()
-	default:
-		// The XDG specification gives ~/.local/share as the default.
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, ".local", "share"), nil
-	}
+	// Reload reads the environment again, thus a change of XDG_DATA_HOME
+	// in the shell of the user applies.
+	xdg.Reload()
+	return filepath.Join(xdg.DataHome, "ste", "dictionary.json")
 }
 
 // Save writes the index.

@@ -224,8 +224,9 @@ This is not legal advice.
 | `github.com/yuin/goldmark` | v1.8.5 | MIT | Reads the Markdown |
 | `github.com/goccy/go-yaml` | v1.19.2 | MIT | Reads the glossary |
 | `github.com/spf13/pflag` | v1.0.10 | BSD-3-Clause | Reads the command flags |
+| `github.com/adrg/xdg` | v0.5.3 | MIT | Gives the data directory of the user |
 
-Each of the 3 is code, and not data. None of them has ASD-STE100 data. The
+Each of the 4 is code, and not data. None of them has ASD-STE100 data. The
 tool used its own reader for Markdown and for YAML before version 0.4.0. A
 CommonMark parser is better, because 5 of the 8 defects of the first
 versions came from that hand-written reader.

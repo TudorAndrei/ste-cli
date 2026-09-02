@@ -8,7 +8,7 @@ description: A deterministic ASD-STE100 checker for Markdown and plain text. Sta
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 3 dependencies. It gives you the rule identifier,
+It is one Go binary with 4 dependencies. It gives you the rule identifier,
 the exact character range, a message, a severity, and a confidence value for
 each finding. A person or a machine can then make the correction.
 
@@ -33,7 +33,7 @@ releases of this repository:
 
 ```bash
 mise use -g github:TudorAndrei/ste-cli        # the newest release
-mise use -g github:TudorAndrei/ste-cli@0.5.0  # one version
+mise use -g github:TudorAndrei/ste-cli@0.6.0  # one version
 ste version
 ```
 
