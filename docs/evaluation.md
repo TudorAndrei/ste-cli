@@ -1,4 +1,11 @@
+---
+title: Evaluation
+description: The measured precision and recall of the rules, and the limits of that measurement.
+---
+
 # Evaluation
+
+[Back to the start page](index.md)
 
 Measurement date: 2026-09-02. Verb data version 1.0.0, term data version
 1.0.0.

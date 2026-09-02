@@ -1,4 +1,11 @@
+---
+title: Rules
+description: The 8 rules, their confidence values, and their limits.
+---
+
 # Rules
+
+[Back to the start page](index.md)
 
 This tool has 8 rules. It does not have the 53 rules of ASD-STE100.
 

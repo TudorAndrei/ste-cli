@@ -1,4 +1,11 @@
+---
+title: Upstream audit
+description: The license and the provenance decision for each related project.
+---
+
 # Upstream audit
+
+[Back to the start page](index.md)
 
 This document records the audit of the related projects. The audit came
 before the first vocabulary file of this project.

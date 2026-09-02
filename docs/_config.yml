@@ -1,0 +1,17 @@
+title: ste
+description: >-
+  A deterministic ASD-STE100 (Simplified Technical English) checker for
+  Markdown and plain text. One Go binary, no dependencies.
+theme: jekyll-theme-primer
+url: https://tudorandrei.github.io
+baseurl: /ste-cli
+
+# The glossary is a data file for the tool, not a page of the site.
+exclude:
+  - glossary.yml
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
