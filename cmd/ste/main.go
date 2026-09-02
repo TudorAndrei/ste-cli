@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -46,6 +47,9 @@ Lint flags:
                  .ste.yml, .ste.yaml, glossary.yml, or docs/glossary.yml in
                  the current directory.
   --no-config    Do not read a glossary file
+  --all          Read every file. Without this flag, a directory does not
+                 give the files that git ignores, and it does not give the
+                 directories that hold build output.
 
 Examples:
   ste lint README.md
@@ -128,6 +132,7 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	maxWords := fs.Int("max-words", 0, "sentence limit in words")
 	cfgPath := fs.String("config", "", "path of the glossary file")
 	noConfig := fs.Bool("no-config", false, "do not read a glossary file")
+	all := fs.Bool("all", false, "read every file, and not only the files that git shows")
 	if err := fs.Parse(reorder(args, lintValueFlags)); err != nil {
 		return exitError
 	}
@@ -157,7 +162,7 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			results = append(results, lintOne("(standard input)", string(raw), opts))
 			continue
 		}
-		files, err := textFiles(p)
+		files, err := textFiles(p, *all)
 		if err != nil {
 			fmt.Fprintf(stderr, "ste: %v\n", err)
 			return exitError
@@ -234,6 +239,35 @@ func options(cfgPath string, noConfig bool, mode string, maxWords int) (checker.
 	return opts, nil
 }
 
+// gitVisible gives the files below dir that git does not ignore. It asks
+// git, because git is the only correct reader of a .gitignore file: the
+// syntax has negation, anchors, and one file for each directory.
+//
+// The result is nil when dir is not in a git work tree, or when git is not
+// on the system. Then no filter applies.
+func gitVisible(dir string) map[string]bool {
+	if _, err := exec.LookPath("git"); err != nil {
+		return nil
+	}
+	// --cached gives the tracked files, and --others gives the untracked
+	// files. --exclude-standard removes the ignored files from --others.
+	cmd := exec.Command("git", "-C", dir, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	visible := map[string]bool{}
+	for _, rel := range strings.Split(string(out), "\x00") {
+		if rel == "" {
+			continue
+		}
+		if abs, err := filepath.Abs(filepath.Join(dir, rel)); err == nil {
+			visible[abs] = true
+		}
+	}
+	return visible
+}
+
 // skippedDirs are the directories that hold build output or dependencies.
 // A walk does not go into them, because their text is not your prose. A
 // directory that starts with "." is also skipped. To check one of these
@@ -252,8 +286,9 @@ var skippedDirs = map[string]bool{
 }
 
 // textFiles gives the files to check. A directory gives all Markdown and
-// text files below it.
-func textFiles(path string) ([]string, error) {
+// text files below it. A file that git ignores does not come from a
+// directory, but a file that you give by its path is always read.
+func textFiles(path string, all bool) ([]string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -262,6 +297,10 @@ func textFiles(path string) ([]string, error) {
 		return []string{path}, nil
 	}
 	root := filepath.Clean(path)
+	var visible map[string]bool
+	if !all {
+		visible = gitVisible(path)
+	}
 	out := []string{}
 	err = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -274,15 +313,23 @@ func textFiles(path string) ([]string, error) {
 				return nil
 			}
 			name := d.Name()
-			if strings.HasPrefix(name, ".") || skippedDirs[name] {
+			if !all && (strings.HasPrefix(name, ".") || skippedDirs[name]) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		switch filepath.Ext(p) {
 		case ".md", ".markdown", ".txt":
-			out = append(out, p)
+		default:
+			return nil
 		}
+		if visible != nil {
+			abs, err := filepath.Abs(p)
+			if err != nil || !visible[abs] {
+				return nil
+			}
+		}
+		out = append(out, p)
 		return nil
 	})
 	if err != nil {

@@ -69,9 +69,16 @@ ste eval testdata
 A path can be a file or a directory. A directory gives all `.md`,
 `.markdown`, and `.txt` files below it. A path of `-` reads standard input.
 
-A walk does not go into `node_modules`, `vendor`, `dist`, `build`, `target`,
-`bin`, `obj`, `out`, `coverage`, `__pycache__`, or a directory whose name
-starts with a period. To check one of these, give its path to the command.
+A walk of a directory does not give:
+
+- a file that git ignores, in a git repository. The tool asks git, thus the
+  full syntax of `.gitignore` applies.
+- `node_modules`, `vendor`, `dist`, `build`, `target`, `bin`, `obj`, `out`,
+  `coverage`, `__pycache__`, or a directory whose name starts with a
+  period.
+
+A file or a directory that you give by its path is always read. `--all`
+removes both filters.
 
 ### Flags of the lint command
 
@@ -83,6 +90,7 @@ starts with a period. To check one of these, give its path to the command.
 | `--max-words` | Replace the sentence limit of both sentence types |
 | `--config` | Path of the glossary file |
 | `--no-config` | Do not read a glossary file |
+| `--all` | Read every file, and not only the files that git shows |
 
 ### Exit codes
 

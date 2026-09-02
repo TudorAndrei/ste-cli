@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -170,6 +171,77 @@ func TestWalkSkipsBuildOutput(t *testing.T) {
 	}
 	if rep.Summary.Files != 1 {
 		t.Fatalf("files %d, want 1: the walk must not read build output", rep.Summary.Files)
+	}
+}
+
+func TestWalkSkipsGitIgnoredFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not on this system")
+	}
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init"}, {"config", "user.email", "test@example.com"}, {"config", "user.name", "test"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	writeFile(t, dir, ".gitignore", "generated.md\nprivate/\n")
+	writeFile(t, dir, "guide.md", "The valve isn't open.\n")
+	writeFile(t, dir, "generated.md", "The report isn't ready.\n")
+	sub := filepath.Join(dir, "private")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	writeFile(t, sub, "secret.md", "The report isn't ready.\n")
+
+	files := func(args ...string) []string {
+		t.Helper()
+		code, stdout, stderr := runCLI(t, "", append([]string{"lint", "--no-config", "--format", "json"}, args...)...)
+		if code != 0 {
+			t.Fatalf("exit %d: %s", code, stderr)
+		}
+		var rep struct {
+			Files []struct {
+				Path string `json:"path"`
+			} `json:"files"`
+		}
+		if err := json.Unmarshal([]byte(stdout), &rep); err != nil {
+			t.Fatalf("the output is not JSON: %v", err)
+		}
+		out := []string{}
+		for _, f := range rep.Files {
+			out = append(out, filepath.Base(f.Path))
+		}
+		return out
+	}
+
+	got := files(dir)
+	if len(got) != 1 || got[0] != "guide.md" {
+		t.Fatalf("files %v, want [guide.md]: git ignores the other files", got)
+	}
+
+	// --all reads every file: guide.md, generated.md, private/secret.md.
+	if got := files("--all", dir); len(got) != 3 {
+		t.Fatalf("files %v with --all, want 3 files", got)
+	}
+}
+
+func TestAGivenFileIsReadEvenWhenGitIgnoresIt(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not on this system")
+	}
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, out)
+	}
+	writeFile(t, dir, ".gitignore", "draft.md\n")
+	path := writeFile(t, dir, "draft.md", "The valve isn't open.\n")
+
+	_, stdout, _ := runCLI(t, "", "lint", "--no-config", path)
+	if !strings.Contains(stdout, "STE-4.2") {
+		t.Fatalf("a file that you give by its path must be read: %q", stdout)
 	}
 }
 

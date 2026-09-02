@@ -213,11 +213,15 @@ boundaries. A list item keeps the lines that continue it. Each cell of a
 table row is a different sentence. This is a decision of this tool, and not
 a rule of the standard.
 
-When you give a directory, the tool does not go into a directory that holds
-build output or dependencies. The list is `node_modules`, `vendor`, `dist`,
-`build`, `target`, `bin`, `obj`, `out`, `coverage`, `__pycache__`, and each
-directory whose name starts with a period. To check one of these
-directories, give its path to the command.
+When you give a directory, the tool does not read a file that git ignores.
+It asks git for the list, thus the full syntax of `.gitignore` applies. It
+also does not go into a directory that holds build output or dependencies:
+`node_modules`, `vendor`, `dist`, `build`, `target`, `bin`, `obj`, `out`,
+`coverage`, `__pycache__`, and each directory whose name starts with a
+period.
+
+A file or a directory that you give by its path is always read. The `--all`
+flag removes both filters.
 
 ## Rules that this tool does not check
 

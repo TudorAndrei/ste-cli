@@ -75,10 +75,17 @@ ste lint docs/
 cat draft.md | ste lint -
 ```
 
-A directory gives all `.md`, `.markdown`, and `.txt` files below it. The
-walk does not go into `node_modules`, `vendor`, `dist`, `build`, `target`,
-`bin`, `obj`, `out`, `coverage`, `__pycache__`, or a directory whose name
-starts with a period. To check one of these, give its path to the command.
+A directory gives all `.md`, `.markdown`, and `.txt` files below it, but it
+does not give:
+
+- a file that git ignores, in a git repository. The tool asks git, thus the
+  full syntax of `.gitignore` applies.
+- `node_modules`, `vendor`, `dist`, `build`, `target`, `bin`, `obj`, `out`,
+  `coverage`, `__pycache__`, or a directory whose name starts with a
+  period.
+
+A file or a directory that you give by its path is always read. `--all`
+removes both filters.
 
 The text output has one line for each finding, and then a summary:
 
@@ -266,6 +273,7 @@ ste help                      Print the usage
 | `--max-words` | Replace the sentence limit of both sentence types |
 | `--config` | Path of the glossary file |
 | `--no-config` | Do not read a glossary file |
+| `--all` | Read every file, and not only the files that git shows |
 
 A flag can come before or after a path.
 
