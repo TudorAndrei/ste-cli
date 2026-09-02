@@ -128,10 +128,11 @@ func TestIndentedListContinuationIsNotCode(t *testing.T) {
 func TestTableCellsAreSeparateSentences(t *testing.T) {
 	// Each cell has 15 words. One row is not a 30-word sentence.
 	cell := "one two three four five six seven eight nine ten one two three four five"
-	src := "| " + cell + " | " + cell + " |\n"
+	src := "| A | B |\n|---|---|\n| " + cell + " | " + cell + " |\n"
 	doc := checker.Parse(src)
-	if len(doc.Sentences) != 2 {
-		t.Fatalf("got %d sentences, want 2: %+v", len(doc.Sentences), doc.Sentences)
+	// Two header cells and two body cells.
+	if len(doc.Sentences) != 4 {
+		t.Fatalf("got %d sentences, want 4: %+v", len(doc.Sentences), doc.Sentences)
 	}
 	if got := checker.Lint(src, checker.Options{}); len(got) != 0 {
 		t.Fatalf("got %d findings for a table row, want 0: %+v", len(got), got)
@@ -187,6 +188,41 @@ func TestAClosingMarkDoesNotStopASentenceEnd(t *testing.T) {
 	doc := checker.Parse("**Open the valve.** Then start the pump.\n")
 	if len(doc.Sentences) != 2 {
 		t.Fatalf("got %d sentences, want 2: %+v", len(doc.Sentences), doc.Sentences)
+	}
+}
+
+// The CommonMark parser gives constructs that the first hand-written reader
+// did not know.
+func TestCommonMarkConstructs(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want int // findings
+	}{
+		{"reference link keeps the label, not the target",
+			"See [the report isn't ready][ref] here.\n\n[ref]: http://example.com/a;b\n", 1},
+		{"setext heading is prose",
+			"The valve isn't open\n====================\n", 1},
+		{"HTML block is not prose",
+			"<div class=\"note\">The report isn't ready.</div>\n", 0},
+		{"an inline HTML tag is not prose",
+			"The valve <b>isn't</b> open.\n", 1},
+		{"a nested list item is its own sentence",
+			"- Open the valve\n  - Start the pump\n", 0},
+		{"an image title is not prose",
+			"![the report isn't ready](a.png)\n", 0},
+		{"a blockquote holds prose",
+			"> The valve isn't open.\n", 1},
+		{"a code fence with a language is not prose",
+			"```go\nx := \"it isn't code prose\"\n```\n", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := checker.Lint(tc.src, checker.Options{})
+			if len(got) != tc.want {
+				t.Errorf("got %d findings, want %d: %+v", len(got), tc.want, got)
+			}
+		})
 	}
 }
 

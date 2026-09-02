@@ -3,9 +3,9 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go program with no dependencies. It has 11 checks. The standard
-has 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue
-9. It is an aid for a writer. **It is not an ASD-certified checker.**
+It is one Go binary with 3 dependencies. It has 11 checks. The standard has
+53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
+It is an aid for a writer. **It is not an ASD-certified checker.**
 
 Documentation: <https://tudorandrei.github.io/ste-cli/>
 
@@ -77,8 +77,8 @@ A walk of a directory does not give:
   `coverage`, `__pycache__`, or a directory whose name starts with a
   period.
 
-A file or a directory that you give by its path is always read. `--all`
-removes both filters.
+The tool always reads a file or a directory that you give by its path.
+`--all` removes both filters.
 
 ### Flags of the lint command
 
@@ -130,8 +130,8 @@ allow:
 disable_rules: [STE-1.1]
 ```
 
-The reader accepts only this subset of YAML: scalars, block lists, inline
-lists, comments, and one level of nested keys.
+The file is YAML. An unknown key is an error, thus a spelling mistake in
+the file does not stay hidden.
 
 ## Output
 
@@ -166,6 +166,17 @@ and its limits. The numbers are the rule numbers of Issue 9.
 | `STE-8.1` | Semicolon |
 | `STE-9.3` | Phrasal verb |
 | `STE-GR-6` | Latin abbreviation (a general recommendation, not a rule) |
+
+## Dependencies
+
+| Module | License | Function |
+|---|---|---|
+| [goldmark](https://github.com/yuin/goldmark) | MIT | Reads the Markdown. It follows CommonMark 0.31.2, and its syntax tree keeps the byte offsets that each finding needs. |
+| [go-yaml](https://github.com/goccy/go-yaml) | MIT | Reads the glossary file. |
+| [pflag](https://github.com/spf13/pflag) | BSD-3-Clause | Reads the command flags. |
+
+All 3 are pure Go, thus the build needs no C compiler and it stays one
+binary for each platform.
 
 ## Structure
 

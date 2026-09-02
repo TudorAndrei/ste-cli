@@ -177,6 +177,22 @@ that directory.
 A future dictionary rule must read a copy that **the user** supplies from
 their own licensed copy. This tool must not ship the dictionary.
 
+## Dependencies
+
+| Module | Version | License | Function |
+|---|---|---|---|
+| `github.com/yuin/goldmark` | v1.8.5 | MIT | Reads the Markdown |
+| `github.com/goccy/go-yaml` | v1.19.2 | MIT | Reads the glossary |
+| `github.com/spf13/pflag` | v1.0.10 | BSD-3-Clause | Reads the command flags |
+
+Each of the 3 is code, and not data. None of them has ASD-STE100 data. The
+tool used its own reader for Markdown and for YAML before version 0.4.0. A
+CommonMark parser is better, because 5 of the 8 defects of the first
+versions came from that hand-written reader.
+
+`gopkg.in/yaml.v3` is not in this list. That project became an archive in
+April 2025.
+
 ## Data in this project
 
 | File | Source | Risk |

@@ -4,7 +4,6 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/spf13/pflag"
 
 	"github.com/TudorAndrei/ste-cli/internal/checker"
 	"github.com/TudorAndrei/ste-cli/internal/config"
@@ -84,47 +85,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// The flags that take a value. reorder needs them to know if the next
-// argument is a value or a path.
-var (
-	lintValueFlags = map[string]bool{
-		"mode": true, "format": true, "fail-over": true,
-		"max-words": true, "config": true,
-	}
-	evalValueFlags = map[string]bool{"format": true}
-)
-
-// reorder moves the flags in front of the paths. The flag package stops at
-// the first argument that is not a flag, but "ste lint docs/ --format json"
-// must also work.
-func reorder(args []string, valueFlags map[string]bool) []string {
-	flags := []string{}
-	paths := []string{}
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "--" {
-			paths = append(paths, args[i+1:]...)
-			break
-		}
-		if arg == "-" || !strings.HasPrefix(arg, "-") {
-			paths = append(paths, arg)
-			continue
-		}
-		flags = append(flags, arg)
-		name := strings.TrimLeft(arg, "-")
-		if strings.Contains(name, "=") {
-			continue
-		}
-		if valueFlags[name] && i+1 < len(args) {
-			i++
-			flags = append(flags, args[i])
-		}
-	}
-	return append(flags, paths...)
-}
-
 func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
+	fs := pflag.NewFlagSet("lint", pflag.ContinueOnError)
 	fs.SetOutput(stderr)
 	mode := fs.String("mode", "", "flavored or strict")
 	format := fs.String("format", "text", "text or json")
@@ -133,7 +95,7 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cfgPath := fs.String("config", "", "path of the glossary file")
 	noConfig := fs.Bool("no-config", false, "do not read a glossary file")
 	all := fs.Bool("all", false, "read every file, and not only the files that git shows")
-	if err := fs.Parse(reorder(args, lintValueFlags)); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
 	if *format != "text" && *format != "json" {
@@ -343,10 +305,10 @@ func textFiles(path string, all bool) ([]string, error) {
 }
 
 func runEval(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("eval", flag.ContinueOnError)
+	fs := pflag.NewFlagSet("eval", pflag.ContinueOnError)
 	fs.SetOutput(stderr)
 	format := fs.String("format", "text", "text or json")
-	if err := fs.Parse(reorder(args, evalValueFlags)); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
 	dir := "testdata"

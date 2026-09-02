@@ -97,6 +97,46 @@ func TestGlossaryStopsATermFinding(t *testing.T) {
 	}
 }
 
+// The reader is now a full YAML reader, thus a file can use the parts of
+// YAML that the first hand-written reader did not accept.
+func TestFullYAMLSyntax(t *testing.T) {
+	const text = `
+mode: strict
+allow:
+  nouns: &shared
+    - parser
+    - webhook
+  verbs: *shared
+disable_rules: [
+  "STE-1.1",
+  'STE-8.1',
+]
+`
+	cfg, err := config.Parse(text)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if cfg.Mode != "strict" {
+		t.Errorf("mode %q", cfg.Mode)
+	}
+	if len(cfg.AllowNouns) != 2 || len(cfg.AllowVerbs) != 2 {
+		t.Errorf("the anchor did not work: nouns %v verbs %v", cfg.AllowNouns, cfg.AllowVerbs)
+	}
+	if len(cfg.DisableRules) != 2 || cfg.DisableRules[0] != "STE-1.1" {
+		t.Errorf("disable_rules %v", cfg.DisableRules)
+	}
+}
+
+func TestEmptyFileIsValid(t *testing.T) {
+	cfg, err := config.Parse("# only a comment\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if cfg.Mode != "" || cfg.MaxWords != 0 {
+		t.Errorf("config %+v, want the defaults", cfg)
+	}
+}
+
 func TestLoadAndFind(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".ste.yml")

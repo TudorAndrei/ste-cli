@@ -201,12 +201,14 @@ an error.
 
 ## What the tool does not examine
 
-The tool replaces these spans with spaces before it applies the rules:
+A CommonMark parser reads the document, and the tool keeps only the prose.
+Thus no rule sees:
 
-- fenced code blocks (```` ``` ```` and `~~~`)
-- indented code blocks (4 or more spaces after an empty line)
+- a fenced code block or an indented code block
 - inline code
-- link targets, autolinks, and bare URLs
+- the target of a link, an autolink, or an image
+- an HTML block or an HTML tag
+- the markers of a heading, a list, a quotation, or a table
 
 A heading, an empty line, and the start of a list item are sentence
 boundaries. A list item keeps the lines that continue it. Each cell of a

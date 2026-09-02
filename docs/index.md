@@ -8,7 +8,7 @@ description: A deterministic ASD-STE100 checker for Markdown and plain text.
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with no dependencies. It gives you the rule identifier,
+It is one Go binary with 3 dependencies. It gives you the rule identifier,
 the exact character range, a message, a severity, and a confidence value for
 each finding. A person or a machine can then make the correction.
 
@@ -150,9 +150,8 @@ disable_rules: [STE-1.1]
 | `allow.verbs` | The technical verbs of the project |
 | `disable_rules` | The rule identifiers to remove from the results |
 
-The reader accepts only this subset of YAML: scalars, block lists, inline
-lists, comments, and one level of nested keys. Thus the tool keeps no
-dependencies.
+The file is YAML. An unknown key is an error, thus a spelling mistake in
+the file does not stay hidden.
 
 `--config <path>` reads a different file. `--no-config` reads no file.
 
