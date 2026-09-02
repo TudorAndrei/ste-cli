@@ -35,6 +35,8 @@ In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
 of a rule one step stronger. The mode does **not** change a word limit.
 
+<!-- ste-disable -->
+
 ## STE-1.1 Unapproved word or word group
 
 Reports 27 words and 11 word groups that have a shorter replacement, for
@@ -204,6 +206,8 @@ The tool obeys both conditions, thus it does not report the name "VS Code"
 and it does not report "vs" as a column title. Before version 0.5.0, the
 name "VS Code" gave 147 wrong findings in one repository.
 
+<!-- ste-enable -->
+
 ## What the tool does not examine
 
 A CommonMark parser reads the document, and the tool keeps only the prose.
@@ -229,8 +233,8 @@ also does not go into a directory that holds build output or dependencies:
 `coverage`, `__pycache__`, and each directory whose name starts with a
 period.
 
-A file or a directory that you give by its path is always read. The `--all`
-flag removes both filters.
+The tool always reads a file or a directory that you give by its path. The
+`--all` flag removes both filters.
 
 ## How to silence a finding
 

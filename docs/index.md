@@ -305,6 +305,8 @@ as one word.
 
 ## The rules
 
+<!-- ste-disable -->
+
 | Rule | Name | Example that it reports |
 |---|---|---|
 | `STE-1.1` | Unapproved word or word group | "Utilize the tool in order to start" |
@@ -318,6 +320,8 @@ as one word.
 | `STE-8.1` | Semicolon | "Open the valve; then start the pump" |
 | `STE-9.3` | Phrasal verb | "carry out the test" |
 | `STE-GR-6` | Latin abbreviation | "e.g." |
+
+<!-- ste-enable -->
 
 A check with the `GR` prefix is a general recommendation of the standard. A
 general recommendation is advice and not a rule. Thus this tool gives it
