@@ -202,6 +202,26 @@ ste lint --use-dict docs/
 `dictionary: true` in the config does the same as `--use-dict`. `ste dict
 info` shows the index, and `ste dict remove` deletes it.
 
+### One import for each machine
+
+The index is global. Import it one time, and each project on that machine
+reads the same file. No lint run reads the specification again: the run
+reads a JSON index of about 135 kB, thus the dictionary adds no measurable
+time.
+
+The index is data, and not a cache, because this tool cannot make it again
+without your copy. Thus it goes in the data directory of the XDG
+specification:
+
+| Path | Condition |
+|---|---|
+| `$STE_DICT` | an explicit path |
+| `$XDG_DATA_HOME/ste/dictionary.json` | you give that variable |
+| `~/.local/share/ste/dictionary.json` | Linux and BSD |
+| `~/Library/Application Support/ste/dictionary.json` | macOS |
+
+`ste dict path` prints the path that applies.
+
 ### The dictionary is off by default, and this is why
 
 ASD-STE100 approves about 900 words, for the maintenance of an aircraft. Ordinary software documentation uses many words that this

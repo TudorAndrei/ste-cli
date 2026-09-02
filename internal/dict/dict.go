@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -267,17 +268,48 @@ func isUpper(s string) bool {
 	return letters > 0
 }
 
-// DefaultPath gives the path of the index for this user. The index stays out
-// of a project directory, because git must never see it.
+// DefaultPath gives the path of the index for this user. One import is
+// sufficient for each machine: each project reads the same index, and no
+// run reads the specification again.
+//
+// The index is data, and not a cache: this tool cannot make it again
+// without the copy of the user. Thus it goes in the data directory of the
+// XDG specification, and not in the cache directory.
+//
+//	$STE_DICT                            an explicit path
+//	$XDG_DATA_HOME/ste/dictionary.json   when the variable is set
+//	~/.local/share/ste/dictionary.json   Linux and BSD
+//	~/Library/Application Support/...    macOS
+//	%AppData%\ste\dictionary.json         Windows
 func DefaultPath() string {
-	if dir := os.Getenv("STE_DICT"); dir != "" {
-		return dir
+	if path := os.Getenv("STE_DICT"); path != "" {
+		return path
 	}
-	base, err := os.UserCacheDir()
+	base, err := dataDir()
 	if err != nil {
 		return ".ste-dictionary.json"
 	}
 	return filepath.Join(base, "ste", "dictionary.json")
+}
+
+// dataDir gives the directory for the data of a user.
+func dataDir() (string, error) {
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return dir, nil
+	}
+	switch runtime.GOOS {
+	case "windows", "darwin", "ios", "plan9":
+		// os.UserConfigDir gives the correct directory for these
+		// systems: %AppData% and ~/Library/Application Support.
+		return os.UserConfigDir()
+	default:
+		// The XDG specification gives ~/.local/share as the default.
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, ".local", "share"), nil
+	}
 }
 
 // Save writes the index.

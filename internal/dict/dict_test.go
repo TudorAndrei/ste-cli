@@ -2,6 +2,7 @@ package dict
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -127,5 +128,37 @@ func TestLoadOfAMissingFileIsNotAnError(t *testing.T) {
 	ix, err := Load(filepath.Join(t.TempDir(), "none.json"))
 	if err != nil || ix != nil {
 		t.Fatalf("index %v, error %v, want nil and nil", ix, err)
+	}
+}
+
+func TestDefaultPathIsGlobalAndFollowsXDG(t *testing.T) {
+	// The index is data, and not a cache: this tool cannot make it again
+	// without the copy of the user.
+	t.Setenv("STE_DICT", "")
+	t.Setenv("XDG_DATA_HOME", "/data")
+	if got := DefaultPath(); got != filepath.Join("/data", "ste", "dictionary.json") {
+		t.Errorf("path %q, want the XDG data directory", got)
+	}
+
+	t.Setenv("STE_DICT", "/explicit/index.json")
+	if got := DefaultPath(); got != "/explicit/index.json" {
+		t.Errorf("path %q, want the explicit path", got)
+	}
+}
+
+func TestDefaultPathWithNoEnvironment(t *testing.T) {
+	t.Setenv("STE_DICT", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	got := DefaultPath()
+	if !filepath.IsAbs(got) {
+		t.Fatalf("path %q is not absolute", got)
+	}
+	// The path must not be in a cache directory, and it must not be in
+	// the working directory of a project.
+	if strings.Contains(strings.ToLower(got), "cache") {
+		t.Errorf("path %q is in a cache directory", got)
+	}
+	if filepath.Base(filepath.Dir(got)) != "ste" {
+		t.Errorf("path %q is not in a directory of this tool", got)
 	}
 }

@@ -19,6 +19,9 @@ ASD, and its terms do not permit redistribution. ASD gives the specification
 free of charge to each writer and user at https://asd-ste100.org, thus you
 can make the index from your own copy.
 
+One import is sufficient for each machine. The index is global: each
+project reads it, and no run reads the specification again.
+
 Usage:
   ste dict import <file>   Read the dictionary and write the index
   ste dict info            Show the index of this user
@@ -31,8 +34,15 @@ that file from the PDF:
   npx -y @firecrawl/anydoc ASD-STE100_ISSUE9.pdf -o ste100.md
   ste dict import ste100.md
 
+The index goes in the data directory of the user:
+
+  $STE_DICT                            an explicit path
+  $XDG_DATA_HOME/ste/dictionary.json   when the variable is set
+  ~/.local/share/ste/dictionary.json   Linux and BSD
+  ~/Library/Application Support/...    macOS
+
 Flags:
-  --out    Path of the index. The default is the cache directory of the user.
+  --out    Path of the index
 `
 
 func runDict(args []string, stdout, stderr io.Writer) int {
@@ -102,7 +112,7 @@ func dictImport(source, path string, stdout, stderr io.Writer) int {
 		path, s.Words, s.Approved, s.Unapproved, s.Alternatives)
 	fmt.Fprintf(stdout, "\nThe index is for you only: do not commit it.\n")
 	fmt.Fprintf(stdout, "The dictionary is off by default. Give --use-dict, or put \"dictionary: true\"\nin your config, to make rule STE-1.1 use it.\n")
-	fmt.Fprintf(stdout, "\nASD-STE100 approves about %d words for aircraft maintenance. On general\nsoftware documentation, the rule reports approximately 1 word in 10. Start\nwith \"ste baseline .\", or with \"min_confidence: 0.7\" to remove the findings\nthat need a part of speech.\n", s.Approved)
+	fmt.Fprintf(stdout, "\nASD-STE100 approves about %d words for aircraft maintenance. On general\nsoftware documentation, the rule reports about 1 word in 10. Start\nwith \"ste baseline .\", or with \"min_confidence: 0.7\" to remove the findings\nthat need a part of speech.\n", s.Approved)
 	return exitOK
 }
 
