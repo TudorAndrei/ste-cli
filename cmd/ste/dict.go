@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -42,14 +43,19 @@ The index goes in the data directory of the user:
   ~/Library/Application Support/...    macOS
 
 Flags:
-  --out    Path of the index
+  --out       Path of the index
+  --format    "text" (default) or "json"
+  --dry-run   Show the plan and write nothing
 `
 
 func runDict(args []string, stdout, stderr io.Writer) int {
 	fs := pflag.NewFlagSet("dict", pflag.ContinueOnError)
 	fs.SetOutput(stderr)
 	out := fs.String("out", "", "path of the index")
+	format := fs.String("format", "text", "text or json")
+	dryRun := fs.Bool("dry-run", false, "show the plan and write nothing")
 	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
 	path := *out
@@ -67,26 +73,36 @@ func runDict(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprint(stderr, dictUsage)
 			return exitError
 		}
-		return dictImport(fs.Arg(1), path, stdout, stderr)
+		return dictImport(fs.Arg(1), path, *format, *dryRun, stdout, stderr)
 	case "info":
-		return dictInfo(path, stdout, stderr)
+		return dictInfo(path, *format, stdout, stderr)
 	case "path":
+		if *format == "json" {
+			return writeJSONLine(stdout, map[string]any{"path": path})
+		}
 		fmt.Fprintln(stdout, path)
 		return exitOK
 	case "remove":
+		exists := fileExists(path)
+		if *dryRun {
+			return writeJSONOrText(stdout, *format,
+				map[string]any{"action": "dict remove", "dry_run": true, "path": path, "exists": exists},
+				fmt.Sprintf("A real run deletes %s.\n", path))
+		}
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			fmt.Fprintf(stderr, "ste: %v\n", err)
 			return exitError
 		}
-		fmt.Fprintf(stdout, "The index is removed. The term rule now uses only its hand-written list.\n")
-		return exitOK
+		return writeJSONOrText(stdout, *format,
+			map[string]any{"action": "dict remove", "dry_run": false, "path": path, "removed": exists},
+			"The index is removed. The term rule now uses only its hand-written list.\n")
 	default:
 		fmt.Fprint(stderr, dictUsage)
 		return exitError
 	}
 }
 
-func dictImport(source, path string, stdout, stderr io.Writer) int {
+func dictImport(source, path, format string, dryRun bool, stdout, stderr io.Writer) int {
 	if strings.EqualFold(filepath.Ext(source), ".pdf") {
 		fmt.Fprintf(stderr, "ste: %s is a PDF. This tool reads text, thus make the Markdown first:\n", source)
 		fmt.Fprintf(stderr, "  npx -y @firecrawl/anydoc %s -o ste100.md\n", source)
@@ -103,11 +119,25 @@ func dictImport(source, path string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
+	s := index.Stats()
+	if dryRun {
+		return writeJSONOrText(stdout, format, map[string]any{
+			"action": "dict import", "dry_run": true, "source": source, "path": path,
+			"words": s.Words, "approved": s.Approved, "unapproved": s.Unapproved,
+			"alternatives": s.Alternatives, "exists": fileExists(path),
+		}, fmt.Sprintf("A real run writes %s with %d words.\n", path, s.Words))
+	}
 	if err := index.Save(path); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
-	s := index.Stats()
+	if format == "json" {
+		return writeJSONLine(stdout, map[string]any{
+			"action": "dict import", "dry_run": false, "source": source, "path": path,
+			"words": s.Words, "approved": s.Approved, "unapproved": s.Unapproved,
+			"alternatives": s.Alternatives,
+		})
+	}
 	fmt.Fprintf(stdout, "%s holds %d words: %d approved and %d not approved, with %d alternatives.\n",
 		path, s.Words, s.Approved, s.Unapproved, s.Alternatives)
 	fmt.Fprintf(stdout, "\nThe index is for you only: do not commit it.\n")
@@ -116,25 +146,54 @@ func dictImport(source, path string, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
-func dictInfo(path string, stdout, stderr io.Writer) int {
+func dictInfo(path, format string, stdout, stderr io.Writer) int {
 	index, err := dict.Load(path)
 	if err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
 	if index == nil {
+		if format == "json" {
+			return writeJSONLine(stdout, map[string]any{"path": path, "present": false})
+		}
 		fmt.Fprintf(stdout, "There is no index at %s.\n", path)
 		fmt.Fprintf(stdout, "Rule STE-1.1 uses its hand-written list of 27 words and 11 word groups.\n")
 		fmt.Fprintf(stdout, "Run \"ste dict import <file>\" to make the index.\n")
 		return exitOK
 	}
 	s := index.Stats()
+	if format == "json" {
+		return writeJSONLine(stdout, map[string]any{
+			"path": path, "present": true, "source": index.Source,
+			"words": s.Words, "approved": s.Approved, "unapproved": s.Unapproved,
+			"alternatives": s.Alternatives,
+		})
+	}
 	fmt.Fprintf(stdout, "index:        %s\n", path)
 	fmt.Fprintf(stdout, "source:       %s\n", index.Source)
 	fmt.Fprintf(stdout, "words:        %d\n", s.Words)
 	fmt.Fprintf(stdout, "approved:     %d\n", s.Approved)
 	fmt.Fprintf(stdout, "not approved: %d\n", s.Unapproved)
 	fmt.Fprintf(stdout, "alternatives: %d\n", s.Alternatives)
+	return exitOK
+}
+
+// writeJSONLine gives one JSON object.
+func writeJSONLine(stdout io.Writer, data map[string]any) int {
+	enc := json.NewEncoder(stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(data); err != nil {
+		return exitError
+	}
+	return exitOK
+}
+
+// writeJSONOrText gives JSON to an agent and a line to a person.
+func writeJSONOrText(stdout io.Writer, format string, data map[string]any, text string) int {
+	if format == "json" {
+		return writeJSONLine(stdout, data)
+	}
+	fmt.Fprint(stdout, text)
 	return exitOK
 }
 

@@ -34,45 +34,60 @@ func TestLintJSONOutput(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, want 0: %s", code, stderr)
 	}
-	var rep struct {
-		Version int    `json:"version"`
-		Mode    string `json:"mode"`
-		Files   []struct {
-			Path     string `json:"path"`
-			Words    int    `json:"words"`
-			Findings []struct {
-				RuleID string `json:"rule_id"`
-				Line   int    `json:"line"`
-				Column int    `json:"column"`
-				Text   string `json:"text"`
-			} `json:"findings"`
-		} `json:"files"`
-		Summary struct {
-			Findings int     `json:"findings"`
-			Words    int     `json:"words"`
-			Score    float64 `json:"score"`
-		} `json:"summary"`
-	}
+	var rep lintReport
 	if err := json.Unmarshal([]byte(stdout), &rep); err != nil {
 		t.Fatalf("the output is not JSON: %v\n%s", err, stdout)
 	}
-	if rep.Version != 1 || rep.Mode != "flavored" {
-		t.Errorf("version %d, mode %q", rep.Version, rep.Mode)
+	if rep.Version != 1 || rep.Mode != "flavored" || rep.Tool != "ste" {
+		t.Errorf("version %d, tool %q, mode %q", rep.Version, rep.Tool, rep.Mode)
 	}
 	if len(rep.Files) != 1 || rep.Files[0].Path != path {
 		t.Fatalf("files %+v", rep.Files)
 	}
-	if len(rep.Files[0].Findings) != 3 {
-		t.Fatalf("got %d findings, want 3: %+v", len(rep.Files[0].Findings), rep.Files[0].Findings)
+	if len(rep.Findings) != 3 {
+		t.Fatalf("got %d findings, want 3: %+v", len(rep.Findings), rep.Findings)
 	}
 	if rep.Summary.Findings != 3 || rep.Summary.Words == 0 || rep.Summary.Score <= 0 {
 		t.Errorf("summary %+v", rep.Summary)
 	}
-	for _, f := range rep.Files[0].Findings {
+	for _, f := range rep.Findings {
 		if f.Line < 1 || f.Column < 1 {
 			t.Errorf("finding %s has the position %d:%d", f.RuleID, f.Line, f.Column)
 		}
+		if f.File != path {
+			t.Errorf("finding %s names the file %q", f.RuleID, f.File)
+		}
 	}
+}
+
+// lintReport is the JSON that "ste lint --format json" gives.
+type lintReport struct {
+	Version int    `json:"version"`
+	Tool    string `json:"tool"`
+	Mode    string `json:"mode"`
+	Files   []struct {
+		Path  string `json:"path"`
+		Words int    `json:"words"`
+		Count int    `json:"count"`
+	} `json:"files"`
+	Findings []struct {
+		RuleID     string  `json:"rule_id"`
+		Severity   string  `json:"severity"`
+		Confidence float64 `json:"confidence"`
+		File       string  `json:"file"`
+		Line       int     `json:"line"`
+		Column     int     `json:"column"`
+		Text       string  `json:"text"`
+	} `json:"findings"`
+	Summary struct {
+		Files     int     `json:"files"`
+		Findings  int     `json:"findings"`
+		Words     int     `json:"words"`
+		Score     float64 `json:"score"`
+		Shown     int     `json:"shown"`
+		Truncated bool    `json:"truncated"`
+		Errors    int     `json:"errors"`
+	} `json:"summary"`
 }
 
 func TestLintCleanFileGivesEmptyJSONFindings(t *testing.T) {
@@ -441,19 +456,7 @@ func TestConfigRulesAndExclude(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
-	var rep struct {
-		Files []struct {
-			Path     string `json:"path"`
-			Findings []struct {
-				RuleID   string `json:"rule_id"`
-				Severity string `json:"severity"`
-			} `json:"findings"`
-		} `json:"files"`
-		Summary struct {
-			Files    int `json:"files"`
-			Findings int `json:"findings"`
-		} `json:"summary"`
-	}
+	var rep lintReport
 	if err := json.Unmarshal([]byte(stdout), &rep); err != nil {
 		t.Fatalf("the output is not JSON: %v", err)
 	}
@@ -463,7 +466,7 @@ func TestConfigRulesAndExclude(t *testing.T) {
 	if rep.Summary.Findings != 1 {
 		t.Fatalf("findings %d, want 1: STE-4.2 is off", rep.Summary.Findings)
 	}
-	if f := rep.Files[0].Findings[0]; f.RuleID != "STE-8.1" || f.Severity != "error" {
+	if f := rep.Findings[0]; f.RuleID != "STE-8.1" || f.Severity != "error" {
 		t.Fatalf("finding %s %s, want STE-8.1 error", f.RuleID, f.Severity)
 	}
 }
@@ -629,5 +632,213 @@ func TestDictGlossaryWins(t *testing.T) {
 	code, stdout, _ := runCLI(t, "", "lint", "--config", cfg, "--dict", index, page)
 	if code != 0 || !strings.Contains(stdout, "0 findings") {
 		t.Fatalf("the glossary must permit the technical noun: exit %d, %q", code, stdout)
+	}
+}
+
+func TestAnUnknownFlagGivesAMessage(t *testing.T) {
+	// pflag with ContinueOnError returns the error and prints nothing.
+	// A command that only returns an exit code leaves the user with no
+	// message at all.
+	cases := [][]string{
+		{"lint", "--use-diict", "."},
+		{"lint", "--formt", "json", "."},
+		{"eval", "--frmat", "json", "testdata"},
+		{"dict", "--ot", "/tmp/x.json", "info"},
+	}
+	for _, args := range cases {
+		code, _, stderr := runCLI(t, "", args...)
+		if code != 2 {
+			t.Errorf("args %v: exit %d, want 2", args, code)
+		}
+		if !strings.Contains(stderr, "unknown flag") {
+			t.Errorf("args %v: stderr %q, want the name of the flag", args, stderr)
+		}
+	}
+}
+
+func TestAgentOutputControls(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "a.md", "The valve isn't open; the report isn't ready.\n")
+	writeFile(t, dir, "b.md", "The pump isn't on; the fan isn't off.\n")
+
+	// The full result.
+	_, stdout, _ := runCLI(t, "", "lint", "--no-config", "--format", "json", dir)
+	var full lintReport
+	if err := json.Unmarshal([]byte(stdout), &full); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	if full.Summary.Findings < 4 {
+		t.Fatalf("findings %d, want 4 or more", full.Summary.Findings)
+	}
+
+	// --limit caps the findings and says that it did.
+	_, stdout, _ = runCLI(t, "", "lint", "--no-config", "--format", "json", "--limit", "2", dir)
+	var small lintReport
+	if err := json.Unmarshal([]byte(stdout), &small); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	if len(small.Findings) != 2 {
+		t.Errorf("findings %d, want 2", len(small.Findings))
+	}
+	if !small.Summary.Truncated || small.Summary.Shown != 2 {
+		t.Errorf("summary %+v, want truncated with shown 2", small.Summary)
+	}
+	if small.Summary.Findings != full.Summary.Findings {
+		t.Errorf("the summary must keep the real total: %d, want %d",
+			small.Summary.Findings, full.Summary.Findings)
+	}
+	// The file rows follow the findings that the output shows.
+	if len(small.Files) > 2 {
+		t.Errorf("files %d, want 2 or fewer with --limit 2", len(small.Files))
+	}
+
+	// --fields gives only the named fields.
+	_, stdout, _ = runCLI(t, "", "lint", "--no-config", "--format", "json", "--fields", "rule_id,line", dir)
+	var projected struct {
+		Findings []map[string]any `json:"findings"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &projected); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	for _, f := range projected.Findings {
+		if len(f) != 2 || f["rule_id"] == nil || f["line"] == nil {
+			t.Fatalf("finding %v, want only rule_id and line", f)
+		}
+	}
+
+	// --summary gives no findings and no file list.
+	_, stdout, _ = runCLI(t, "", "lint", "--no-config", "--format", "json", "--summary", dir)
+	if strings.Contains(stdout, "\"findings\": [") || strings.Contains(stdout, "\"files\": [") {
+		t.Errorf("--summary must give no list: %q", stdout)
+	}
+
+	// An unknown field is an error that names the fields.
+	code, _, stderr := runCLI(t, "", "lint", "--no-config", "--fields", "rule_id,nope", dir)
+	if code != 2 || !strings.Contains(stderr, "nope") {
+		t.Errorf("exit %d, stderr %q", code, stderr)
+	}
+}
+
+func TestNDJSONOutput(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "a.md", "The valve isn't open; the report isn't ready.\n")
+
+	_, stdout, _ := runCLI(t, "", "lint", "--no-config", "--format", "ndjson", dir)
+	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("got %d lines, want a finding and a summary", len(lines))
+	}
+	findings, summaries := 0, 0
+	for _, line := range lines {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(line), &obj); err != nil {
+			t.Fatalf("line is not JSON: %v: %s", err, line)
+		}
+		switch obj["type"] {
+		case "finding":
+			findings++
+		case "summary":
+			summaries++
+		default:
+			t.Errorf("line has no type: %s", line)
+		}
+	}
+	if summaries != 1 {
+		t.Errorf("summaries %d, want 1", summaries)
+	}
+	if findings < 1 {
+		t.Errorf("findings %d, want 1 or more", findings)
+	}
+}
+
+func TestSchemaIsSelfDescribing(t *testing.T) {
+	code, stdout, stderr := runCLI(t, "", "schema")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	var s struct {
+		Tool  string `json:"tool"`
+		Rules []struct {
+			ID       string `json:"id"`
+			Standard string `json:"standard_rule"`
+		} `json:"rules"`
+		ExitCodes  map[string]string `json:"exit_codes"`
+		ConfigKeys map[string]any    `json:"config_keys"`
+		Output     map[string]any    `json:"output"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &s); err != nil {
+		t.Fatalf("the schema is not JSON: %v", err)
+	}
+	if s.Tool != "ste" {
+		t.Errorf("tool %q", s.Tool)
+	}
+	if len(s.Rules) != 11 {
+		t.Errorf("rules %d, want 11", len(s.Rules))
+	}
+	for _, r := range s.Rules {
+		if !strings.HasPrefix(r.ID, "STE-") || r.Standard == "" {
+			t.Errorf("rule %+v", r)
+		}
+	}
+	for _, code := range []string{"0", "1", "2"} {
+		if s.ExitCodes[code] == "" {
+			t.Errorf("the schema has no exit code %s", code)
+		}
+	}
+	if s.ConfigKeys["rules"] == nil || s.ConfigKeys["baseline"] == nil {
+		t.Errorf("the schema is missing a config key")
+	}
+	if s.Output["finding_fields"] == nil {
+		t.Errorf("the schema does not name the fields of a finding")
+	}
+}
+
+func TestDryRunWritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "a.md", "The valve isn't open.\n")
+	base := filepath.Join(dir, "baseline.json")
+
+	code, stdout, stderr := runCLI(t, "", "baseline", "--no-config", "--baseline", base, "--dry-run", "--format", "json", dir)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	var plan map[string]any
+	if err := json.Unmarshal([]byte(stdout), &plan); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	if plan["dry_run"] != true || plan["action"] != "baseline" {
+		t.Errorf("plan %v", plan)
+	}
+	if _, err := os.Stat(base); !os.IsNotExist(err) {
+		t.Fatalf("--dry-run wrote the file")
+	}
+
+	// The real run writes it.
+	if code, _, _ := runCLI(t, "", "baseline", "--no-config", "--baseline", base, dir); code != 0 {
+		t.Fatal("the real run failed")
+	}
+	if _, err := os.Stat(base); err != nil {
+		t.Fatalf("the real run wrote nothing: %v", err)
+	}
+}
+
+func TestDictDryRun(t *testing.T) {
+	dir := t.TempDir()
+	source := writeFile(t, dir, "spec.md", dictFixture)
+	index := filepath.Join(dir, "dictionary.json")
+
+	code, stdout, _ := runCLI(t, "", "dict", "import", "--out", index, "--dry-run", "--format", "json", source)
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	var plan map[string]any
+	if err := json.Unmarshal([]byte(stdout), &plan); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	if plan["dry_run"] != true || plan["words"].(float64) != 2 {
+		t.Errorf("plan %v", plan)
+	}
+	if _, err := os.Stat(index); !os.IsNotExist(err) {
+		t.Fatal("--dry-run wrote the index")
 	}
 }

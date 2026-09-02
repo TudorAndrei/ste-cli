@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -45,11 +46,16 @@ Usage:
   ste dict <command>            Make a local index of the ASD-STE100
                                 dictionary from your own copy
   ste eval [flags] <dir>        Measure the rules against a labeled corpus
+  ste schema                    Print the interface of this tool as JSON,
+                                for an agent
   ste version                   Print the version
 
 Lint flags:
   --mode          "flavored" (default) or "strict"
-  --format        "text" (default) or "json"
+  --format        "text" (default), "json", or "ndjson"
+  --limit         Maximum number of findings in the output
+  --fields        The fields of a finding to give, separated by a comma
+  --summary       Give only the summary
   --config        Path of the config file. The default is the first of
                   .ste.yml, .ste.yaml, glossary.yml, or docs/glossary.yml.
   --no-config     Do not read a config file
@@ -92,6 +98,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runDict(args[1:], stdout, stderr)
 	case "eval":
 		return runEval(args[1:], stdout, stderr)
+	case "schema":
+		return runSchema(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
 		fmt.Fprintf(stdout, "ste %s\n", Version)
 		return exitOK
@@ -108,7 +116,10 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	fs := pflag.NewFlagSet("lint", pflag.ContinueOnError)
 	fs.SetOutput(stderr)
 	mode := fs.String("mode", "", "flavored or strict")
-	format := fs.String("format", "text", "text or json")
+	format := fs.String("format", "text", "text, json, or ndjson")
+	limit := fs.Int("limit", 0, "maximum number of findings in the output")
+	fields := fs.String("fields", "", "the fields of a finding to give, separated by a comma")
+	summaryOnly := fs.Bool("summary", false, "give only the summary")
 	failOver := fs.Float64("fail-over", -1, "maximum score for each 100 words")
 	maxWords := fs.Int("max-words", 0, "sentence limit in words")
 	cfgPath := fs.String("config", "", "path of the glossary file")
@@ -120,11 +131,30 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	warnAsError := fs.Bool("warnings-as-errors", false, "make each warning an error, and exit with code 1")
 	dictPath := fs.String("dict", "", "path of the dictionary index")
 	useDict := fs.Bool("use-dict", false, "use the imported ASD-STE100 dictionary for rule STE-1.1")
+	dryRun := fs.Bool("dry-run", false, "for the baseline command: show the plan and write nothing")
 	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(stderr, "ste: %v\n", err)
+		fmt.Fprintf(stderr, "Run \"ste help\" for the flags.\n")
 		return exitError
 	}
-	if *format != "text" && *format != "json" {
-		fmt.Fprintf(stderr, "ste: the format %q is not \"text\" or \"json\"\n", *format)
+	if !report.ValidFormat(*format) {
+		fmt.Fprintf(stderr, "ste: the format %q is not one of: %s\n", *format, strings.Join(report.Formats(), ", "))
+		return exitError
+	}
+	shape := report.Options{Format: report.Format(*format), Limit: *limit, SummaryOnly: *summaryOnly}
+	if *fields != "" {
+		shape.Fields = strings.Split(*fields, ",")
+		for i := range shape.Fields {
+			shape.Fields[i] = strings.TrimSpace(shape.Fields[i])
+		}
+		if unknown := report.ValidFields(shape.Fields); len(unknown) > 0 {
+			fmt.Fprintf(stderr, "ste: no field is named %s. The fields are: %s\n",
+				strings.Join(unknown, ", "), strings.Join(report.Fields(), ", "))
+			return exitError
+		}
+	}
+	if *limit < 0 {
+		fmt.Fprintf(stderr, "ste: --limit must not be less than 0\n")
 		return exitError
 	}
 
@@ -205,17 +235,31 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 		if basePath == "" {
 			basePath = baseline.DefaultName
 		}
-		if err := saveBaseline(basePath, results); err != nil {
-			fmt.Fprintf(stderr, "ste: %v\n", err)
-			return exitError
-		}
 		total := 0
 		for _, r := range results {
 			total += len(r.Findings)
 		}
-		fmt.Fprintf(stdout, "%s holds %d findings of %d files.\n", basePath, total, len(results))
-		fmt.Fprintf(stdout, "The tool now reports only a new finding. Remove the file to report all.\n")
-		return exitOK
+		if *dryRun {
+			return writePlan(stdout, shape.Format, map[string]any{
+				"action":   "baseline",
+				"dry_run":  true,
+				"path":     basePath,
+				"findings": total,
+				"files":    len(results),
+				"exists":   fileExists(basePath),
+			}, fmt.Sprintf("A real run writes %s with %d findings of %d files.\n", basePath, total, len(results)))
+		}
+		if err := saveBaseline(basePath, results); err != nil {
+			fmt.Fprintf(stderr, "ste: %v\n", err)
+			return exitError
+		}
+		return writePlan(stdout, shape.Format, map[string]any{
+			"action":   "baseline",
+			"dry_run":  false,
+			"path":     basePath,
+			"findings": total,
+			"files":    len(results),
+		}, fmt.Sprintf("%s holds %d findings of %d files.\nThe tool now reports only a new finding. Remove the file to report all.\n", basePath, total, len(results)))
 	}
 
 	accepted := 0
@@ -228,21 +272,16 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 		results, accepted = applyBaseline(set, results)
 	}
 
-	rep := report.New(string(opts.Normalized().Mode), results)
-	if *format == "json" {
-		err = report.WriteJSON(stdout, rep)
-	} else {
-		err = report.WriteText(stdout, rep)
-	}
-	if err != nil {
+	rep := report.New(string(opts.Normalized().Mode), results, accepted)
+	if err := report.Write(stdout, rep, shape); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
-	if accepted > 0 && *format == "text" {
+	if accepted > 0 && shape.Format == report.FormatText {
 		fmt.Fprintf(stdout, "%d findings are in the baseline %s, thus this report does not show them.\n", accepted, basePath)
 	}
-	if errors := countErrors(rep); opts.WarningsAsErrors && errors > 0 {
-		fmt.Fprintf(stderr, "ste: %d findings have the error severity\n", errors)
+	if opts.WarningsAsErrors && rep.Summary.Errors > 0 {
+		fmt.Fprintf(stderr, "ste: %d findings have the error severity\n", rep.Summary.Errors)
 		return exitThreshold
 	}
 	if *failOnNew && rep.Summary.Findings > 0 {
@@ -256,17 +295,27 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	return exitOK
 }
 
-// countErrors gives the number of findings with the error severity.
-func countErrors(rep report.Report) int {
-	n := 0
-	for _, f := range rep.Files {
-		for _, d := range f.Findings {
-			if d.Severity == checker.SeverityError {
-				n++
-			}
+// fileExists tells if a path is a file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// writePlan gives the result of a command that changes a file, as JSON for
+// an agent or as a line for a person.
+func writePlan(stdout io.Writer, format report.Format, data map[string]any, text string) int {
+	if format == report.FormatJSON || format == report.FormatNDJSON {
+		enc := json.NewEncoder(stdout)
+		if format == report.FormatJSON {
+			enc.SetIndent("", "  ")
 		}
+		if err := enc.Encode(data); err != nil {
+			return exitError
+		}
+		return exitOK
 	}
-	return n
+	fmt.Fprint(stdout, text)
+	return exitOK
 }
 
 // applyBaseline removes the findings that the project accepted before. It
@@ -455,6 +504,7 @@ func runEval(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	format := fs.String("format", "text", "text or json")
 	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
 	dir := "testdata"

@@ -403,6 +403,26 @@ the `info` severity.
 [rules.md](rules.md) gives each rule, its confidence values, and its known
 limits.
 
+## For an agent
+
+An agent is a first-class reader of this tool. `ste schema` prints the full
+interface as JSON. It gives each command and each flag, with the permitted
+values. It also gives each config key, each rule with its number in the
+standard, the fields of a finding, and the exit codes.
+
+```bash
+ste schema                                     # what this tool accepts
+ste lint --format json --summary docs/         # 226 bytes, not 4 MB
+ste lint --format json --limit 20 --fields rule_id,file,line,text docs/
+ste lint --format ndjson docs/                 # one object for each line
+ste baseline --dry-run --format json .         # the plan, and no change
+```
+
+[AGENTS.md](https://github.com/TudorAndrei/ste-cli/blob/main/AGENTS.md)
+gives the rules for an agent. It tells how to keep the output small, why
+exit code 0 is not proof of a clean document, and which findings need a
+person.
+
 ## Commands
 
 ```text
