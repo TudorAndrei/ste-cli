@@ -1,5 +1,7 @@
 package rules
 
+import "strings"
+
 // RuleUnapprovedTerm is the identifier of the term rule.
 const RuleUnapprovedTerm = "STE-1.1"
 
@@ -70,8 +72,20 @@ func Terms(doc Document, opts Options) []Diagnostic {
 				continue
 			}
 			t := s.Tokens[i]
+			if opts.Allowed(t.Lower) {
+				continue
+			}
+			// The dictionary of the user is the authority. The
+			// hand-written list applies only to a word that the
+			// dictionary does not have.
+			if d, ok := lookupDictionary(opts, t.Lower); ok {
+				d.Start, d.End = t.Start, t.End
+				d.Message = "\"" + t.Text + "\" is not an approved word."
+				out = append(out, d)
+				continue
+			}
 			replacement, banned := bannedWords[t.Lower]
-			if !banned || opts.Allowed(t.Lower) {
+			if !banned {
 				continue
 			}
 			out = append(out, Diagnostic{
@@ -86,6 +100,37 @@ func Terms(doc Document, opts Options) []Diagnostic {
 		}
 	}
 	return out
+}
+
+// lookupDictionary asks the dictionary about a word. The second value is
+// false when there is no dictionary, or when the dictionary approves the
+// word, or when the dictionary does not have the word.
+func lookupDictionary(opts Options, word string) (Diagnostic, bool) {
+	if opts.Dictionary == nil {
+		return Diagnostic{}, false
+	}
+	alternatives, onlyVerb, unapproved := opts.Dictionary.Unapproved(word)
+	if !unapproved {
+		return Diagnostic{}, false
+	}
+	// The dictionary is the authority of rule 1.1, thus the confidence is
+	// higher than the confidence of the hand list. But a word that the
+	// dictionary has only as a verb is often a technical noun in the same
+	// text, and this tool cannot see the difference.
+	confidence := 0.95
+	if onlyVerb {
+		confidence = 0.6
+	}
+	suggestion := "The dictionary gives no alternative. Write the idea in approved words."
+	if len(alternatives) > 0 {
+		suggestion = "Write \"" + strings.Join(alternatives, "\", or \"") + "\"."
+	}
+	return Diagnostic{
+		RuleID:     RuleUnapprovedTerm,
+		Severity:   SeverityWarning,
+		Confidence: confidence,
+		Suggestion: suggestion,
+	}, true
 }
 
 func matchPhrase(s Sentence, i int, opts Options) (Diagnostic, int, bool) {

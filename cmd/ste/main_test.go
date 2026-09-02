@@ -544,3 +544,90 @@ func TestWarningsAsErrorsKeepsAnExplicitInfoRule(t *testing.T) {
 		t.Errorf("stdout %q", stdout)
 	}
 }
+
+// The fixture is not the ASD-STE100 dictionary. It has the shape of the
+// table of part 2, with invented words.
+const dictFixture = `## Part 2 – Dictionary
+
+|Word (part of speech)|Approved meaning/ ALTERNATIVES|STE EXAMPLE|Non-STE example|
+|---|---|---|---|
+|FRAMMIS (n)|A part of the machine|INSTALL THE FRAMMIS.||
+|wibble (n)|FRAMMIS (n)|INSTALL THE FRAMMIS.|Install the wibble.|
+`
+
+func TestDictImportAndUse(t *testing.T) {
+	dir := t.TempDir()
+	source := writeFile(t, dir, "spec.md", dictFixture)
+	index := filepath.Join(dir, "dictionary.json")
+
+	// Before the import, there is no index.
+	if code, stdout, _ := runCLI(t, "", "dict", "info", "--out", index); code != 0 || !strings.Contains(stdout, "no index") {
+		t.Fatalf("exit %d, stdout %q", code, stdout)
+	}
+
+	code, stdout, stderr := runCLI(t, "", "dict", "import", "--out", index, source)
+	if code != 0 {
+		t.Fatalf("import: exit %d: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "2 words") || !strings.Contains(stdout, "do not commit") {
+		t.Fatalf("import output %q", stdout)
+	}
+
+	page := writeFile(t, dir, "page.md", "Install the wibble in the frammis.\n")
+
+	// The dictionary is off by default, thus the word gives no finding.
+	if code, stdout, _ := runCLI(t, "", "lint", "--no-config", "--dict", index, page); code != 0 || !strings.Contains(stdout, "0 findings") {
+		t.Fatalf("the dictionary must be off by default: exit %d, stdout %q", code, stdout)
+	}
+
+	// --use-dict makes rule STE-1.1 use it.
+	_, stdout, _ = runCLI(t, "", "lint", "--no-config", "--dict", index, "--use-dict", page)
+	if !strings.Contains(stdout, "STE-1.1") || !strings.Contains(stdout, "wibble") {
+		t.Fatalf("the dictionary gave no finding: %q", stdout)
+	}
+	if !strings.Contains(stdout, "frammis") {
+		t.Fatalf("the report gives no alternative: %q", stdout)
+	}
+}
+
+func TestDictUseWithNoIndexIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	page := writeFile(t, dir, "page.md", "Install the wibble.\n")
+	missing := filepath.Join(dir, "none.json")
+	code, _, stderr := runCLI(t, "", "lint", "--no-config", "--dict", missing, "--use-dict", page)
+	if code != 2 {
+		t.Fatalf("exit %d, want 2", code)
+	}
+	if !strings.Contains(stderr, "dict import") {
+		t.Fatalf("the error must name the command: %q", stderr)
+	}
+}
+
+func TestDictImportRejectsAPDF(t *testing.T) {
+	dir := t.TempDir()
+	pdf := writeFile(t, dir, "spec.pdf", "%PDF-1.4\n")
+	code, _, stderr := runCLI(t, "", "dict", "import", "--out", filepath.Join(dir, "d.json"), pdf)
+	if code != 2 {
+		t.Fatalf("exit %d, want 2", code)
+	}
+	if !strings.Contains(stderr, "anydoc") {
+		t.Fatalf("the error must give the conversion command: %q", stderr)
+	}
+}
+
+func TestDictGlossaryWins(t *testing.T) {
+	// A technical noun of the project stays, even when the dictionary does
+	// not approve it. Rule 1.6 permits it.
+	dir := t.TempDir()
+	source := writeFile(t, dir, "spec.md", dictFixture)
+	index := filepath.Join(dir, "dictionary.json")
+	if code, _, _ := runCLI(t, "", "dict", "import", "--out", index, source); code != 0 {
+		t.Fatal("import failed")
+	}
+	page := writeFile(t, dir, "page.md", "Install the wibble.\n")
+	cfg := writeFile(t, dir, "ste.yml", "dictionary: true\nallow:\n  nouns: [wibble]\n")
+	code, stdout, _ := runCLI(t, "", "lint", "--config", cfg, "--dict", index, page)
+	if code != 0 || !strings.Contains(stdout, "0 findings") {
+		t.Fatalf("the glossary must permit the technical noun: exit %d, %q", code, stdout)
+	}
+}

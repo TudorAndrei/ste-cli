@@ -178,6 +178,58 @@ no `ste-enable` applies to the end of the file.
 A gate reads the report after the baseline, thus an accepted finding never
 blocks. You can give more than one gate.
 
+## The dictionary
+
+ASD-STE100 has two parts. This tool has the writing rules of part 1. Part 2
+is the dictionary: about 900 approved words, and about 1300 words that the
+standard does not approve, each with its approved alternative. Rule 1.1 needs that dictionary.
+
+**This tool does not ship the dictionary.** The specification is the
+property of ASD, and its terms permit no reproduction or publication without
+written authority. But ASD gives the specification **free of charge** to
+each writer and user at [asd-ste100.org](https://www.asd-ste100.org), thus
+you can make the index from your own copy:
+
+```bash
+# 1. Get your own copy from asd-ste100.org, then make the text:
+npx -y @firecrawl/anydoc ASD-STE100_ISSUE9.pdf -o ste100.md
+
+# 2. Make the index. It goes in your cache directory, not in the project.
+ste dict import ste100.md
+
+# 3. Rule STE-1.1 uses it only when you ask:
+ste lint --use-dict docs/
+```
+
+`dictionary: true` in the config does the same as `--use-dict`. `ste dict
+info` shows the index, and `ste dict remove` deletes it.
+
+### The dictionary is off by default, and this is why
+
+ASD-STE100 approves about 900 words, for the maintenance of an aircraft. Ordinary software documentation uses many words that this
+dictionary does not approve: "state", "file", "build", "should". On a
+repository of 180 files, the rules of part 1 gave 1037 findings, and the
+same repository with the dictionary gave **9490**.
+
+The dictionary is correct. It is also too much for a README. Use it for a
+procedure, and use the baseline and `min_confidence` for the rest.
+
+### What the tool cannot know
+
+The dictionary gives a part of speech for each word, and this tool has no
+part-of-speech tagger. "pump" is an example: the dictionary does not approve
+the **verb** "pump", but "pump" is a correct technical noun. A word that the
+dictionary has only as a verb thus gets a confidence of 0.60. The other
+words get 0.95, and `min_confidence: 0.7` removes the first class.
+
+The glossary is the correct answer for your technical nouns. Rule 1.6 and
+rule 1.8 of the standard tell you to do the same:
+
+```yaml
+allow:
+  nouns: [pump, valve, actuator]
+```
+
 ## Config
 
 The tool reads the first of `.ste.yml`, `.ste.yaml`, `glossary.yml`, or
@@ -218,6 +270,7 @@ warnings_as_errors: false
 | `baseline` | The path of the file of accepted findings |
 | `fail_over` | The score that makes the command exit with code 1 |
 | `warnings_as_errors` | Make each warning an error, and exit with code 1 |
+| `dictionary` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
 
 An unknown key is an error, thus a spelling mistake does not stay hidden.
 `--config <path>` reads a different file, and `--no-config` reads no file.
@@ -350,6 +403,8 @@ ste help                      Print the usage
 | `--baseline` | Path of the file of accepted findings |
 | `--fail-on-new` | Exit with code 1 when a finding is not in the baseline |
 | `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
+| `--use-dict` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
+| `--dict` | Path of the dictionary index |
 | `--all` | Read every file, and not only the files that git shows |
 
 A flag can come before or after a path.

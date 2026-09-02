@@ -31,6 +31,7 @@ type file struct {
 	MinConfidence    *float64          `yaml:"min_confidence"`
 	FailOver         *float64          `yaml:"fail_over"`
 	WarningsAsErrors *bool             `yaml:"warnings_as_errors"`
+	Dictionary       *bool             `yaml:"dictionary"`
 	Baseline         *string           `yaml:"baseline"`
 }
 
@@ -56,6 +57,11 @@ type Config struct {
 	// WarningsAsErrors makes each warning an error, and the command then
 	// exits with code 1.
 	WarningsAsErrors bool
+	// Dictionary makes rule STE-1.1 use the imported ASD-STE100
+	// dictionary. It is off by default, because the dictionary approves
+	// about 900 words for aircraft maintenance, thus it reports a large
+	// part of ordinary software documentation.
+	Dictionary bool
 }
 
 // Options makes the checker options from the config.
@@ -136,6 +142,9 @@ func Parse(text string) (Config, error) {
 	}
 	if f.WarningsAsErrors != nil {
 		cfg.WarningsAsErrors = *f.WarningsAsErrors
+	}
+	if f.Dictionary != nil {
+		cfg.Dictionary = *f.Dictionary
 	}
 	if f.MinConfidence != nil {
 		if *f.MinConfidence < 0 || *f.MinConfidence > 1 {

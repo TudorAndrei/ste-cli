@@ -83,6 +83,24 @@ type Options struct {
 	// info finding, because a general recommendation is advice and not a
 	// rule of the standard.
 	WarningsAsErrors bool
+	// Dictionary is the ASD-STE100 dictionary that the user imported from
+	// their own copy. It is nil when there is no import, and then the term
+	// rule uses only its short hand-written list.
+	Dictionary Dictionary
+}
+
+// Dictionary answers the one question that rule 1.1 asks about a word.
+type Dictionary interface {
+	// Unapproved gives the approved alternatives for a word that the
+	// dictionary does not approve. A word that the dictionary does not
+	// have gives false, because rule 1.6 permits a technical noun that is
+	// not in the dictionary.
+	//
+	// onlyVerb is true when the dictionary has the word only as a verb.
+	// English uses many of those words as a noun too, as in "pump", and
+	// this tool has no part-of-speech tagger. The term rule gives a lower
+	// confidence to that finding.
+	Unapproved(word string) (alternatives []string, onlyVerb bool, unapproved bool)
 }
 
 // Confidence gives the lowest confidence that the mode accepts.

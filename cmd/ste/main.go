@@ -42,6 +42,8 @@ Usage:
   ste lint [flags] [path ...]   Check files, directories, or standard input
   ste baseline [flags] [path]   Accept the findings of today, and report only
                                 the new ones from now
+  ste dict <command>            Make a local index of the ASD-STE100
+                                dictionary from your own copy
   ste eval [flags] <dir>        Measure the rules against a labeled corpus
   ste version                   Print the version
 
@@ -60,6 +62,8 @@ Lint flags:
   --fail-over     Exit with code 1 when the score for each 100 words is
                   more than this value
   --max-words     Replace the sentence limit
+  --use-dict      Use the imported ASD-STE100 dictionary for rule STE-1.1
+  --dict          Path of the dictionary index
   --all           Read every file, and not only the files that git shows
 
 Examples:
@@ -84,6 +88,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runLint(args[1:], stdin, stdout, stderr, false)
 	case "baseline":
 		return runLint(args[1:], stdin, stdout, stderr, true)
+	case "dict":
+		return runDict(args[1:], stdout, stderr)
 	case "eval":
 		return runEval(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
@@ -112,6 +118,8 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	noBaseline := fs.Bool("no-baseline", false, "report every finding, and not only the new ones")
 	failOnNew := fs.Bool("fail-on-new", false, "exit with code 1 when a finding is not in the baseline")
 	warnAsError := fs.Bool("warnings-as-errors", false, "make each warning an error, and exit with code 1")
+	dictPath := fs.String("dict", "", "path of the dictionary index")
+	useDict := fs.Bool("use-dict", false, "use the imported ASD-STE100 dictionary for rule STE-1.1")
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
@@ -135,6 +143,21 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	}
 	if *warnAsError {
 		opts.WarningsAsErrors = true
+	}
+	// The dictionary is off by default. It approves about 900 words for
+	// aircraft maintenance, thus it reports a large part of ordinary
+	// software documentation.
+	if *useDict || cfg.Dictionary {
+		index, err := loadDictionary(*dictPath)
+		if err != nil {
+			fmt.Fprintf(stderr, "ste: %v\n", err)
+			return exitError
+		}
+		if index == nil {
+			fmt.Fprintf(stderr, "ste: there is no dictionary index. Run \"ste dict import <file>\" first.\n")
+			return exitError
+		}
+		opts.Dictionary = index
 	}
 
 	results := []report.FileResult{}

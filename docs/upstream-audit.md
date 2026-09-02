@@ -174,8 +174,48 @@ The local copy and its Markdown conversion are in `.standard/`, which
 `.gitignore` excludes. This repository is public, thus git must never see
 that directory.
 
-A future dictionary rule must read a copy that **the user** supplies from
-their own licensed copy. This tool must not ship the dictionary.
+### The terms of ASD, in detail
+
+The copyright page of Issue 9 gives three statements that decide what this
+repository can hold:
+
+<!-- ste-disable STE-3.6 -->
+
+1. **The bar.** "no reproduction or publication of it, in whole or in part,
+   shall be made without the written authority of an officer" of ASD.
+2. **Distribution.** ASD gives the specification free of charge to each
+   writer and user through asd-ste100.org. But: "Unauthorized distribution
+   of ASD-STE100, direct or through different websites or portals, is
+   strictly prohibited without written permission from the STEMG." A public
+   repository is such a portal.
+
+<!-- ste-enable STE-3.6 -->
+3. **Special usage rights.** ASD gives irrevocable permission to 8 groups.
+   They can use, reproduce, or publish the document, in whole or in part,
+   free of charge. The groups include the member companies of ASD, AIA,
+   AIAC, and ICCAIA. They also include the **customers** of those
+   companies, and **universities and research institutes for educational
+   purposes**. The owner of this repository is not in one of those groups.
+
+Statement 2 is the reason that this repository holds no dictionary. Two
+paths can change that: written permission from the STEMG, or an owner who
+is in one of the groups of statement 3.
+
+Statement 2 also gives the design of the `ste dict` command. The
+specification is free for each user, thus a user can make the index from
+their own copy. The tool ships the parser, the user supplies the data, and
+nothing moves from one user to another.
+
+### What a rule number is
+
+A rule number, a numeric limit, and a statement in our own words are facts
+about the specification. Copyright protects the expression of an idea, and
+not the idea. The dictionary is different. It is a compilation, and ASD is in
+Brussels. Thus the database right of the European Union can protect the
+investment in it, and that right is separate from copyright. This is the
+reason for more care with the dictionary than with the rules.
+
+This is not legal advice.
 
 ## Dependencies
 
