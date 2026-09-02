@@ -18,7 +18,7 @@ GitHub releases of this repository:
 
 ```bash
 mise use -g github:TudorAndrei/ste-cli        # the newest release
-mise use -g github:TudorAndrei/ste-cli@0.4.0  # one version
+mise use -g github:TudorAndrei/ste-cli@0.5.0  # one version
 ste version
 ```
 
@@ -32,7 +32,7 @@ project:
 
 mise finds the correct asset for your platform without an option. The
 archive names use the words that its asset matcher knows, for example
-`ste-0.4.0-darwin-arm64.tar.gz` and `ste-0.4.0-linux-x64.tar.gz`. Each
+`ste-0.5.0-darwin-arm64.tar.gz` and `ste-0.5.0-linux-x64.tar.gz`. Each
 release also has a `checksums.txt` file, thus mise can verify the download
 and write it to `mise.lock`.
 
@@ -278,8 +278,8 @@ archives for the 5 platforms, and makes the GitHub release with a
 `checksums.txt` file.
 
 ```bash
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 To make the same archives on your computer:
@@ -289,7 +289,7 @@ mise run dist       # writes dist/
 ```
 
 The version in the binary comes from the tag:
-`go build -ldflags "-X main.Version=0.4.0"`. A build from the source
+`go build -ldflags "-X main.Version=0.5.0"`. A build from the source
 without that flag says `dev`.
 
 ## Limits
