@@ -52,5 +52,9 @@ allow:
 # value. Without this key, the tool never blocks.
 # fail_over: 2.5
 
+# Make each warning an error, and exit with code 1. An info finding stays
+# advice, because a general recommendation is not a rule of the standard.
+# warnings_as_errors: true
+
 # The old name for "rules: <id>: off".
 disable_rules: []

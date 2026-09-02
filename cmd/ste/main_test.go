@@ -481,3 +481,66 @@ func TestFailOverFromTheConfig(t *testing.T) {
 		t.Fatalf("exit %d, want 0", code)
 	}
 }
+
+func TestWarningsAsErrors(t *testing.T) {
+	dir := t.TempDir()
+	// A contraction is a warning. A Latin abbreviation is info, because a
+	// general recommendation is advice and not a rule.
+	path := writeFile(t, dir, "draft.md", "The valve isn't open, e.g. the second one.\n")
+
+	// By default the tool does not block.
+	if code, _, _ := runCLI(t, "", "lint", "--no-config", path); code != 0 {
+		t.Fatalf("exit %d, want 0", code)
+	}
+
+	code, stdout, stderr := runCLI(t, "", "lint", "--no-config", "--warnings-as-errors", path)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "error [STE-4.2]") {
+		t.Errorf("the warning did not become an error: %q", stdout)
+	}
+	if !strings.Contains(stdout, "info [STE-GR-6]") {
+		t.Errorf("a general recommendation must stay advice: %q", stdout)
+	}
+}
+
+func TestWarningsAsErrorsFromTheConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, "draft.md", "The valve isn't open.\n")
+	cfg := writeFile(t, dir, "ste.yml", "warnings_as_errors: true\n")
+	if code, _, _ := runCLI(t, "", "lint", "--config", cfg, path); code != 1 {
+		t.Fatalf("exit %d, want 1", code)
+	}
+}
+
+func TestWarningsAsErrorsObeysTheBaseline(t *testing.T) {
+	// An accepted finding must not block, even with this flag. The gate is
+	// for the new work, and not for the text that the project accepted.
+	dir := t.TempDir()
+	writeFile(t, dir, "old.md", "The valve isn't open.\n")
+	base := filepath.Join(dir, "baseline.json")
+	if code, _, stderr := runCLI(t, "", "baseline", "--no-config", "--baseline", base, dir); code != 0 {
+		t.Fatalf("baseline: exit %d: %s", code, stderr)
+	}
+	if code, _, _ := runCLI(t, "", "lint", "--no-config", "--baseline", base, "--warnings-as-errors", dir); code != 0 {
+		t.Fatalf("exit %d, want 0: the baseline must hide the finding", code)
+	}
+	writeFile(t, dir, "new.md", "The report isn't ready.\n")
+	if code, _, _ := runCLI(t, "", "lint", "--no-config", "--baseline", base, "--warnings-as-errors", dir); code != 1 {
+		t.Fatalf("exit %d, want 1: a new finding must block", code)
+	}
+}
+
+func TestWarningsAsErrorsKeepsAnExplicitInfoRule(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, "draft.md", "The valve isn't open.\n")
+	cfg := writeFile(t, dir, "ste.yml", "rules:\n  STE-4.2: info\n")
+	code, stdout, _ := runCLI(t, "", "lint", "--config", cfg, "--warnings-as-errors", path)
+	if code != 0 {
+		t.Fatalf("exit %d, want 0: an explicit info rule must not become an error", code)
+	}
+	if !strings.Contains(stdout, "info [STE-4.2]") {
+		t.Errorf("stdout %q", stdout)
+	}
+}

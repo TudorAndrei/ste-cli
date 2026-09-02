@@ -25,12 +25,13 @@ type file struct {
 		Nouns []string `yaml:"nouns"`
 		Verbs []string `yaml:"verbs"`
 	} `yaml:"allow"`
-	DisableRules  []string          `yaml:"disable_rules"`
-	Rules         map[string]string `yaml:"rules"`
-	Exclude       []string          `yaml:"exclude"`
-	MinConfidence *float64          `yaml:"min_confidence"`
-	FailOver      *float64          `yaml:"fail_over"`
-	Baseline      *string           `yaml:"baseline"`
+	DisableRules     []string          `yaml:"disable_rules"`
+	Rules            map[string]string `yaml:"rules"`
+	Exclude          []string          `yaml:"exclude"`
+	MinConfidence    *float64          `yaml:"min_confidence"`
+	FailOver         *float64          `yaml:"fail_over"`
+	WarningsAsErrors *bool             `yaml:"warnings_as_errors"`
+	Baseline         *string           `yaml:"baseline"`
 }
 
 // Config is the content of the config file.
@@ -52,17 +53,21 @@ type Config struct {
 	FailOver float64
 	// Baseline is the path of the file of accepted findings.
 	Baseline string
+	// WarningsAsErrors makes each warning an error, and the command then
+	// exits with code 1.
+	WarningsAsErrors bool
 }
 
 // Options makes the checker options from the config.
 func (c Config) Options() rules.Options {
 	opts := rules.Options{
-		MaxWords:      c.MaxWords,
-		AllowNouns:    c.AllowNouns,
-		AllowVerbs:    c.AllowVerbs,
-		DisableRules:  c.DisableRules,
-		RuleSeverity:  c.Rules,
-		MinConfidence: c.MinConfidence,
+		MaxWords:         c.MaxWords,
+		AllowNouns:       c.AllowNouns,
+		AllowVerbs:       c.AllowVerbs,
+		DisableRules:     c.DisableRules,
+		RuleSeverity:     c.Rules,
+		MinConfidence:    c.MinConfidence,
+		WarningsAsErrors: c.WarningsAsErrors,
 	}
 	if c.Mode != "" {
 		opts.Mode = rules.Mode(c.Mode)
@@ -128,6 +133,9 @@ func Parse(text string) (Config, error) {
 	}
 	if f.FailOver != nil {
 		cfg.FailOver = *f.FailOver
+	}
+	if f.WarningsAsErrors != nil {
+		cfg.WarningsAsErrors = *f.WarningsAsErrors
 	}
 	if f.MinConfidence != nil {
 		if *f.MinConfidence < 0 || *f.MinConfidence > 1 {

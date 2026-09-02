@@ -94,6 +94,7 @@ The tool always reads a file or a directory that you give by its path.
 | `--baseline` | Path of the file of accepted findings |
 | `--no-baseline` | Report every finding, and not only the new ones |
 | `--fail-on-new` | Exit with code 1 when a finding is not in the baseline |
+| `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
 | `--all` | Read every file, and not only the files that git shows |
 
 ### Exit codes
@@ -125,7 +126,8 @@ A checker that reports 1000 findings on its first day is a checker that a
 team removes. This tool is an aid, and not a gate:
 
 - It exits with code 0 even when it finds something. It blocks only when you
-  ask for a gate with `--fail-on-new` or `--fail-over`.
+  ask for a gate with `--fail-on-new`, `--warnings-as-errors`, or
+  `--fail-over`.
 - A baseline accepts the findings that exist today, thus only a new finding
   comes to your attention.
 - Each rule has its own severity, thus you can accept the rules one at a
@@ -160,6 +162,17 @@ The tool does not check this block.
 A directive with no rule identifier applies to every rule. A directive with
 no `ste-enable` applies to the end of the file.
 
+### The three gates
+
+| Gate | Blocks when |
+|---|---|
+| `--fail-on-new` | A finding is not in the baseline |
+| `--warnings-as-errors` | A finding has the warning severity, which becomes an error. An info finding stays advice. |
+| `--fail-over <n>` | The score for each 100 words is more than n |
+
+A gate reads the report after the baseline, thus an accepted finding never
+blocks. You can give more than one gate.
+
 ## Config
 
 The tool reads the first of `.ste.yml`, `.ste.yaml`, `glossary.yml`, or
@@ -185,6 +198,7 @@ min_confidence: 0.6     # remove each finding below this value
 max_words: 25           # replace the sentence limits of the standard
 baseline: .ste-baseline.json
 fail_over: 2.5          # without this key, the tool never blocks
+warnings_as_errors: false
 ```
 
 An unknown key is an error, thus a spelling mistake does not stay hidden.

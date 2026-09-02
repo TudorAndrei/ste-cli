@@ -54,6 +54,9 @@ Lint flags:
   --baseline      Path of the file of accepted findings
   --no-baseline   Report every finding, and not only the new ones
   --fail-on-new   Exit with code 1 when a finding is not in the baseline
+  --warnings-as-errors
+                  Make each warning an error, and exit with code 1. An info
+                  finding stays advice.
   --fail-over     Exit with code 1 when the score for each 100 words is
                   more than this value
   --max-words     Replace the sentence limit
@@ -108,6 +111,7 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	baselinePath := fs.String("baseline", "", "path of the file of accepted findings")
 	noBaseline := fs.Bool("no-baseline", false, "report every finding, and not only the new ones")
 	failOnNew := fs.Bool("fail-on-new", false, "exit with code 1 when a finding is not in the baseline")
+	warnAsError := fs.Bool("warnings-as-errors", false, "make each warning an error, and exit with code 1")
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
@@ -128,6 +132,9 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	}
 	if *failOver < 0 {
 		*failOver = cfg.FailOver
+	}
+	if *warnAsError {
+		opts.WarningsAsErrors = true
 	}
 
 	results := []report.FileResult{}
@@ -211,6 +218,10 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	if accepted > 0 && *format == "text" {
 		fmt.Fprintf(stdout, "%d findings are in the baseline %s, thus this report does not show them.\n", accepted, basePath)
 	}
+	if errors := countErrors(rep); opts.WarningsAsErrors && errors > 0 {
+		fmt.Fprintf(stderr, "ste: %d findings have the error severity\n", errors)
+		return exitThreshold
+	}
 	if *failOnNew && rep.Summary.Findings > 0 {
 		fmt.Fprintf(stderr, "ste: %d findings are not in the baseline\n", rep.Summary.Findings)
 		return exitThreshold
@@ -220,6 +231,19 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 		return exitThreshold
 	}
 	return exitOK
+}
+
+// countErrors gives the number of findings with the error severity.
+func countErrors(rep report.Report) int {
+	n := 0
+	for _, f := range rep.Files {
+		for _, d := range f.Findings {
+			if d.Severity == checker.SeverityError {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 // applyBaseline removes the findings that the project accepted before. It

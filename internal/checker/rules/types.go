@@ -79,6 +79,10 @@ type Options struct {
 	// MinConfidence removes each finding below this value. A value of 0
 	// selects the default of the mode.
 	MinConfidence float64
+	// WarningsAsErrors makes each warning an error. It does not change an
+	// info finding, because a general recommendation is advice and not a
+	// rule of the standard.
+	WarningsAsErrors bool
 }
 
 // Confidence gives the lowest confidence that the mode accepts.
@@ -94,6 +98,18 @@ func (o Options) Confidence() float64 {
 
 // Severity gives the severity of a finding after the config applies.
 func (o Options) Severity(ruleID string, given Severity) Severity {
+	return o.promote(o.severity(ruleID, given))
+}
+
+// promote makes a warning an error when the config asks for it.
+func (o Options) promote(s Severity) Severity {
+	if o.WarningsAsErrors && s == SeverityWarning {
+		return SeverityError
+	}
+	return s
+}
+
+func (o Options) severity(ruleID string, given Severity) Severity {
 	if s, ok := o.RuleSeverity[ruleID]; ok {
 		return s
 	}
