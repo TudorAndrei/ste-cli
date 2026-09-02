@@ -1,6 +1,6 @@
 ---
 title: Rules
-description: The 11 rules, their confidence values, and their limits.
+description: The 11 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
 ---
 
 # Rules
@@ -195,15 +195,22 @@ phrasal verb from two words.
 
 ## STE-GR-6 Latin abbreviation
 
-Reports "e.g.", "i.e.", "etc.", and 5 more Latin abbreviations. GR-6 is a general
-recommendation, thus the severity is `info` and strict mode does not make it
-an error.
+Reports "e.g.", "i.e.", "etc.", and 5 more Latin abbreviations. GR-6 is a
+general recommendation, thus the severity is `info`, and no mode and no flag
+makes it an error.
+
+**Limits.** A Latin abbreviation is lower-case and it ends with a period.
+The tool obeys both conditions, thus it does not report the name "VS Code"
+and it does not report "vs" as a column title. Before version 0.5.0, the
+name "VS Code" gave 147 wrong findings in one repository.
 
 ## What the tool does not examine
 
 A CommonMark parser reads the document, and the tool keeps only the prose.
 Thus no rule sees:
 
+- the front matter at the top of a file, between "---" or "+++" fences.
+  Front matter is data for a tool, and it is not prose.
 - a fenced code block or an indented code block
 - inline code
 - the target of a link, an autolink, or an image
@@ -224,6 +231,20 @@ period.
 
 A file or a directory that you give by its path is always read. The `--all`
 flag removes both filters.
+
+## How to silence a finding
+
+No rule set is correct for every sentence. A wrong finding must not stop the
+work, thus the tool gives four methods:
+
+| Method | Use it for |
+|---|---|
+| `<!-- ste-disable-next-line -->` in the text | one sentence |
+| `rules: {STE-3.6: off}` in the config | one rule, for the project |
+| `exclude:` in the config | a directory or a file type |
+| `ste baseline .` | each finding that exists today |
+
+The [start page](index.md) gives the full config and the other directives.
 
 ## Rules that this tool does not check
 

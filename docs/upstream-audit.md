@@ -1,6 +1,6 @@
 ---
 title: Upstream audit
-description: The license and the provenance decision for each related project.
+description: The license and the provenance decision for each related project, and what this repository takes from the specification.
 ---
 
 # Upstream audit

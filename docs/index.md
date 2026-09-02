@@ -1,6 +1,6 @@
 ---
 title: ste
-description: A deterministic ASD-STE100 checker for Markdown and plain text.
+description: A deterministic ASD-STE100 checker for Markdown and plain text. Start with a baseline, and block only a new violation.
 ---
 
 # ste

@@ -1,10 +1,18 @@
 title: ste
+tagline: Simplified Technical English for your docs
 description: >-
-  A deterministic ASD-STE100 (Simplified Technical English) checker for
-  Markdown and plain text. One Go binary, no dependencies.
+  A deterministic ASD-STE100 checker for Markdown and plain text. It reports
+  the passive voice, long sentences, phrasal verbs, and 8 more rules, with the
+  exact span of each one. Start with a baseline, and block only a new
+  violation.
 theme: jekyll-theme-primer
 url: https://tudorandrei.github.io
 baseurl: /ste-cli
+
+# The card that a chat application or a social network shows for a link.
+image: https://tudorandrei.github.io/ste-cli/assets/og.png
+twitter:
+  card: summary_large_image
 
 # The glossary is a data file for the tool, not a page of the site.
 exclude:
@@ -15,3 +23,4 @@ defaults:
       path: ""
     values:
       layout: default
+      image: https://tudorandrei.github.io/ste-cli/assets/og.png

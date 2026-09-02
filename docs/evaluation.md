@@ -1,6 +1,6 @@
 ---
 title: Evaluation
-description: The measured precision and recall of the rules, and the limits of that measurement.
+description: The measured precision and recall of the rules, the defects that a run on a real repository found, and the limits of the measurement.
 ---
 
 # Evaluation
@@ -135,6 +135,27 @@ The run found 2 defects in the tool, and version 0.2.1 corrects them:
 
 `docs/rules.md` gives the rules that the audit found to be not mechanically
 checkable. The tool does not try to check them.
+
+### The tool on a repository of 180 files
+
+Version 0.4.0 ran on a repository of software documentation that is not part
+of this project: 180 files, 93654 words, mostly architecture decision
+records. The run gave 1295 findings in 0.09 seconds. A person then read the
+findings.
+
+| Group | Findings | Verdict |
+|---|---|---|
+| Front matter | 127 | **Wrong.** 169 of the 180 files start with YAML front matter. CommonMark has no front matter, thus the parser read the keys as a sentence. |
+| The name "VS Code" | 147 | **Wrong.** The rule for a Latin abbreviation matched the name. |
+| Semicolons, passive voice, long sentences | ~1000 | Correct on a sample of each rule. |
+
+Version 0.5.0 corrects both defects, and the same repository now gives 1037
+findings. The correction is 258 findings, or 20% of the first result.
+
+This measurement is the reason for the controls in version 0.5.0. A tool
+that gives 1295 findings on its first day is a tool that a team removes,
+even when 80% of the findings are correct. The baseline, the severity of
+each rule, and the directives in the text give a team a way to start.
 
 ## 5. The rule for a new rule
 
