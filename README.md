@@ -69,6 +69,10 @@ ste eval testdata
 A path can be a file or a directory. A directory gives all `.md`,
 `.markdown`, and `.txt` files below it. A path of `-` reads standard input.
 
+A walk does not go into `node_modules`, `vendor`, `dist`, `build`, `target`,
+`bin`, `obj`, `out`, `coverage`, `__pycache__`, or a directory whose name
+starts with a period. To check one of these, give its path to the command.
+
 ### Flags of the lint command
 
 | Flag | Function |

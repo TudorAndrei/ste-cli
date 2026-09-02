@@ -79,7 +79,7 @@ defect, and each defect now has a test:
 | Wrong finding | Cause | Correction |
 |---|---|---|
 | `STE-3.6` on "is MIT-licensed" | A hyphenated adjective ends with "ed". | `isCompound` in `rules/verbs.go`. |
-| `STE-1.1` on "Additional documentation" | An indented code block was prose. | Indented-block mask in `checker/document.go`. |
+| `STE-1.1` on `Additional documentation` | An indented code block was prose. | Indented-block mask in `checker/document.go`. |
 | 3 × `STE-5.1` on a 26 to 35-word "sentence" | Inline code after a period hid the start of the next sentence, thus two sentences became one. | The look-ahead in `endsSentence` uses the source text. |
 | `STE-5.1` on a 34-word "sentence" | The cells of a Markdown table row became one sentence. | A cell separator is a sentence boundary. |
 
@@ -97,7 +97,7 @@ defect, and each defect now has a test:
 
 The first version of this tool used rule numbers that were an estimate. An
 audit of ASD-STE100 Issue 9, one agent for each group of sections, gave the
-true numbers and found 6 defects. All 6 are corrected.
+true numbers and found 6 defects. This version corrects all 6.
 
 | Defect | Correction |
 |---|---|
@@ -110,13 +110,27 @@ true numbers and found 6 defects. All 6 are corrected.
 
 Two more defects came from the same audit and have tests:
 
-- A step of a procedure that continues on a second line was two sentences,
-  thus its full length was never measured.
-- "is being adjusted" gave a progressive finding and a passive finding. Only
-  the passive finding is correct.
+- A step of a procedure that continues on a second line became two
+  sentences. Thus the tool never measured its full length.
+- `is being adjusted` gave a progressive finding and a passive finding.
+  Only the passive finding is correct.
 
 The audit also confirmed that `STE-1.1`, `STE-3.5`, `STE-4.2`, `STE-5.1`,
 and `STE-8.1` had the correct numbers.
+
+### The tool on its own repository
+
+Version 0.2.0 ran on this repository. The run gave 76 findings in 12 files.
+56 of the findings are correct and expected: 20 in the invalid fixtures, and
+36 in the quoted examples of the rule pages. 13 are correct findings in
+`idea.md`, which is not written in Simplified Technical English.
+
+The run found 2 defects in the tool, and version 0.2.1 corrects them:
+
+| Defect | Correction |
+|---|---|
+| `STE-1.14` reported "Defence" in the name of an organization. A name keeps its spelling, and rule 8.6 makes a proper noun one unit. | The rule does not report a capitalized word that does not start its sentence. |
+| The walk of a directory read `dist/`, which holds build output. | The walk does not go into a directory that holds build output or dependencies. |
 
 `docs/rules.md` gives the rules that the audit found to be not mechanically
 checkable. The tool does not try to check them.

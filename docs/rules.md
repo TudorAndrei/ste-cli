@@ -40,7 +40,7 @@ of a rule one step stronger. The mode does **not** change a word limit.
 Reports 27 words and 11 word groups that have a shorter replacement, for
 example "utilize" and "in order to".
 
-**Limits.** The list is written by hand. It is not the ASD-STE100
+**Limits.** A person wrote the list by hand. It is not the ASD-STE100
 approved-word dictionary, and this tool cannot tell you if a word is in that
 dictionary. Rule 1.1 also has parts that need the dictionary: the approved
 part of speech (rule 1.2) and the approved meaning (rule 1.3). This tool
@@ -55,9 +55,16 @@ company or industry, thus a project glossary agrees with the standard.
 Reports 54 British spellings that have one American form, for example
 "colour" and "centre". Rule 1.14 tells you to use American English spelling.
 
-**Limits.** The list keeps out each pair that needs a part of speech. Three
-examples are "licence", "practise", and "programme". A different official
-directive can replace rule 1.14. Use `disable_rules` for that.
+**Limits.**
+
+- The list keeps out each pair that needs a part of speech. Three examples
+  are "licence", "practise", and "programme".
+- The tool does not report a capitalized word that does not start its
+  sentence, because that word is usually a name. An example is "Defence" in
+  the name of an organization. Thus the tool does not find a British
+  spelling in a title with capital letters on each word.
+- A different official directive can replace rule 1.14. Use `disable_rules`
+  for that.
 
 ## STE-3.4 Complex verb construction
 
@@ -205,6 +212,12 @@ A heading, an empty line, and the start of a list item are sentence
 boundaries. A list item keeps the lines that continue it. Each cell of a
 table row is a different sentence. This is a decision of this tool, and not
 a rule of the standard.
+
+When you give a directory, the tool does not go into a directory that holds
+build output or dependencies: `node_modules`, `vendor`, `dist`, `build`,
+`target`, `bin`, `obj`, `out`, `coverage`, `__pycache__`, and each directory
+whose name starts with a period. To check one of these directories, give its
+path to the command.
 
 ## Rules that this tool does not check
 

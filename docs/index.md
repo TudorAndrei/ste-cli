@@ -75,7 +75,10 @@ ste lint docs/
 cat draft.md | ste lint -
 ```
 
-A directory gives all `.md`, `.markdown`, and `.txt` files below it.
+A directory gives all `.md`, `.markdown`, and `.txt` files below it. The
+walk does not go into `node_modules`, `vendor`, `dist`, `build`, `target`,
+`bin`, `obj`, `out`, `coverage`, `__pycache__`, or a directory whose name
+starts with a period. To check one of these, give its path to the command.
 
 The text output has one line for each finding, and then a summary:
 

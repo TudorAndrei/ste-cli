@@ -166,7 +166,7 @@ What entered this repository from that work:
 What did **not** enter this repository:
 
 - The text of the specification, its tables, and its example sentences.
-- **The dictionary of part 2.** Part 2 gives approximately 2000 words in a
+- **The dictionary of part 2.** Part 2 gives about 2000 words in a
   form that a program can parse. It is the largest and most valuable part of
   the specification, and it stays out of this repository.
 

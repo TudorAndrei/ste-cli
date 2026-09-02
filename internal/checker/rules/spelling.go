@@ -1,5 +1,7 @@
 package rules
 
+import "unicode"
+
 // Identifiers of the word-level rules that come from Issue 9.
 const (
 	// RuleSpelling is rule 1.14: use American English spelling.
@@ -47,9 +49,16 @@ var britishSpellings = map[string]string{
 func Spelling(doc Document, opts Options) []Diagnostic {
 	out := []Diagnostic{}
 	for _, s := range doc.Sentences {
-		for _, t := range s.Tokens {
+		for i, t := range s.Tokens {
 			american, found := britishSpellings[t.Lower]
 			if !found || opts.Allowed(t.Lower) {
+				continue
+			}
+			// A capitalized word that does not start the sentence is
+			// usually a name, as in "the Defence Industries Association".
+			// A name keeps its spelling. Rule 8.6 also makes a proper noun
+			// one unit.
+			if i > 0 && isCapitalized(t.Text) {
 				continue
 			}
 			out = append(out, Diagnostic{
@@ -153,6 +162,15 @@ func LatinAbbreviations(doc Document, opts Options) []Diagnostic {
 		}
 	}
 	return out
+}
+
+// isCapitalized tells if the word starts with a capital letter.
+func isCapitalized(word string) bool {
+	if word == "" {
+		return false
+	}
+	r := []rune(word)[0]
+	return unicode.IsUpper(r)
 }
 
 // tokensMatch tells if the tokens at i are the given words.

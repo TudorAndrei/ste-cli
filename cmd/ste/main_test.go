@@ -145,6 +145,53 @@ func TestLintDirectory(t *testing.T) {
 	}
 }
 
+func TestWalkSkipsBuildOutput(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "guide.md", "The valve isn't open.\n")
+	for _, name := range []string{"dist", "node_modules", ".cache"} {
+		sub := filepath.Join(dir, name)
+		if err := os.MkdirAll(sub, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		writeFile(t, sub, "notes.md", "The report isn't ready.\n")
+	}
+
+	code, stdout, stderr := runCLI(t, "", "lint", "--no-config", "--format", "json", dir)
+	if code != 0 {
+		t.Fatalf("exit %d, want 0: %s", code, stderr)
+	}
+	var rep struct {
+		Summary struct {
+			Files int `json:"files"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &rep); err != nil {
+		t.Fatalf("the output is not JSON: %v", err)
+	}
+	if rep.Summary.Files != 1 {
+		t.Fatalf("files %d, want 1: the walk must not read build output", rep.Summary.Files)
+	}
+}
+
+func TestAGivenDirectoryIsAlwaysRead(t *testing.T) {
+	// The walk skips "dist" below a directory, but it reads "dist" when
+	// you give that path to the command.
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "dist")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	writeFile(t, sub, "notes.md", "The report isn't ready.\n")
+
+	code, stdout, stderr := runCLI(t, "", "lint", "--no-config", sub)
+	if code != 0 {
+		t.Fatalf("exit %d, want 0: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "STE-4.2") {
+		t.Fatalf("the given directory was not read: %q", stdout)
+	}
+}
+
 func TestTheSentenceTypeSelectsTheLimit(t *testing.T) {
 	dir := t.TempDir()
 	// The sentence has 22 words: correct as descriptive text (limit 25),

@@ -41,6 +41,27 @@ func TestSpellingRuleObeysTheGlossary(t *testing.T) {
 	}
 }
 
+func TestSpellingRuleKeepsAName(t *testing.T) {
+	// "Defence" is part of the name of an organization. A name keeps its
+	// spelling.
+	text := "The AeroSpace and Defence Industries Association makes the standard."
+	if got := checker.Lint(text, checker.Options{}); len(got) != 0 {
+		t.Fatalf("got %d findings, want 0: %s", len(got), format(text, got))
+	}
+}
+
+func TestSpellingRuleStillReportsTheFirstWord(t *testing.T) {
+	// A capital letter at the start of a sentence is not a name.
+	text := "Colour is not correct here."
+	got := checker.Lint(text, checker.Options{})
+	if len(got) != 1 {
+		t.Fatalf("got %d findings, want 1: %s", len(got), format(text, got))
+	}
+	if got[0].RuleID != "STE-1.14" {
+		t.Errorf("rule %s, want STE-1.14", got[0].RuleID)
+	}
+}
+
 func TestNominalizationRule(t *testing.T) {
 	text := "Do a check of the pressure."
 	got := checker.Lint(text, checker.Options{})

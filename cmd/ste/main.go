@@ -234,6 +234,23 @@ func options(cfgPath string, noConfig bool, mode string, maxWords int) (checker.
 	return opts, nil
 }
 
+// skippedDirs are the directories that hold build output or dependencies.
+// A walk does not go into them, because their text is not your prose. A
+// directory that starts with "." is also skipped. To check one of these
+// directories, give its path to the command.
+var skippedDirs = map[string]bool{
+	"node_modules": true,
+	"vendor":       true,
+	"dist":         true,
+	"build":        true,
+	"target":       true,
+	"bin":          true,
+	"obj":          true,
+	"out":          true,
+	"coverage":     true,
+	"__pycache__":  true,
+}
+
 // textFiles gives the files to check. A directory gives all Markdown and
 // text files below it.
 func textFiles(path string) ([]string, error) {
@@ -244,13 +261,20 @@ func textFiles(path string) ([]string, error) {
 	if !info.IsDir() {
 		return []string{path}, nil
 	}
+	root := filepath.Clean(path)
 	out := []string{}
 	err = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
-			if name := d.Name(); name != "." && strings.HasPrefix(name, ".") {
+			// The directory that you give is always read. Only a
+			// directory below it can be skipped.
+			if filepath.Clean(p) == root {
+				return nil
+			}
+			name := d.Name()
+			if strings.HasPrefix(name, ".") || skippedDirs[name] {
 				return filepath.SkipDir
 			}
 			return nil
