@@ -20,6 +20,10 @@ type (
 	Sentence = rules.Sentence
 	// Token is one word.
 	Token = rules.Token
+	// Dictionary is the ASD-STE100 dictionary of the user.
+	Dictionary = rules.Dictionary
+	// DictionaryResult is what the dictionary says about a word.
+	DictionaryResult = rules.DictionaryResult
 )
 
 // Severity values.

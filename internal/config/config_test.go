@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/TudorAndrei/ste-cli/internal/checker"
@@ -166,5 +167,52 @@ func TestShippedGlossaryParses(t *testing.T) {
 	}
 	if cfg.Mode == "" {
 		t.Error("docs/glossary.yml gives no mode")
+	}
+}
+
+func TestSoftwarePreset(t *testing.T) {
+	// ASD-STE100 is a language for the maintenance of an aircraft, thus
+	// its dictionary does not approve "hook" or "build". Rule 1.5 of the
+	// standard permits the technical nouns of a subject field, and
+	// category 19 is computer science.
+	cfg, err := config.Parse("presets: [software]\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(cfg.Presets) != 1 || cfg.Presets[0] != "software" {
+		t.Errorf("presets %v", cfg.Presets)
+	}
+	has := map[string]bool{}
+	for _, n := range cfg.AllowNouns {
+		has[n] = true
+	}
+	for _, word := range []string{"hook", "file", "build", "graph", "commit", "webhook"} {
+		if !has[word] {
+			t.Errorf("the software preset has no %q", word)
+		}
+	}
+	// The preset joins the nouns of the project.
+	cfg, err = config.Parse("presets: [software]\nallow:\n  nouns: [criv]\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	found := false
+	for _, n := range cfg.AllowNouns {
+		if n == "criv" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("the preset removed the nouns of the project")
+	}
+}
+
+func TestAnUnknownPresetIsAnError(t *testing.T) {
+	_, err := config.Parse("presets: [aerospace]\n")
+	if err == nil {
+		t.Fatal("the parser accepted an unknown preset")
+	}
+	if !strings.Contains(err.Error(), "software") {
+		t.Errorf("the error must name the presets: %v", err)
 	}
 }

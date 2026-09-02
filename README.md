@@ -97,6 +97,7 @@ The tool always reads a file or a directory that you give by its path.
 | `--fail-on-new` | Exit with code 1 when a finding is not in the baseline |
 | `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
 | `--use-dict` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
+| `--preset` | Add the technical nouns of a subject field: `software` |
 | `--dict` | Path of the dictionary index |
 | `--all` | Read every file, and not only the files that git shows |
 
@@ -232,13 +233,38 @@ same repository with the dictionary gave **9490**.
 The dictionary is correct. It is also too much for a README. Use it for a
 procedure, and use the baseline and `min_confidence` for the rest.
 
+### The technical nouns of your field
+
+ASD-STE100 is a language for the maintenance of an aircraft. Its dictionary
+does not approve "hook", "file", "build", or "graph", because those words
+are not part of that field. Rule 1.5 of the standard gives 22 categories of
+technical noun, and category 19 is computer science and information
+technology. Thus a writer of software documentation is permitted to use the
+technical nouns of software.
+
+```yaml
+presets: [software]     # or: ste lint --preset software
+```
+
+The preset holds about 170 technical nouns of software and of information
+technology. On one repository of 180 files, the dictionary gave 8213
+findings, and the dictionary with this preset gave 6709.
+
 ### What the tool cannot know
 
 The dictionary gives a part of speech for each word, and this tool has no
-part-of-speech tagger. "pump" is an example: the dictionary does not approve
-the **verb** "pump", but "pump" is a correct technical noun. A word that the
-dictionary has only as a verb thus gets a confidence of 0.60. The other
-words get 0.95, and `min_confidence: 0.7` removes the first class.
+part-of-speech tagger. "graph" is an example: the dictionary does not
+approve the **verb** "graph", but "a graph" is a correct technical noun.
+
+The tool uses the shape of the sentence in place of a tagger: a determiner
+in the same noun phrase makes the word a noun. Thus "The dependency graph
+is large" gives no finding, and "Graph the test results" gives one. A modal
+verb ends the phrase, thus "The tool can graph the results" gives a finding
+too.
+
+The test is not perfect. A word that the dictionary has only as a verb gets
+a confidence of 0.60. The other words get 0.95. Thus `min_confidence: 0.7`
+removes the first class.
 
 The glossary is the correct answer for your technical nouns. Rule 1.6 and
 rule 1.8 of the standard tell you to do the same:

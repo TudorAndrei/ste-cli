@@ -78,7 +78,7 @@ func Terms(doc Document, opts Options) []Diagnostic {
 			// The dictionary of the user is the authority. The
 			// hand-written list applies only to a word that the
 			// dictionary does not have.
-			if d, ok := lookupDictionary(opts, t.Lower); ok {
+			if d, ok := lookupDictionary(opts, s, i); ok {
 				d.Start, d.End = t.Start, t.End
 				d.Message = "\"" + t.Text + "\" is not an approved word."
 				out = append(out, d)
@@ -105,15 +105,25 @@ func Terms(doc Document, opts Options) []Diagnostic {
 // lookupDictionary asks the dictionary about a word. The second value is
 // false when there is no dictionary, or when the dictionary approves the
 // word, or when the dictionary does not have the word.
-func lookupDictionary(opts Options, word string) (Diagnostic, bool) {
+func lookupDictionary(opts Options, s Sentence, i int) (Diagnostic, bool) {
 	if opts.Dictionary == nil {
 		return Diagnostic{}, false
 	}
+	word := s.Tokens[i].Lower
 	result, unapproved := opts.Dictionary.Unapproved(word)
 	if !unapproved {
 		return Diagnostic{}, false
 	}
 	onlyVerb := result.OnlyVerb
+	// The dictionary can hold a word only as a verb, as with "graph",
+	// "hook", and "pump". English uses each of them as a noun too, and
+	// rule 1.6 permits a technical noun. This tool has no part-of-speech
+	// tagger, but it does not need one for the common case: a determiner
+	// or a possessive before the word makes it a noun. "the dependency
+	// graph" is a noun, and "Graph the results" is a verb.
+	if onlyVerb && precededByDeterminer(s, i) {
+		return Diagnostic{}, false
+	}
 	// The dictionary is the authority of rule 1.1, thus the confidence is
 	// higher than the confidence of the hand list. But a word that the
 	// dictionary has only as a verb is often a technical noun in the same
@@ -127,8 +137,11 @@ func lookupDictionary(opts Options, word string) (Diagnostic, bool) {
 	case len(result.Alternatives) > 0:
 		suggestion = "Write \"" + strings.Join(result.Alternatives, "\", or \"") + "\"."
 	case result.TechnicalNoun:
-		// The dictionary approves the word, but as a technical noun.
-		suggestion = "The dictionary approves \"" + word + "\" as a technical noun. Do not use it as a verb."
+		// The dictionary approves the word as a technical noun, and not
+		// as a verb. This tool has no part-of-speech tagger, thus it
+		// cannot know which one this sentence uses. The message states
+		// what the dictionary says, and it does not state a fault.
+		suggestion = "The dictionary approves \"" + word + "\" as a technical noun only. If this sentence uses it as a verb, write a different verb."
 	}
 	return Diagnostic{
 		RuleID:     RuleUnapprovedTerm,
@@ -136,6 +149,47 @@ func lookupDictionary(opts Options, word string) (Diagnostic, bool) {
 		Confidence: confidence,
 		Suggestion: suggestion,
 	}, true
+}
+
+// determiners are the words that make the word after them a noun.
+var determiners = map[string]bool{
+	"a": true, "an": true, "the": true, "this": true, "that": true,
+	"these": true, "those": true, "its": true, "their": true, "our": true,
+	"your": true, "my": true, "his": true, "her": true, "no": true,
+	"each": true, "every": true, "any": true, "some": true, "one": true,
+	"another": true, "both": true, "all": true, "which": true, "what": true,
+	"same": true, "other": true, "first": true, "last": true, "next": true,
+	"new": true, "old": true, "full": true, "empty": true, "current": true,
+}
+
+// phraseStoppers end a noun phrase. A determiner before one of these words
+// does not make the word after them a noun: in "the tool can graph the
+// results", "graph" is a verb.
+var phraseStoppers = map[string]bool{
+	"to": true, "not": true, "can": true, "could": true, "must": true,
+	"will": true, "would": true, "shall": true, "should": true,
+	"may": true, "might": true, "do": true, "does": true, "did": true,
+	"and": true, "or": true, "but": true, "if": true, "when": true,
+	"then": true, "also": true, "please": true, "always": true,
+	"never": true, "is": true, "are": true, "was": true, "were": true,
+	"be": true, "been": true, "being": true, "cannot": true,
+}
+
+// precededByDeterminer tells if a determiner or a possessive comes before
+// the token, in the same noun phrase. It looks back over the words that can
+// modify a noun, as in "the dependency graph", and it stops at a word that
+// ends the phrase.
+func precededByDeterminer(s Sentence, i int) bool {
+	for back := 1; back <= 3 && i-back >= 0; back++ {
+		previous := s.Tokens[i-back].Lower
+		if determiners[previous] || strings.HasSuffix(previous, "'s") {
+			return true
+		}
+		if phraseStoppers[previous] {
+			return false
+		}
+	}
+	return false
 }
 
 func matchPhrase(s Sentence, i int, opts Options) (Diagnostic, int, bool) {

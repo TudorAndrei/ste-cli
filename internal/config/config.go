@@ -32,6 +32,7 @@ type file struct {
 	FailOver         *float64          `yaml:"fail_over"`
 	WarningsAsErrors *bool             `yaml:"warnings_as_errors"`
 	Dictionary       *bool             `yaml:"dictionary"`
+	Presets          []string          `yaml:"presets"`
 	Baseline         *string           `yaml:"baseline"`
 }
 
@@ -57,6 +58,8 @@ type Config struct {
 	// WarningsAsErrors makes each warning an error, and the command then
 	// exits with code 1.
 	WarningsAsErrors bool
+	// Presets are the lists of technical nouns to add to allow.nouns.
+	Presets []string
 	// Dictionary makes rule STE-1.1 use the imported ASD-STE100
 	// dictionary. It is off by default, because the dictionary approves
 	// about 900 words for aircraft maintenance, thus it reports a large
@@ -145,6 +148,17 @@ func Parse(text string) (Config, error) {
 	}
 	if f.Dictionary != nil {
 		cfg.Dictionary = *f.Dictionary
+	}
+	// A preset adds the technical nouns of one subject field. Rule 1.5 of
+	// the standard gives 22 categories of technical noun, and category 19
+	// is computer science and information technology.
+	for _, name := range f.Presets {
+		nouns, found := Preset(name)
+		if !found {
+			return Config{}, fmt.Errorf("the preset %q is not one of: %s", name, strings.Join(Presets(), ", "))
+		}
+		cfg.Presets = append(cfg.Presets, name)
+		cfg.AllowNouns = append(cfg.AllowNouns, nouns...)
 	}
 	if f.MinConfidence != nil {
 		if *f.MinConfidence < 0 || *f.MinConfidence > 1 {

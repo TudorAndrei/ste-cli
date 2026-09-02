@@ -69,6 +69,7 @@ Lint flags:
                   more than this value
   --max-words     Replace the sentence limit
   --use-dict      Use the imported ASD-STE100 dictionary for rule STE-1.1
+  --preset        Add the technical nouns of a subject field: "software"
   --dict          Path of the dictionary index
   --all           Read every file, and not only the files that git shows
 
@@ -131,6 +132,7 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	warnAsError := fs.Bool("warnings-as-errors", false, "make each warning an error, and exit with code 1")
 	dictPath := fs.String("dict", "", "path of the dictionary index")
 	useDict := fs.Bool("use-dict", false, "use the imported ASD-STE100 dictionary for rule STE-1.1")
+	preset := fs.String("preset", "", "add the technical nouns of a subject field, such as \"software\"")
 	dryRun := fs.Bool("dry-run", false, "for the baseline command: show the plan and write nothing")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
@@ -173,6 +175,14 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	}
 	if *warnAsError {
 		opts.WarningsAsErrors = true
+	}
+	if *preset != "" {
+		nouns, found := config.Preset(*preset)
+		if !found {
+			fmt.Fprintf(stderr, "ste: the preset %q is not one of: %s\n", *preset, strings.Join(config.Presets(), ", "))
+			return exitError
+		}
+		opts.AllowNouns = append(opts.AllowNouns, nouns...)
 	}
 	// The dictionary is off by default. It approves about 900 words for
 	// aircraft maintenance, thus it reports a large part of ordinary

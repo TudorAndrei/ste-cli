@@ -130,3 +130,62 @@ func TestLatinAbbreviationNeedsThePeriodAndLowerCase(t *testing.T) {
 		t.Errorf("got %d findings for \"e.g.\", want 1", len(got))
 	}
 }
+
+// fakeDictionary is a dictionary for a test. It gives one word that the
+// dictionary holds only as a verb, as ASD-STE100 does with "graph".
+type fakeDictionary struct{}
+
+func (fakeDictionary) Unapproved(word string) (checker.DictionaryResult, bool) {
+	if word == "graph" {
+		return checker.DictionaryResult{OnlyVerb: true, TechnicalNoun: true}, true
+	}
+	if word == "utilize" {
+		return checker.DictionaryResult{Alternatives: []string{"use"}}, true
+	}
+	return checker.DictionaryResult{}, false
+}
+
+func TestANounPhraseIsNotAVerb(t *testing.T) {
+	// The dictionary holds "graph" only as a verb. This tool has no
+	// part-of-speech tagger, but a determiner in the same noun phrase
+	// makes the word a noun.
+	opts := checker.Options{Dictionary: fakeDictionary{}}
+	cases := []struct {
+		text string
+		want int
+	}{
+		{"Graph the test results.", 1},         // an imperative verb
+		{"The dependency graph is large.", 0},  // a noun, with one modifier
+		{"The graph is large.", 0},             // a noun
+		{"Look at its graph of the data.", 0},  // a possessive
+		{"The tool can graph the results.", 1}, // a modal ends the phrase
+		{"Do not graph the results.", 1},       // "not" ends the phrase
+		{"The parser's graph is large.", 0},    // a possessive with 's
+	}
+	for _, tc := range cases {
+		got := checker.Lint(tc.text, opts)
+		n := 0
+		for _, d := range got {
+			if d.RuleID == "STE-1.1" {
+				n++
+			}
+		}
+		if n != tc.want {
+			t.Errorf("%q: got %d findings of STE-1.1, want %d", tc.text, n, tc.want)
+		}
+	}
+}
+
+func TestAWordWithAnAlternativeIsAlwaysReported(t *testing.T) {
+	// The noun-phrase test applies only to a word that the dictionary
+	// holds as a verb alone. "utilize" has an alternative, thus a
+	// determiner does not remove it.
+	opts := checker.Options{Dictionary: fakeDictionary{}}
+	got := checker.Lint("The utilize option is wrong.", opts)
+	if len(got) != 1 || got[0].RuleID != "STE-1.1" {
+		t.Fatalf("got %+v, want one STE-1.1 finding", got)
+	}
+	if got[0].Suggestion != "Write \"use\"." {
+		t.Errorf("suggestion %q", got[0].Suggestion)
+	}
+}
