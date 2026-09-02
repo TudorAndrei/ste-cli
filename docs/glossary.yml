@@ -1,0 +1,25 @@
+# Project glossary for the ste checker.
+#
+# mode          "flavored" (default) or "strict".
+#               flavored: 25-word sentences, high-confidence findings only.
+#               strict:   20-word sentences, all findings, error severity.
+# max_words     An optional sentence limit that replaces the mode default.
+# allow.nouns   The technical nouns of this project. The term rules do not
+#               report them.
+# allow.verbs   The technical verbs of this project.
+# disable_rules The rule IDs to remove from the results.
+
+mode: flavored
+
+allow:
+  nouns:
+    - checker
+    - glossary
+    - linter
+    - parser
+    - webhook
+  verbs:
+    - lint
+    - parse
+
+disable_rules: []
