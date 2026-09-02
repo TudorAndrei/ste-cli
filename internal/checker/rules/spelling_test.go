@@ -104,13 +104,29 @@ func TestLatinAbbreviationRule(t *testing.T) {
 }
 
 func TestGeneralRecommendationStaysBelowARule(t *testing.T) {
-	// Strict mode makes a rule an error, but a general recommendation must
-	// not become an error.
+	// Strict mode makes a rule an error. A general recommendation is
+	// advice and not a rule, thus it keeps the info severity.
 	got := checker.Lint("Use the tool, e.g. the wrench.", checker.Options{Mode: checker.ModeStrict})
 	if len(got) != 1 {
 		t.Fatalf("got %d findings, want 1", len(got))
 	}
-	if got[0].Severity != checker.SeverityWarning {
-		t.Errorf("severity %q, want %q", got[0].Severity, checker.SeverityWarning)
+	if got[0].Severity != checker.SeverityInfo {
+		t.Errorf("severity %q, want %q", got[0].Severity, checker.SeverityInfo)
+	}
+}
+
+func TestLatinAbbreviationNeedsThePeriodAndLowerCase(t *testing.T) {
+	// "VS Code" is a name, and "vs" without a period is not the Latin
+	// abbreviation.
+	for _, text := range []string{
+		"Install the VS Code extension.",
+		"Compare the vs value of the two files.",
+	} {
+		if got := checker.Lint(text, checker.Options{}); len(got) != 0 {
+			t.Errorf("got %d findings for %q, want 0: %s", len(got), text, format(text, got))
+		}
+	}
+	if got := checker.Lint("Use a tool, e.g. the wrench.", checker.Options{}); len(got) != 1 {
+		t.Errorf("got %d findings for \"e.g.\", want 1", len(got))
 	}
 }

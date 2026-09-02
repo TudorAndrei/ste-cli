@@ -378,3 +378,106 @@ func TestEvalCommand(t *testing.T) {
 			rep.Totals.Precision, rep.Totals.Recall)
 	}
 }
+
+func TestBaselineWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "old.md", "The valve isn't open.\n")
+	base := filepath.Join(dir, "baseline.json")
+
+	// 1. Record the findings that the project accepts today.
+	code, stdout, stderr := runCLI(t, "", "baseline", "--no-config", "--baseline", base, dir)
+	if code != 0 {
+		t.Fatalf("baseline: exit %d: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "holds 1 findings") {
+		t.Fatalf("baseline output %q", stdout)
+	}
+	if _, err := os.Stat(base); err != nil {
+		t.Fatalf("the baseline file is missing: %v", err)
+	}
+
+	// 2. The same text now gives no finding.
+	code, stdout, _ = runCLI(t, "", "lint", "--no-config", "--baseline", base, dir)
+	if code != 0 || !strings.Contains(stdout, "0 findings") {
+		t.Fatalf("exit %d, stdout %q", code, stdout)
+	}
+	if !strings.Contains(stdout, "1 findings are in the baseline") {
+		t.Fatalf("the report does not name the baseline: %q", stdout)
+	}
+
+	// 3. A new violation is reported, and it fails the gate.
+	writeFile(t, dir, "new.md", "The report isn't ready.\n")
+	code, stdout, _ = runCLI(t, "", "lint", "--no-config", "--baseline", base, "--fail-on-new", dir)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1: %q", code, stdout)
+	}
+	if !strings.Contains(stdout, "new.md") || strings.Contains(stdout, "old.md") {
+		t.Fatalf("the report must show only the new file: %q", stdout)
+	}
+
+	// 4. Without the gate, a new finding does not change the exit code.
+	if code, _, _ := runCLI(t, "", "lint", "--no-config", "--baseline", base, dir); code != 0 {
+		t.Fatalf("exit %d, want 0: the tool must not block by default", code)
+	}
+
+	// 5. --no-baseline shows everything again.
+	_, stdout, _ = runCLI(t, "", "lint", "--no-config", "--baseline", base, "--no-baseline", dir)
+	if !strings.Contains(stdout, "old.md") || !strings.Contains(stdout, "new.md") {
+		t.Fatalf("--no-baseline must show every finding: %q", stdout)
+	}
+}
+
+func TestConfigRulesAndExclude(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "guide.md", "Open the valve; the report isn't ready.\n")
+	sub := filepath.Join(dir, "fixtures")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	writeFile(t, sub, "sample.md", "The valve isn't open.\n")
+	cfg := writeFile(t, dir, "ste.yml", "rules:\n  STE-4.2: off\n  STE-8.1: error\nexclude:\n  - \"**/fixtures/**\"\n")
+
+	code, stdout, stderr := runCLI(t, "", "lint", "--config", cfg, "--format", "json", dir)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	var rep struct {
+		Files []struct {
+			Path     string `json:"path"`
+			Findings []struct {
+				RuleID   string `json:"rule_id"`
+				Severity string `json:"severity"`
+			} `json:"findings"`
+		} `json:"files"`
+		Summary struct {
+			Files    int `json:"files"`
+			Findings int `json:"findings"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &rep); err != nil {
+		t.Fatalf("the output is not JSON: %v", err)
+	}
+	if rep.Summary.Files != 1 {
+		t.Fatalf("files %d, want 1: the exclude pattern must remove the fixture", rep.Summary.Files)
+	}
+	if rep.Summary.Findings != 1 {
+		t.Fatalf("findings %d, want 1: STE-4.2 is off", rep.Summary.Findings)
+	}
+	if f := rep.Files[0].Findings[0]; f.RuleID != "STE-8.1" || f.Severity != "error" {
+		t.Fatalf("finding %s %s, want STE-8.1 error", f.RuleID, f.Severity)
+	}
+}
+
+func TestFailOverFromTheConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, "draft.md", "The file has been sent; it isn't ready.\n")
+	cfg := writeFile(t, dir, "ste.yml", "fail_over: 2.5\n")
+	if code, _, _ := runCLI(t, "", "lint", "--config", cfg, path); code != 1 {
+		t.Fatalf("exit %d, want 1: the config gives the gate", code)
+	}
+	// Without the key, the tool never blocks.
+	cfg2 := writeFile(t, dir, "ste2.yml", "mode: flavored\n")
+	if code, _, _ := runCLI(t, "", "lint", "--config", cfg2, path); code != 0 {
+		t.Fatalf("exit %d, want 0", code)
+	}
+}

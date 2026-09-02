@@ -60,8 +60,9 @@ mise run build      # writes bin/ste
 
 ```bash
 ste lint README.md
+ste baseline .                    # accept the findings of today
+ste lint --fail-on-new docs/      # block only a new violation
 ste lint --mode strict --format json docs/
-ste lint --fail-over 2.5 draft.md
 cat draft.md | ste lint -
 ste eval testdata
 ```
@@ -89,7 +90,10 @@ The tool always reads a file or a directory that you give by its path.
 | `--fail-over` | Exit with code 1 when the score is more than this value |
 | `--max-words` | Replace the sentence limit of both sentence types |
 | `--config` | Path of the glossary file |
-| `--no-config` | Do not read a glossary file |
+| `--no-config` | Do not read a config file |
+| `--baseline` | Path of the file of accepted findings |
+| `--no-baseline` | Report every finding, and not only the new ones |
+| `--fail-on-new` | Exit with code 1 when a finding is not in the baseline |
 | `--all` | Read every file, and not only the files that git shows |
 
 ### Exit codes
@@ -97,7 +101,7 @@ The tool always reads a file or a directory that you give by its path.
 | Code | Condition |
 |---|---|
 | 0 | The tool ran. Findings do not change this code. |
-| 1 | You give `--fail-over`, and the score is more than the limit. |
+| 1 | You gave a gate (`--fail-on-new` or `--fail-over`) and the text does not pass it. |
 | 2 | A flag, a file, or the glossary has an error. |
 
 The score is the number of findings for each 100 words.
@@ -115,23 +119,75 @@ words (rule 5.1). A note and descriptive text get 25 words (rules 5.5 and
 6.3). The tool reads the structure of the Markdown: a numbered list item is
 an instruction. `--max-words` replaces both limits.
 
-## Glossary
+## How to adopt it
 
-A project can permit its own technical words. The tool reads the first of
-`.ste.yml`, `.ste.yaml`, `glossary.yml`, or `docs/glossary.yml` in the
-current directory.
+A checker that reports 1000 findings on its first day is a checker that a
+team removes. This tool is an aid, and not a gate:
 
-```yaml
-mode: flavored
-max_words: 25
-allow:
-  nouns: [parser, webhook]
-  verbs: [provision]
-disable_rules: [STE-1.1]
+- It exits with code 0 even when it finds something. It blocks only when you
+  ask for a gate with `--fail-on-new` or `--fail-over`.
+- A baseline accepts the findings that exist today, thus only a new finding
+  comes to your attention.
+- Each rule has its own severity, thus you can accept the rules one at a
+  time.
+- A wrong finding has three escape hatches: a comment in the text, a rule in
+  the config, or a path in `exclude`.
+
+The sequence for a repository that has documentation already:
+
+```bash
+ste lint .                    # see the size of the problem
+ste baseline .                # accept it, and write .ste-baseline.json
+ste lint --fail-on-new .      # from now, only a new violation fails
 ```
 
-The file is YAML. An unknown key is an error, thus a spelling mistake in
-the file does not stay hidden.
+The number in the baseline goes down when you correct the text. Write the
+file again with `ste baseline .` to record the new, lower number.
+
+### Silence one finding in the text
+
+```markdown
+<!-- ste-disable-next-line -->
+This sentence is not checked.
+
+The tool does not check this line. <!-- ste-disable-line STE-3.6 -->
+
+<!-- ste-disable STE-8.1 -->
+The tool does not check this block.
+<!-- ste-enable STE-8.1 -->
+```
+
+A directive with no rule identifier applies to every rule. A directive with
+no `ste-enable` applies to the end of the file.
+
+## Config
+
+The tool reads the first of `.ste.yml`, `.ste.yaml`, `glossary.yml`, or
+`docs/glossary.yml`. Every key is optional.
+
+```yaml
+mode: flavored          # or strict
+
+rules:                  # off, info, warning, or error
+  STE-8.1: error        # your text already obeys this rule
+  STE-3.6: info         # this rule needs a rewrite, thus only advice today
+  STE-5.1: off          # this rule comes later
+
+exclude:                # the tool also skips the files that git ignores
+  - "**/fixtures/**"
+  - "*.generated.md"
+
+allow:                  # the technical words of your project
+  nouns: [parser, webhook]
+  verbs: [provision]
+
+min_confidence: 0.6     # remove each finding below this value
+max_words: 25           # replace the sentence limits of the standard
+baseline: .ste-baseline.json
+fail_over: 2.5          # without this key, the tool never blocks
+```
+
+An unknown key is an error, thus a spelling mistake does not stay hidden.
 
 ## Output
 

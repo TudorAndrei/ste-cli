@@ -1,16 +1,31 @@
-# Project glossary for the ste checker.
+# Config for the ste checker. Every key is optional.
 #
-# mode          "flavored" (default) or "strict".
-#               flavored: 25-word sentences, high-confidence findings only.
-#               strict:   20-word sentences, all findings, error severity.
-# max_words     An optional sentence limit that replaces the mode default.
-# allow.nouns   The technical nouns of this project. The term rules do not
-#               report them.
-# allow.verbs   The technical verbs of this project.
-# disable_rules The rule IDs to remove from the results.
+# The tool is an aid, and not a gate. Start with everything as advice, then
+# make a rule an error when your text is ready for it.
 
+# "flavored" (default) keeps the high-confidence findings.
+# "strict" keeps all findings and makes each rule one step stronger.
 mode: flavored
 
+# The severity of one rule: off, info, warning, or error.
+# Use "off" for a rule that you do not want today, and "error" for a rule
+# that your text already obeys. This is the method to accept the rules one
+# at a time.
+rules:
+  # STE-8.1: error
+  # STE-3.6: info
+  # STE-5.1: off
+  {}
+
+# The files that the tool does not read. The tool also does not read a file
+# that git ignores.
+exclude:
+  - "**/fixtures/**"
+  - "*.generated.md"
+
+# The technical words of this project. The rules do not report them.
+# Rule 1.8 of ASD-STE100 tells writers to use the technical nouns of their
+# company or industry, thus this list agrees with the standard.
 allow:
   nouns:
     - checker
@@ -22,4 +37,20 @@ allow:
     - lint
     - parse
 
+# Remove each finding below this confidence. The default is 0.6 in flavored
+# mode and 0 in strict mode.
+# min_confidence: 0.7
+
+# An optional sentence limit that replaces both limits of the standard.
+# max_words: 25
+
+# The file of accepted findings. "ste baseline ." writes it. After that, the
+# tool reports only a new finding.
+# baseline: .ste-baseline.json
+
+# Exit with code 1 when the score for each 100 words is more than this
+# value. Without this key, the tool never blocks.
+# fail_over: 2.5
+
+# The old name for "rules: <id>: off".
 disable_rules: []

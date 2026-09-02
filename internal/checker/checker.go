@@ -18,6 +18,9 @@ func Lint(text string, options Options) []Diagnostic {
 // it when it must also know the word count of the document.
 func LintDocument(doc Document, options Options) []Diagnostic {
 	opts := options.Normalized()
+	limit := opts.Confidence()
+	suppressed := suppressions(doc.Source)
+
 	found := []Diagnostic{}
 	for _, rule := range rules.All() {
 		found = append(found, rule(doc, opts)...)
@@ -25,15 +28,17 @@ func LintDocument(doc Document, options Options) []Diagnostic {
 
 	out := make([]Diagnostic, 0, len(found))
 	for _, d := range found {
-		if isDisabled(d.RuleID, opts.DisableRules) {
+		if isDisabled(d.RuleID, opts.DisableRules) || d.Confidence < limit {
 			continue
 		}
-		if opts.Mode == ModeFlavored && d.Confidence < rules.MinConfidenceFlavored {
+		severity := opts.Severity(d.RuleID, d.Severity)
+		if severity == rules.SeverityOff {
 			continue
 		}
-		if opts.Mode == ModeStrict {
-			d.Severity = strictSeverity(d.Severity)
+		if suppressed.covers(doc.Source, d) {
+			continue
 		}
+		d.Severity = severity
 		out = append(out, d)
 	}
 
@@ -47,16 +52,6 @@ func LintDocument(doc Document, options Options) []Diagnostic {
 		return out[i].RuleID < out[j].RuleID
 	})
 	return out
-}
-
-// strictSeverity makes every finding one step stronger in strict mode.
-func strictSeverity(s Severity) Severity {
-	switch s {
-	case SeverityInfo:
-		return SeverityWarning
-	default:
-		return SeverityError
-	}
 }
 
 func isDisabled(ruleID string, disabled []string) bool {

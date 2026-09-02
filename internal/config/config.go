@@ -25,25 +25,44 @@ type file struct {
 		Nouns []string `yaml:"nouns"`
 		Verbs []string `yaml:"verbs"`
 	} `yaml:"allow"`
-	DisableRules []string `yaml:"disable_rules"`
+	DisableRules  []string          `yaml:"disable_rules"`
+	Rules         map[string]string `yaml:"rules"`
+	Exclude       []string          `yaml:"exclude"`
+	MinConfidence *float64          `yaml:"min_confidence"`
+	FailOver      *float64          `yaml:"fail_over"`
+	Baseline      *string           `yaml:"baseline"`
 }
 
-// Config is the content of the glossary file.
+// Config is the content of the config file.
 type Config struct {
 	Mode         string
 	MaxWords     int
 	AllowNouns   []string
 	AllowVerbs   []string
 	DisableRules []string
+	// Rules gives a severity to one rule: "off", "info", "warning", or
+	// "error". A project uses it to accept a rule slowly.
+	Rules map[string]rules.Severity
+	// Exclude holds the path patterns that the tool does not read.
+	Exclude []string
+	// MinConfidence removes each finding below this value.
+	MinConfidence float64
+	// FailOver gives the score that makes the command exit with code 1. A
+	// negative value never fails.
+	FailOver float64
+	// Baseline is the path of the file of accepted findings.
+	Baseline string
 }
 
 // Options makes the checker options from the config.
 func (c Config) Options() rules.Options {
 	opts := rules.Options{
-		MaxWords:     c.MaxWords,
-		AllowNouns:   c.AllowNouns,
-		AllowVerbs:   c.AllowVerbs,
-		DisableRules: c.DisableRules,
+		MaxWords:      c.MaxWords,
+		AllowNouns:    c.AllowNouns,
+		AllowVerbs:    c.AllowVerbs,
+		DisableRules:  c.DisableRules,
+		RuleSeverity:  c.Rules,
+		MinConfidence: c.MinConfidence,
 	}
 	if c.Mode != "" {
 		opts.Mode = rules.Mode(c.Mode)
@@ -101,6 +120,31 @@ func Parse(text string) (Config, error) {
 		AllowNouns:   f.Allow.Nouns,
 		AllowVerbs:   f.Allow.Verbs,
 		DisableRules: f.DisableRules,
+		Exclude:      f.Exclude,
+		FailOver:     -1,
+	}
+	if f.Baseline != nil {
+		cfg.Baseline = *f.Baseline
+	}
+	if f.FailOver != nil {
+		cfg.FailOver = *f.FailOver
+	}
+	if f.MinConfidence != nil {
+		if *f.MinConfidence < 0 || *f.MinConfidence > 1 {
+			return Config{}, fmt.Errorf("min_confidence must be between 0 and 1")
+		}
+		cfg.MinConfidence = *f.MinConfidence
+	}
+	if len(f.Rules) > 0 {
+		cfg.Rules = map[string]rules.Severity{}
+		for id, severity := range f.Rules {
+			switch rules.Severity(severity) {
+			case rules.SeverityOff, rules.SeverityInfo, rules.SeverityWarning, rules.SeverityError:
+				cfg.Rules[id] = rules.Severity(severity)
+			default:
+				return Config{}, fmt.Errorf("the severity %q of rule %q is not \"off\", \"info\", \"warning\", or \"error\"", severity, id)
+			}
+		}
 	}
 	if f.Mode != nil {
 		mode := *f.Mode

@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 
+	"github.com/TudorAndrei/ste-cli/internal/baseline"
 	"github.com/TudorAndrei/ste-cli/internal/checker"
 	"github.com/TudorAndrei/ste-cli/internal/config"
 	"github.com/TudorAndrei/ste-cli/internal/eval"
@@ -33,29 +35,35 @@ const (
 
 const usage = `ste finds ASD-STE100 violations in Markdown and plain text.
 
+The tool is an aid, and not a gate. It exits with code 0 even when it finds
+something, until you ask for a gate with --fail-over or --fail-on-new.
+
 Usage:
   ste lint [flags] [path ...]   Check files, directories, or standard input
+  ste baseline [flags] [path]   Accept the findings of today, and report only
+                                the new ones from now
   ste eval [flags] <dir>        Measure the rules against a labeled corpus
   ste version                   Print the version
 
 Lint flags:
-  --mode         "flavored" (default) or "strict"
-  --format       "text" (default) or "json"
-  --fail-over    Exit with code 1 when the score for each 100 words is
-                 more than this value
-  --max-words    Replace the sentence limit of the mode
-  --config       Path of the glossary file. The default is the first of
-                 .ste.yml, .ste.yaml, glossary.yml, or docs/glossary.yml in
-                 the current directory.
-  --no-config    Do not read a glossary file
-  --all          Read every file. Without this flag, a directory does not
-                 give the files that git ignores, and it does not give the
-                 directories that hold build output.
+  --mode          "flavored" (default) or "strict"
+  --format        "text" (default) or "json"
+  --config        Path of the config file. The default is the first of
+                  .ste.yml, .ste.yaml, glossary.yml, or docs/glossary.yml.
+  --no-config     Do not read a config file
+  --baseline      Path of the file of accepted findings
+  --no-baseline   Report every finding, and not only the new ones
+  --fail-on-new   Exit with code 1 when a finding is not in the baseline
+  --fail-over     Exit with code 1 when the score for each 100 words is
+                  more than this value
+  --max-words     Replace the sentence limit
+  --all           Read every file, and not only the files that git shows
 
 Examples:
   ste lint README.md
+  ste baseline .                          # accept what exists today
+  ste lint --fail-on-new docs/            # block only a new violation
   ste lint --mode strict --format json docs/
-  ste lint --fail-over 2.5 draft.md
   cat draft.md | ste lint -
 `
 
@@ -70,7 +78,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "lint":
-		return runLint(args[1:], stdin, stdout, stderr)
+		return runLint(args[1:], stdin, stdout, stderr, false)
+	case "baseline":
+		return runLint(args[1:], stdin, stdout, stderr, true)
 	case "eval":
 		return runEval(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
@@ -85,7 +95,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write bool) int {
 	fs := pflag.NewFlagSet("lint", pflag.ContinueOnError)
 	fs.SetOutput(stderr)
 	mode := fs.String("mode", "", "flavored or strict")
@@ -95,6 +105,9 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cfgPath := fs.String("config", "", "path of the glossary file")
 	noConfig := fs.Bool("no-config", false, "do not read a glossary file")
 	all := fs.Bool("all", false, "read every file, and not only the files that git shows")
+	baselinePath := fs.String("baseline", "", "path of the file of accepted findings")
+	noBaseline := fs.Bool("no-baseline", false, "report every finding, and not only the new ones")
+	failOnNew := fs.Bool("fail-on-new", false, "exit with code 1 when a finding is not in the baseline")
 	if err := fs.Parse(args); err != nil {
 		return exitError
 	}
@@ -103,10 +116,18 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	opts, err := options(*cfgPath, *noConfig, *mode, *maxWords)
+	cfg, err := loadConfig(*cfgPath, *noConfig)
 	if err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
+	}
+	opts, err := options(cfg, *mode, *maxWords)
+	if err != nil {
+		fmt.Fprintf(stderr, "ste: %v\n", err)
+		return exitError
+	}
+	if *failOver < 0 {
+		*failOver = cfg.FailOver
 	}
 
 	results := []report.FileResult{}
@@ -124,7 +145,7 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			results = append(results, lintOne("(standard input)", string(raw), opts))
 			continue
 		}
-		files, err := textFiles(p, *all)
+		files, err := textFiles(p, *all, cfg.Exclude)
 		if err != nil {
 			fmt.Fprintf(stderr, "ste: %v\n", err)
 			return exitError
@@ -139,6 +160,44 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
+	// The baseline holds the findings that the project accepts today, thus
+	// the report shows only the new ones.
+	basePath := *baselinePath
+	if basePath == "" {
+		basePath = cfg.Baseline
+	}
+	if basePath == "" {
+		if _, err := os.Stat(baseline.DefaultName); err == nil {
+			basePath = baseline.DefaultName
+		}
+	}
+	if write {
+		if basePath == "" {
+			basePath = baseline.DefaultName
+		}
+		if err := saveBaseline(basePath, results); err != nil {
+			fmt.Fprintf(stderr, "ste: %v\n", err)
+			return exitError
+		}
+		total := 0
+		for _, r := range results {
+			total += len(r.Findings)
+		}
+		fmt.Fprintf(stdout, "%s holds %d findings of %d files.\n", basePath, total, len(results))
+		fmt.Fprintf(stdout, "The tool now reports only a new finding. Remove the file to report all.\n")
+		return exitOK
+	}
+
+	accepted := 0
+	if basePath != "" && !*noBaseline {
+		set, err := baseline.Load(basePath)
+		if err != nil {
+			fmt.Fprintf(stderr, "ste: %v\n", err)
+			return exitError
+		}
+		results, accepted = applyBaseline(set, results)
+	}
+
 	rep := report.New(string(opts.Normalized().Mode), results)
 	if *format == "json" {
 		err = report.WriteJSON(stdout, rep)
@@ -149,11 +208,51 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
+	if accepted > 0 && *format == "text" {
+		fmt.Fprintf(stdout, "%d findings are in the baseline %s, thus this report does not show them.\n", accepted, basePath)
+	}
+	if *failOnNew && rep.Summary.Findings > 0 {
+		fmt.Fprintf(stderr, "ste: %d findings are not in the baseline\n", rep.Summary.Findings)
+		return exitThreshold
+	}
 	if *failOver >= 0 && rep.Summary.Score > *failOver {
 		fmt.Fprintf(stderr, "ste: the score %.2f is more than the limit %.2f\n", rep.Summary.Score, *failOver)
 		return exitThreshold
 	}
 	return exitOK
+}
+
+// applyBaseline removes the findings that the project accepted before. It
+// gives the new results and the number of accepted findings.
+func applyBaseline(set *baseline.Set, results []report.FileResult) ([]report.FileResult, int) {
+	accepted := 0
+	out := make([]report.FileResult, 0, len(results))
+	for _, r := range results {
+		kept := make([]report.Finding, 0, len(r.Findings))
+		for _, f := range r.Findings {
+			if set.Take(r.Path, f.RuleID, f.Text) {
+				accepted++
+				continue
+			}
+			kept = append(kept, f)
+		}
+		r.Findings = kept
+		out = append(out, r)
+	}
+	return out, accepted
+}
+
+// saveBaseline writes the findings of this run as the accepted findings.
+func saveBaseline(path string, results []report.FileResult) error {
+	entries := make([]baseline.Result, 0, len(results))
+	for _, r := range results {
+		findings := make([]baseline.Finding, 0, len(r.Findings))
+		for _, f := range r.Findings {
+			findings = append(findings, baseline.Finding{RuleID: f.RuleID, Text: f.Text})
+		}
+		entries = append(entries, baseline.Result{Path: r.Path, Findings: findings})
+	}
+	return baseline.Save(path, entries, time.Now().UTC().Format(time.RFC3339))
 }
 
 func lintOne(path, source string, opts checker.Options) report.FileResult {
@@ -166,34 +265,31 @@ func lintOne(path, source string, opts checker.Options) report.FileResult {
 	return out
 }
 
-// options merges the glossary file and the command flags. A flag always wins.
-func options(cfgPath string, noConfig bool, mode string, maxWords int) (checker.Options, error) {
-	opts := checker.Options{}
-	if !noConfig {
-		path := cfgPath
-		if path == "" {
-			if found, ok := config.Find("."); ok {
-				path = found
-			}
-		}
-		if path != "" {
-			cfg, err := config.Load(path)
-			if err != nil {
-				return opts, err
-			}
-			opts = cfg.Options()
-		}
+// loadConfig reads the config file, or gives an empty config.
+func loadConfig(cfgPath string, noConfig bool) (config.Config, error) {
+	cfg := config.Config{FailOver: -1}
+	if noConfig {
+		return cfg, nil
 	}
+	path := cfgPath
+	if path == "" {
+		found, ok := config.Find(".")
+		if !ok {
+			return cfg, nil
+		}
+		path = found
+	}
+	return config.Load(path)
+}
+
+// options merges the config file and the command flags. A flag always wins.
+func options(cfg config.Config, mode string, maxWords int) (checker.Options, error) {
+	opts := cfg.Options()
 	if mode != "" {
 		if mode != string(checker.ModeFlavored) && mode != string(checker.ModeStrict) {
 			return opts, fmt.Errorf("the mode %q is not \"flavored\" or \"strict\"", mode)
 		}
 		opts.Mode = checker.Mode(mode)
-		// The mode default for the sentence limit must win over the
-		// limit of the other mode.
-		if maxWords == 0 {
-			opts.MaxWords = 0
-		}
 	}
 	if maxWords > 0 {
 		opts.MaxWords = maxWords
@@ -250,7 +346,7 @@ var skippedDirs = map[string]bool{
 // textFiles gives the files to check. A directory gives all Markdown and
 // text files below it. A file that git ignores does not come from a
 // directory, but a file that you give by its path is always read.
-func textFiles(path string, all bool) ([]string, error) {
+func textFiles(path string, all bool, exclude []string) ([]string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -290,6 +386,9 @@ func textFiles(path string, all bool) ([]string, error) {
 			if err != nil || !visible[abs] {
 				return nil
 			}
+		}
+		if matchesAny(p, root, exclude) {
+			return nil
 		}
 		out = append(out, p)
 		return nil

@@ -125,35 +125,88 @@ limit from the type of the sentence:
 
 `--max-words` replaces both limits.
 
-## The glossary
+## How to adopt it
 
-Each project has technical words that are correct for that project. The
-glossary permits them, and it does not make the grammar rules weaker.
+A checker that reports 1000 findings on its first day is a checker that a
+team removes. This tool is an aid, and not a gate:
+
+- It exits with code 0 even when it finds something. It blocks only when you
+  ask for a gate with `--fail-on-new` or `--fail-over`.
+- A baseline accepts the findings that exist today, thus only a new finding
+  comes to your attention.
+- Each rule has its own severity, thus you can accept the rules one at a
+  time.
+- A wrong finding has three escape hatches: a comment in the text, a rule in
+  the config, or a path in `exclude`.
+
+The sequence for a repository that has documentation already:
+
+```bash
+ste lint .                    # see the size of the problem
+ste baseline .                # accept it, and write .ste-baseline.json
+ste lint --fail-on-new .      # from now, only a new violation fails
+```
+
+The number in the baseline goes down when you correct the text. Write the
+file again with `ste baseline .` to record the new, lower number.
+
+### Silence one finding in the text
+
+```markdown
+<!-- ste-disable-next-line -->
+This sentence is not checked.
+
+The tool does not check this line. <!-- ste-disable-line STE-3.6 -->
+
+<!-- ste-disable STE-8.1 -->
+The tool does not check this block.
+<!-- ste-enable STE-8.1 -->
+```
+
+A directive with no rule identifier applies to every rule. A directive with
+no `ste-enable` applies to the end of the file.
+
+## Config
 
 The tool reads the first of `.ste.yml`, `.ste.yaml`, `glossary.yml`, or
-`docs/glossary.yml` in the current directory.
+`docs/glossary.yml`. Every key is optional.
 
 ```yaml
-mode: flavored
-max_words: 25
-allow:
+mode: flavored          # or strict
+
+rules:                  # off, info, warning, or error
+  STE-8.1: error        # your text already obeys this rule
+  STE-3.6: info         # this rule needs a rewrite, thus only advice today
+  STE-5.1: off          # this rule comes later
+
+exclude:                # the tool also skips the files that git ignores
+  - "**/fixtures/**"
+  - "*.generated.md"
+
+allow:                  # the technical words of your project
   nouns: [parser, webhook]
   verbs: [provision]
-disable_rules: [STE-1.1]
+
+min_confidence: 0.6     # remove each finding below this value
+max_words: 25           # replace the sentence limits of the standard
+baseline: .ste-baseline.json
+fail_over: 2.5          # without this key, the tool never blocks
 ```
 
 | Key | Function |
 |---|---|
 | `mode` | `flavored` or `strict` |
-| `max_words` | An optional sentence limit that replaces both limits |
+| `rules` | The severity of one rule: `off`, `info`, `warning`, or `error` |
+| `exclude` | The path patterns that the tool does not read |
 | `allow.nouns` | The technical nouns of the project |
 | `allow.verbs` | The technical verbs of the project |
-| `disable_rules` | The rule identifiers to remove from the results |
+| `min_confidence` | Remove each finding below this value |
+| `max_words` | Replace the sentence limits of the standard |
+| `baseline` | The path of the file of accepted findings |
+| `fail_over` | The score that makes the command exit with code 1 |
 
-The file is YAML. An unknown key is an error, thus a spelling mistake in
-the file does not stay hidden.
-
-`--config <path>` reads a different file. `--no-config` reads no file.
+An unknown key is an error, thus a spelling mistake does not stay hidden.
+`--config <path>` reads a different file, and `--no-config` reads no file.
 
 ## Use in CI
 
@@ -203,7 +256,7 @@ ste lint --fail-over 2.5 docs/
 | Exit code | Condition |
 |---|---|
 | 0 | The tool ran. Findings do not change this code. |
-| 1 | You give `--fail-over`, and the score is more than the limit. |
+| 1 | You gave a gate (`--fail-on-new` or `--fail-over`) and the text does not pass it. |
 | 2 | A flag, a file, or the glossary has an error. |
 
 A GitHub Actions step:
@@ -211,8 +264,12 @@ A GitHub Actions step:
 ```yaml
 - uses: jdx/mise-action@v4
 - run: mise use -g github:TudorAndrei/ste-cli
-- run: ste lint --fail-over 2.5 docs/
+- run: ste lint --fail-on-new docs/
 ```
+
+`--fail-on-new` is the correct gate for a repository that has documentation
+already. The findings in the baseline do not stop the work. A new violation
+does.
 
 ## What the tool does not examine
 
@@ -271,7 +328,9 @@ ste help                      Print the usage
 | `--fail-over` | Exit with code 1 when the score is more than this value |
 | `--max-words` | Replace the sentence limit of both sentence types |
 | `--config` | Path of the glossary file |
-| `--no-config` | Do not read a glossary file |
+| `--no-config` | Do not read a config file |
+| `--baseline` | Path of the file of accepted findings |
+| `--fail-on-new` | Exit with code 1 when a finding is not in the baseline |
 | `--all` | Read every file, and not only the files that git shows |
 
 A flag can come before or after a path.

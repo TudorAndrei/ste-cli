@@ -3,6 +3,8 @@
 // parent checker package builds a Document, then calls each rule here.
 package rules
 
+import "strings"
+
 // Severity tells how strongly the tool objects to a span of text.
 type Severity string
 
@@ -52,19 +54,63 @@ type Diagnostic struct {
 	Suggestion string   `json:"suggestion,omitempty"`
 }
 
+// SeverityOff removes a rule from the result. It is a severity value in the
+// config file, and it never appears in a finding.
+const SeverityOff Severity = "off"
+
 // Options controls the rules. The config package fills this structure from
-// glossary.yml, and the CLI flags can replace single fields.
+// the config file, and the CLI flags can replace single fields.
 type Options struct {
 	Mode Mode
 	// MaxWords is the sentence limit in words. A value of 0 selects the
-	// default for the mode.
+	// limit from the type of each sentence.
 	MaxWords int
 	// AllowNouns and AllowVerbs are the project terms that the term rule
 	// must not report.
 	AllowNouns []string
 	AllowVerbs []string
-	// DisableRules holds the rule IDs to remove from the result.
+	// DisableRules holds the rule IDs to remove from the result. The
+	// RuleSeverity map with the value "off" does the same.
 	DisableRules []string
+	// RuleSeverity replaces the severity of one rule. The value "off"
+	// removes the rule. A project uses this to make a rule advice today
+	// and an error later.
+	RuleSeverity map[string]Severity
+	// MinConfidence removes each finding below this value. A value of 0
+	// selects the default of the mode.
+	MinConfidence float64
+}
+
+// Confidence gives the lowest confidence that the mode accepts.
+func (o Options) Confidence() float64 {
+	if o.MinConfidence > 0 {
+		return o.MinConfidence
+	}
+	if o.Mode == ModeStrict {
+		return 0
+	}
+	return MinConfidenceFlavored
+}
+
+// Severity gives the severity of a finding after the config applies.
+func (o Options) Severity(ruleID string, given Severity) Severity {
+	if s, ok := o.RuleSeverity[ruleID]; ok {
+		return s
+	}
+	if o.Mode == ModeStrict {
+		// A general recommendation is advice, and not a rule of the
+		// standard. Strict mode does not make it an error.
+		if strings.HasPrefix(ruleID, "STE-GR-") {
+			return given
+		}
+		switch given {
+		case SeverityInfo:
+			return SeverityWarning
+		default:
+			return SeverityError
+		}
+	}
+	return given
 }
 
 // Normalized returns a copy of the options with all defaults applied. It

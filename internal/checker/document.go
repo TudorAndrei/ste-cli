@@ -31,6 +31,9 @@ func Parse(src string) Document {
 
 	buf := blankCopy(source)
 	blocks := collectBlocks(root, source)
+	if end := frontMatterEnd(src); end > 0 {
+		blocks = dropBefore(blocks, end)
+	}
 	for _, b := range blocks {
 		for _, seg := range b.segments {
 			copy(buf[seg.Start:seg.Stop], source[seg.Start:seg.Stop])
@@ -43,6 +46,49 @@ func Parse(src string) Document {
 		doc.Sentences = append(doc.Sentences, b.sentences(src, masked)...)
 	}
 	return doc
+}
+
+// frontMatterEnd gives the offset after the front matter of a document, or
+// 0 when the document has none. Front matter is data for a tool, and it is
+// not prose. CommonMark has no front matter, thus a Markdown parser reads
+// the "---" as a horizontal rule and the keys as a paragraph.
+func frontMatterEnd(src string) int {
+	var fence string
+	switch {
+	case strings.HasPrefix(src, "---\n"), strings.HasPrefix(src, "---\r\n"):
+		fence = "---"
+	case strings.HasPrefix(src, "+++\n"), strings.HasPrefix(src, "+++\r\n"):
+		fence = "+++"
+	default:
+		return 0
+	}
+	for i := strings.IndexByte(src, '\n') + 1; i < len(src); {
+		lineEnd := strings.IndexByte(src[i:], '\n')
+		line := src[i:]
+		next := len(src)
+		if lineEnd >= 0 {
+			line = src[i : i+lineEnd]
+			next = i + lineEnd + 1
+		}
+		switch strings.TrimRight(line, " \t\r") {
+		case fence, "...":
+			return next
+		}
+		i = next
+	}
+	// No closing fence: the document is not front matter.
+	return 0
+}
+
+// dropBefore removes each block that starts before the offset.
+func dropBefore(blocks []block, offset int) []block {
+	out := blocks[:0]
+	for _, b := range blocks {
+		if b.segments[0].Start >= offset {
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 // blankCopy gives a buffer of the same length with a space at each byte. It

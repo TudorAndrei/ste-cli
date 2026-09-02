@@ -150,6 +150,13 @@ func LatinAbbreviations(doc Document, opts Options) []Diagnostic {
 			if !found || opts.Allowed(t.Lower) {
 				continue
 			}
+			// A Latin abbreviation is lower-case and it ends with a
+			// period: "e.g.", "vs.". "VS Code" is a name, and "Etc" at
+			// the start of a sentence is rare. This test removes the
+			// large majority of the wrong findings.
+			if t.Text != t.Lower || !followedByPeriod(doc.Source, t.End) {
+				continue
+			}
 			out = append(out, Diagnostic{
 				RuleID:     RuleLatinAbbreviation,
 				Message:    "\"" + t.Text + "\" is a Latin abbreviation.",
@@ -162,6 +169,11 @@ func LatinAbbreviations(doc Document, opts Options) []Diagnostic {
 		}
 	}
 	return out
+}
+
+// followedByPeriod tells if a period comes immediately after the offset.
+func followedByPeriod(source string, end int) bool {
+	return end < len(source) && source[end] == '.'
 }
 
 // isCapitalized tells if the word starts with a capital letter.
