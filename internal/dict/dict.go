@@ -18,6 +18,8 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
+
+	"github.com/TudorAndrei/ste-cli/internal/checker/rules"
 )
 
 // Version is the format version of the index file.
@@ -34,6 +36,10 @@ type Entry struct {
 	// Alternatives are the approved words to use in place of an
 	// unapproved word.
 	Alternatives []string `json:"alternatives,omitempty"`
+	// TechnicalNoun tells that the dictionary approves the word as a
+	// technical noun, and not as this part of speech. The dictionary
+	// writes "(TN)" for that.
+	TechnicalNoun bool `json:"technical_noun,omitempty"`
 }
 
 // Index is the dictionary in memory.
@@ -82,26 +88,30 @@ func (ix *Index) Lookup(word string) []Entry {
 // gives the approved alternatives. A word that is not in the dictionary
 // gives false, because rule 1.6 permits a technical noun that the dictionary
 // does not have.
-func (ix *Index) Unapproved(word string) ([]string, bool, bool) {
+func (ix *Index) Unapproved(word string) (rules.DictionaryResult, bool) {
 	entries := ix.Lookup(word)
 	if len(entries) == 0 {
-		return nil, false, false
+		return rules.DictionaryResult{}, false
 	}
+	out := rules.DictionaryResult{OnlyVerb: true}
 	alternatives := []string{}
-	onlyVerb := true
 	for _, e := range entries {
 		// One word can be approved as one part of speech and not
 		// approved as a different one. This tool has no part-of-speech
 		// tagger, thus one approved entry makes the word approved.
 		if e.Approved {
-			return nil, false, false
+			return rules.DictionaryResult{}, false
 		}
 		if e.POS != "v" {
-			onlyVerb = false
+			out.OnlyVerb = false
+		}
+		if e.TechnicalNoun {
+			out.TechnicalNoun = true
 		}
 		alternatives = append(alternatives, e.Alternatives...)
 	}
-	return merge(nil, alternatives), onlyVerb, true
+	out.Alternatives = merge(nil, alternatives)
+	return out, true
 }
 
 func (ix *Index) build() {
@@ -153,6 +163,9 @@ func Parse(markdown, source string) (*Index, error) {
 		if strings.TrimSpace(word) == "" {
 			if last >= 0 {
 				ix.Words[last].Alternatives = merge(ix.Words[last].Alternatives, alternatives(meaning))
+				if technicalNoun(meaning) {
+					ix.Words[last].TechnicalNoun = true
+				}
 			}
 			continue
 		}
@@ -173,6 +186,7 @@ func Parse(markdown, source string) (*Index, error) {
 			// alternatives of the meaning column.
 			if !entry.Approved && n == 0 {
 				entry.Alternatives = alternatives(meaning)
+				entry.TechnicalNoun = technicalNoun(meaning)
 			}
 			key := entry.Word + "\x00" + entry.POS
 			if at, found := seen[key]; found {
@@ -194,6 +208,22 @@ func Parse(markdown, source string) (*Index, error) {
 	}
 	if len(ix.Words) == 0 {
 		return nil, fmt.Errorf("the text has no dictionary entry")
+	}
+	// "graph (v)" gives the alternative "GRAPH (TN)": the word itself, as a
+	// technical noun. An alternative that is the word gives the advice
+	// "Write graph" for the word "graph", thus it must go. The
+	// TechnicalNoun field keeps the meaning.
+	for i := range ix.Words {
+		kept := ix.Words[i].Alternatives[:0]
+		for _, alt := range ix.Words[i].Alternatives {
+			if alt != ix.Words[i].Word {
+				kept = append(kept, alt)
+			}
+		}
+		if len(kept) == 0 {
+			kept = nil
+		}
+		ix.Words[i].Alternatives = kept
 	}
 	sort.Slice(ix.Words, func(i, j int) bool {
 		if ix.Words[i].Word != ix.Words[j].Word {
@@ -225,8 +255,22 @@ func tableRow(line string) ([]string, bool) {
 // technical noun and "TV" is a technical verb.
 var markers = map[string]bool{"tn": true, "tv": true, "ste": true, "asd": true}
 
-// alternatives reads the approved words from the meaning column.
+// technicalNoun tells if a meaning cell has the "(TN)" label. The label
+// means that the dictionary approves the word as a technical noun, and not
+// as the part of speech of the row.
+func technicalNoun(meaning string) bool {
+	return strings.Contains(meaning, "(TN)") || strings.Contains(meaning, "[TN]")
+}
+
+// bracketed matches the text in parentheses or in square brackets.
+var bracketed = regexp.MustCompile(`\([^)]*\)|\[[^\]]*\]`)
+
+// alternatives reads the approved words from the meaning column. The text in
+// parentheses is an explanation and not an alternative: the entry for "bolt"
+// gives "ATTACH (v) (WITH A BOLT [TN] OR BOLTS [TN])", and the alternative
+// is "attach".
 func alternatives(meaning string) []string {
+	meaning = bracketed.ReplaceAllString(meaning, " ")
 	out := []string{}
 	for _, m := range alternative.FindAllStringSubmatch(meaning, -1) {
 		word := strings.ToLower(strings.TrimSpace(m[1]))

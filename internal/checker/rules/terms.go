@@ -109,10 +109,11 @@ func lookupDictionary(opts Options, word string) (Diagnostic, bool) {
 	if opts.Dictionary == nil {
 		return Diagnostic{}, false
 	}
-	alternatives, onlyVerb, unapproved := opts.Dictionary.Unapproved(word)
+	result, unapproved := opts.Dictionary.Unapproved(word)
 	if !unapproved {
 		return Diagnostic{}, false
 	}
+	onlyVerb := result.OnlyVerb
 	// The dictionary is the authority of rule 1.1, thus the confidence is
 	// higher than the confidence of the hand list. But a word that the
 	// dictionary has only as a verb is often a technical noun in the same
@@ -122,8 +123,12 @@ func lookupDictionary(opts Options, word string) (Diagnostic, bool) {
 		confidence = 0.6
 	}
 	suggestion := "The dictionary gives no alternative. Write the idea in approved words."
-	if len(alternatives) > 0 {
-		suggestion = "Write \"" + strings.Join(alternatives, "\", or \"") + "\"."
+	switch {
+	case len(result.Alternatives) > 0:
+		suggestion = "Write \"" + strings.Join(result.Alternatives, "\", or \"") + "\"."
+	case result.TechnicalNoun:
+		// The dictionary approves the word, but as a technical noun.
+		suggestion = "The dictionary approves \"" + word + "\" as a technical noun. Do not use it as a verb."
 	}
 	return Diagnostic{
 		RuleID:     RuleUnapprovedTerm,

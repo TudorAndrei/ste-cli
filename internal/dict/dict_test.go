@@ -24,6 +24,8 @@ const fixture = `
 ||FRAMMIS (n)|INSTALL THE FRAMMIS.|Install the wibble.|
 |snarf (v)|MAKE A LIST|MAKE A LIST OF THE PARTS.|Snarf the parts.|
 |zorble (n)|No alternative is possible|||
+|blep (v)|BLEP (TN)|MAKE A BLEP OF THE PLATE.|Blep the plate.|
+|frob (v)|GRIBBLE (v) (WITH A FRAMMIS [TN] OR FRAMMISES [TN])|GRIBBLE THE PLATE WITH A FRAMMIS.|Frob the plate.|
 |GRIBBLE (n)|A hole in a plate|EXAMINE THE GRIBBLE.||
 `
 
@@ -42,8 +44,8 @@ func TestParseReadsOnlyPartTwo(t *testing.T) {
 	if len(ix.Lookup("rule")) != 0 {
 		t.Errorf("the parser read part 1")
 	}
-	if got := ix.Stats().Words; got != 6 {
-		t.Errorf("words %d, want 6: %+v", got, ix.Words)
+	if got := ix.Stats().Words; got != 8 {
+		t.Errorf("words %d, want 8: %+v", got, ix.Words)
 	}
 }
 
@@ -60,10 +62,12 @@ func TestApprovedAndUnapproved(t *testing.T) {
 		{"wibble", true, false, []string{"gribble", "frammis"}},
 		{"snarf", true, true, []string{"make a list"}},
 		{"zorble", true, false, nil},
+		{"blep", true, true, nil},
+		{"frob", true, true, []string{"gribble"}},
 		{"unknown-word", false, false, nil},
 	}
 	for _, tc := range cases {
-		alts, onlyVerb, unapproved := ix.Unapproved(tc.word)
+		got, unapproved := ix.Unapproved(tc.word)
 		if unapproved != tc.unapproved {
 			t.Errorf("%s: unapproved %v, want %v", tc.word, unapproved, tc.unapproved)
 			continue
@@ -71,16 +75,16 @@ func TestApprovedAndUnapproved(t *testing.T) {
 		if !unapproved {
 			continue
 		}
-		if onlyVerb != tc.onlyVerb {
-			t.Errorf("%s: onlyVerb %v, want %v", tc.word, onlyVerb, tc.onlyVerb)
+		if got.OnlyVerb != tc.onlyVerb {
+			t.Errorf("%s: onlyVerb %v, want %v", tc.word, got.OnlyVerb, tc.onlyVerb)
 		}
-		if len(alts) != len(tc.alts) {
-			t.Errorf("%s: alternatives %v, want %v", tc.word, alts, tc.alts)
+		if len(got.Alternatives) != len(tc.alts) {
+			t.Errorf("%s: alternatives %v, want %v", tc.word, got.Alternatives, tc.alts)
 			continue
 		}
-		for i := range alts {
-			if alts[i] != tc.alts[i] {
-				t.Errorf("%s: alternatives %v, want %v", tc.word, alts, tc.alts)
+		for i := range got.Alternatives {
+			if got.Alternatives[i] != tc.alts[i] {
+				t.Errorf("%s: alternatives %v, want %v", tc.word, got.Alternatives, tc.alts)
 				break
 			}
 		}
@@ -95,8 +99,37 @@ func TestAWordApprovedAsOnePartOfSpeech(t *testing.T) {
 	if entries := ix.Lookup("gribble"); len(entries) != 2 {
 		t.Fatalf("entries %+v, want 2", entries)
 	}
-	if _, _, unapproved := ix.Unapproved("gribble"); unapproved {
+	if _, unapproved := ix.Unapproved("gribble"); unapproved {
 		t.Error("gribble is approved")
+	}
+}
+
+func TestTechnicalNounIsNotItsOwnAlternative(t *testing.T) {
+	// "blep (v)" gives the alternative "BLEP (TN)": the word itself, as a
+	// technical noun. The advice "Write blep" for the word "blep" is not
+	// useful, thus the alternative goes and the flag stays.
+	ix := parseFixture(t)
+	got, unapproved := ix.Unapproved("blep")
+	if !unapproved {
+		t.Fatal("blep is not approved as a verb")
+	}
+	if len(got.Alternatives) != 0 {
+		t.Errorf("alternatives %v, want none", got.Alternatives)
+	}
+	if !got.TechnicalNoun {
+		t.Error("the dictionary approves blep as a technical noun")
+	}
+}
+
+func TestAnExplanationIsNotAnAlternative(t *testing.T) {
+	// The entry for "frob" gives "GRIBBLE (v) (WITH A FRAMMIS [TN] OR
+	// FRAMMISES [TN])". The alternative is "gribble". The text in
+	// parentheses explains the alternative, thus "with a frammis" and "or
+	// frammises" are not alternatives.
+	ix := parseFixture(t)
+	got, _ := ix.Unapproved("frob")
+	if len(got.Alternatives) != 1 || got.Alternatives[0] != "gribble" {
+		t.Errorf("alternatives %v, want [gribble]", got.Alternatives)
 	}
 }
 
@@ -119,7 +152,7 @@ func TestSaveAndLoad(t *testing.T) {
 	if back.Stats() != ix.Stats() {
 		t.Errorf("stats %+v, want %+v", back.Stats(), ix.Stats())
 	}
-	if _, _, unapproved := back.Unapproved("wibble"); !unapproved {
+	if _, unapproved := back.Unapproved("wibble"); !unapproved {
 		t.Error("the index lost its entries")
 	}
 }

@@ -89,18 +89,31 @@ type Options struct {
 	Dictionary Dictionary
 }
 
-// Dictionary answers the one question that rule 1.1 asks about a word.
-type Dictionary interface {
-	// Unapproved gives the approved alternatives for a word that the
-	// dictionary does not approve. A word that the dictionary does not
-	// have gives false, because rule 1.6 permits a technical noun that is
-	// not in the dictionary.
-	//
-	// onlyVerb is true when the dictionary has the word only as a verb.
+// DictionaryResult is what the dictionary says about a word that it does
+// not approve.
+type DictionaryResult struct {
+	// Alternatives are the approved words to write in its place. The word
+	// itself is never in this list.
+	Alternatives []string
+	// OnlyVerb is true when the dictionary has the word only as a verb.
 	// English uses many of those words as a noun too, as in "pump", and
 	// this tool has no part-of-speech tagger. The term rule gives a lower
 	// confidence to that finding.
-	Unapproved(word string) (alternatives []string, onlyVerb bool, unapproved bool)
+	OnlyVerb bool
+	// TechnicalNoun is true when the dictionary approves the word as a
+	// technical noun, and not as the part of speech of this entry. The
+	// dictionary writes "(TN)" for that. "graph" is an example: you can
+	// write "a graph", but not "to graph the results".
+	TechnicalNoun bool
+}
+
+// Dictionary answers the one question that rule 1.1 asks about a word.
+type Dictionary interface {
+	// Unapproved gives the result for a word that the dictionary does not
+	// approve. A word that the dictionary does not have gives false,
+	// because rule 1.6 permits a technical noun that is not in the
+	// dictionary.
+	Unapproved(word string) (DictionaryResult, bool)
 }
 
 // Confidence gives the lowest confidence that the mode accepts.
