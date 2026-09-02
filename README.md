@@ -7,6 +7,8 @@ It is one Go program with no dependencies. It has 8 rules, not the 53 rules
 of the standard. It is an aid for a writer. **It is not an ASD-certified
 checker.**
 
+Documentation: <https://tudorandrei.github.io/ste-cli/>
+
 ## Installation
 
 ### With mise
