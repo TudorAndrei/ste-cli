@@ -1,0 +1,149 @@
+{
+  "data_version": "1.0.0",
+  "cases": [
+    {
+      "name": "perfect/present-perfect-passive",
+      "text": "The file has been sent to the server.",
+      "expect": [
+        { "rule_id": "STE-3.1", "text": "has been sent" }
+      ]
+    },
+    {
+      "name": "perfect/past-perfect",
+      "text": "The task had gone to the queue.",
+      "expect": [
+        { "rule_id": "STE-3.1", "text": "had gone" }
+      ]
+    },
+    {
+      "name": "perfect/present-perfect",
+      "text": "We have written the report.",
+      "expect": [
+        { "rule_id": "STE-3.1", "text": "have written" }
+      ]
+    },
+    {
+      "name": "perfect/have-to-is-not-perfect",
+      "text": "You have to start the pump.",
+      "expect": []
+    },
+    {
+      "name": "progressive/simple",
+      "text": "The server is running.",
+      "expect": [
+        { "rule_id": "STE-3.5", "text": "is running" }
+      ]
+    },
+    {
+      "name": "progressive/with-adverb",
+      "text": "The server is still running.",
+      "expect": [
+        { "rule_id": "STE-3.5", "text": "is still running" }
+      ]
+    },
+    {
+      "name": "progressive/negated",
+      "text": "The parser was not reading the file.",
+      "expect": [
+        { "rule_id": "STE-3.5", "text": "was not reading" }
+      ]
+    },
+    {
+      "name": "progressive/noun-is-not-progressive",
+      "text": "The result is nothing.",
+      "expect": []
+    },
+    {
+      "name": "passive/with-agent",
+      "text": "The file was sent by the parser.",
+      "expect": [
+        { "rule_id": "STE-3.2", "text": "was sent" }
+      ]
+    },
+    {
+      "name": "passive/perfect-with-agent",
+      "text": "The file has been read by the parser.",
+      "expect": [
+        { "rule_id": "STE-3.1", "text": "has been read" },
+        { "rule_id": "STE-3.2", "text": "been read" }
+      ]
+    },
+    {
+      "name": "passive/regular-participle",
+      "text": "The report was approved.",
+      "expect": [
+        { "rule_id": "STE-3.2", "text": "was approved" }
+      ]
+    },
+    {
+      "name": "adjectival/configured",
+      "text": "The service is configured.",
+      "expect": []
+    },
+    {
+      "name": "adjectival/enabled",
+      "text": "The webhook is enabled.",
+      "expect": []
+    },
+    {
+      "name": "adjectival/closed",
+      "text": "The valve is closed.",
+      "expect": []
+    },
+    {
+      "name": "adjectival/agent-makes-it-passive",
+      "text": "The valve is closed by the operator.",
+      "expect": [
+        { "rule_id": "STE-3.2", "text": "is closed" }
+      ]
+    },
+    {
+      "name": "phrasal/base-form",
+      "text": "Carry out the test.",
+      "expect": [
+        { "rule_id": "STE-1.4", "text": "Carry out" }
+      ]
+    },
+    {
+      "name": "phrasal/third-person",
+      "text": "The system carries out the test.",
+      "expect": [
+        { "rule_id": "STE-1.4", "text": "carries out" }
+      ]
+    },
+    {
+      "name": "phrasal/past-form",
+      "text": "The operator carried out the test.",
+      "expect": [
+        { "rule_id": "STE-1.4", "text": "carried out" }
+      ]
+    },
+    {
+      "name": "phrasal/ing-form",
+      "text": "The operator is carrying out the test.",
+      "expect": [
+        { "rule_id": "STE-3.5", "text": "is carrying" },
+        { "rule_id": "STE-1.4", "text": "carrying out" }
+      ]
+    },
+    {
+      "name": "phrasal/two-word-particle",
+      "text": "Get rid of the old file.",
+      "expect": [
+        { "rule_id": "STE-1.4", "text": "Get rid of" }
+      ]
+    },
+    {
+      "name": "phrasal/shut-down",
+      "text": "Shut down the computer.",
+      "expect": [
+        { "rule_id": "STE-1.4", "text": "Shut down" }
+      ]
+    },
+    {
+      "name": "clean/imperative",
+      "text": "Start the pump. Then open the valve.",
+      "expect": []
+    }
+  ]
+}
