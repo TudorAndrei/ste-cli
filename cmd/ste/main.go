@@ -18,8 +18,9 @@ import (
 	"github.com/TudorAndrei/ste-cli/internal/report"
 )
 
-// Version is the version of the tool.
-const Version = "0.1.0"
+// Version is the version of the tool. The release build replaces it with
+// the tag name: go build -ldflags "-X main.Version=0.1.0".
+var Version = "dev"
 
 // Exit codes.
 const (

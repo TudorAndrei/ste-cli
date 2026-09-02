@@ -13,10 +13,22 @@ run = "go test ./..."
 description = "Run the Go static checks"
 run = "go vet ./..."
 
+[tasks.fmt-check]
+description = "Fail if a file needs gofmt"
+run = 'files="$(gofmt -l .)"; if [ -n "$files" ]; then echo "$files"; exit 1; fi'
+
 [tasks.check]
 description = "Format, vet, and test"
 depends = ["fmt", "vet", "test"]
 
+[tasks.ci]
+description = "Check the format, vet, and test without a change to a file"
+depends = ["fmt-check", "vet", "test"]
+
 [tasks.build]
 description = "Build the ste binary"
 run = "go build -o bin/ste ./cmd/ste"
+
+[tasks.dist]
+description = "Build the release archives for all platforms into dist/"
+run = "./scripts/dist.sh"

@@ -9,17 +9,49 @@ checker.**
 
 ## Installation
 
-The project uses [mise](https://mise.jdx.dev) for its toolchain.
+### With mise
+
+The GitHub backend of [mise](https://mise.jdx.dev) gets the binary from the
+GitHub releases of this repository:
 
 ```bash
-mise install
-mise run build      # writes bin/ste
+mise use -g github:TudorAndrei/ste-cli        # the newest release
+mise use -g github:TudorAndrei/ste-cli@0.1.0  # one version
+ste version
 ```
 
-Or use Go directly:
+To pin the tool for one project, put this in the `mise.toml` of that
+project:
+
+```toml
+[tools]
+"github:TudorAndrei/ste-cli" = "latest"
+```
+
+mise finds the correct asset for your platform without an option. The
+archive names use the words that its asset matcher knows, for example
+`ste-0.1.0-darwin-arm64.tar.gz` and `ste-0.1.0-linux-x64.tar.gz`. Each
+release also has a `checksums.txt` file, thus mise can verify the download
+and write it to `mise.lock`.
+
+The releases give binaries for macOS (arm64, x64), Linux (arm64, x64), and
+Windows (x64).
+
+### With Go
+
+This path does not need a release:
 
 ```bash
-go install ./cmd/ste
+mise use -g "go:github.com/TudorAndrei/ste-cli/cmd/ste"
+# or
+go install github.com/TudorAndrei/ste-cli/cmd/ste@latest
+```
+
+### From the source
+
+```bash
+mise install        # gets the Go version from mise.toml
+mise run build      # writes bin/ste
 ```
 
 ## Usage
@@ -129,9 +161,32 @@ docs/                     the rules, the audit, and the measurement
 
 ```bash
 mise run check      # gofmt, go vet, go test
+mise run ci         # the same, but no file changes: gofmt only reports
 ```
 
 Result on 2026-09-02: all tests pass. 6 packages, 0 failures.
+
+## Release
+
+A tag that starts with `v` starts the release workflow in
+`.github/workflows/release.yml`. The workflow runs the tests, builds the
+archives for the 5 platforms, and makes the GitHub release with a
+`checksums.txt` file.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+To make the same archives on your computer:
+
+```bash
+mise run dist       # writes dist/
+```
+
+The version in the binary comes from the tag:
+`go build -ldflags "-X main.Version=0.1.0"`. A build from the source
+without that flag says `dev`.
 
 ## Limits
 
