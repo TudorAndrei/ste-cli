@@ -214,10 +214,10 @@ table row is a different sentence. This is a decision of this tool, and not
 a rule of the standard.
 
 When you give a directory, the tool does not go into a directory that holds
-build output or dependencies: `node_modules`, `vendor`, `dist`, `build`,
-`target`, `bin`, `obj`, `out`, `coverage`, `__pycache__`, and each directory
-whose name starts with a period. To check one of these directories, give its
-path to the command.
+build output or dependencies. The list is `node_modules`, `vendor`, `dist`,
+`build`, `target`, `bin`, `obj`, `out`, `coverage`, `__pycache__`, and each
+directory whose name starts with a period. To check one of these
+directories, give its path to the command.
 
 ## Rules that this tool does not check
 

@@ -123,7 +123,8 @@ and `STE-8.1` had the correct numbers.
 Version 0.2.0 ran on this repository. The run gave 76 findings in 12 files.
 56 of the findings are correct and expected: 20 in the invalid fixtures, and
 36 in the quoted examples of the rule pages. 13 are correct findings in
-`idea.md`, which is not written in Simplified Technical English.
+`idea.md`. The author of that file did not use Simplified Technical
+English.
 
 The run found 2 defects in the tool, and version 0.2.1 corrects them:
 
