@@ -43,8 +43,11 @@ Then read the text yourself for the rules below.
 ### The words
 
 - **1.3 One meaning for each word.** A word of the dictionary has one approved
-  meaning. "Follow" means "come after", and not "obey". Look for a word that
-  the text uses with a second meaning.
+  meaning, and that meaning is frequently more narrow than the meaning in
+  usual English. Look for a word that the text uses in two senses. A word that
+  names a part in one sentence, and an action in the next one, is an example.
+  Give the rule number. The writer can then compare the word with their own
+  copy of the dictionary.
 - **1.10 No slang, and no jargon.** A technical noun must be a term of the
   field, and not the language of one team. "The job got stuck" is not a
   technical statement.
@@ -64,8 +67,8 @@ Then read the text yourself for the rules below.
 - **2.2 A long technical noun.** A technical noun of more than three words
   must appear in full one time, before its short form.
 - **4.4 Connecting words.** Two sentences with related ideas need a connecting
-  word: "then", "thus", "but". Find a place where the reader must guess the
-  relation.
+  word between them. Find a place where the reader must guess the relation of
+  one sentence to the sentence before it.
 - **4.5 Articles.** An article ("the", "a") is necessary before most nouns.
   The standard permits no article in a general statement. Judge which one the
   sentence is.
