@@ -28,6 +28,15 @@ func TestConditionOrder(t *testing.T) {
 		{"a time phrase and no clause",
 			"1. Close the valve after the test.\n", 0},
 
+		// "while" gives a time or a contrast, and not a condition. Each of
+		// these gave a wrong finding on a real repository.
+		{"\"while\" with a gerund",
+			"1. Read the report while investigating one failure of the run.\n", 0},
+		{"\"while\" with a contrast",
+			"1. Use the prefix match while exact lookup keeps the raw string.\n", 0},
+		{"\"unless\" is a condition",
+			"1. Copy the assets of the module unless the generator includes them.\n", 1},
+
 		// The rule reads an instruction only.
 		{"descriptive text keeps its order",
 			"The tool writes the report when the run is complete.\n", 0},

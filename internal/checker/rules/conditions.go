@@ -7,10 +7,14 @@ import "strings"
 const RuleConditionOrder = "STE-5.4"
 
 // conditionWords start a condition clause. The standard gives "when" and
-// "if" in its examples, and these other words make the same clause.
+// "if" in its examples, and "unless" makes the same clause.
+//
+// "while", "before", "after", and "until" are not in this list. They give a
+// time and not a condition, and a test on a real repository showed that
+// each of them gives a wrong finding: "while keeping the rules unchanged"
+// is a gerund, and "while exact lookup keeps the string" is a contrast.
 var conditionWords = map[string]bool{
-	"when": true, "if": true, "before": true, "after": true,
-	"until": true, "unless": true, "while": true,
+	"when": true, "if": true, "unless": true,
 }
 
 // clauseVerbs take a clause as their object, and not as a condition. "Make

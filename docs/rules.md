@@ -320,8 +320,13 @@ the light comes on, set the switch to NORMAL" gives none.
   word in capital letters is a value.
 - "Check if the valve is open" gives no finding. A verb such as "check" or
   "verify" takes the clause as its object, and not as a condition.
-- The condition must hold a verb of its own. "Close the valve after the
-  test" names a time, and the standard gives no correction for it.
+- The rule reads 3 words: "when", "if", and "unless". "while", "before",
+  "after", and "until" give a time and not a condition. On a repository of
+  180 files, each of those 4 words gave a wrong finding: "while keeping the
+  rules unchanged" is a gerund, and "while exact lookup keeps the string" is
+  a contrast. The 3 words that stay gave 4 findings on that repository, and
+  a person confirmed each one.
+- The condition must hold a verb of its own.
 - The severity is `info`, because the tool has no parser and the test is the
   position of a word.
 
