@@ -80,7 +80,7 @@ a `corpus.truth` file. This project uses the same idea in
 | Result | **borrow design only** |
 
 The repository gives no statement about the source of its three JSON data
-files. The MIT license of the code is thus not enough proof for the data.
+files. The MIT license of the code is not enough proof for the data.
 This project does not use that data.
 
 Kept as ideas only: one test file for each rule, and the annotated sample
@@ -171,7 +171,7 @@ What did **not** enter this repository:
   the specification, and it stays out of this repository.
 
 The local copy and its Markdown conversion are in `.standard/`, which
-`.gitignore` excludes. This repository is public, thus git must never see
+`.gitignore` excludes. This repository is public, and git must never see
 that directory.
 
 ### The terms of ASD, in detail
@@ -202,7 +202,7 @@ paths can change that: written permission from the STEMG, or an owner who
 is in one of the groups of statement 3.
 
 Statement 2 also gives the design of the `ste dict` command. The
-specification is free for each user, thus a user can make the index from
+specification is free for each user, and a user can make the index from
 their own copy. The tool ships the parser, the user supplies the data, and
 nothing moves from one user to another.
 

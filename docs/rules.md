@@ -1,14 +1,16 @@
 ---
 title: Rules
-description: The 11 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
+description: The 15 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
 ---
 
 # Rules
 
 [Back to the start page](index.md)
 
-This tool has 11 checks. ASD-STE100 Issue 9 has 53 rules and a dictionary of
-approved words. This tool does not have the dictionary.
+This tool has 15 checks. ASD-STE100 Issue 9 has 53 rules and a dictionary of
+approved words. The tool does not ship the dictionary. `ste dict import`
+makes an index from your own copy of the specification, and `--use-dict`
+then gives rule 1.1 the full word list.
 
 The rule numbers are the rule numbers of Issue 9. A check with the `GR`
 prefix is a general recommendation of the standard. A general
@@ -30,6 +32,10 @@ severity, and strict mode does not make it an error.
 | `STE-8.1` | Semicolon | 1.00 | warning |
 | `STE-9.3` | Phrasal verb | 0.85 | warning |
 | `STE-GR-6` | Latin abbreviation | 0.90 | info |
+| `STE-4.3` | A list with two constructions | 0.80 | info |
+| `STE-5.5` | An instruction in a note | 0.80 | warning |
+| `STE-6.6` | Paragraph too long | 1.00 | warning |
+| `STE-7.3` | A safety instruction with no explanation | 0.70 | warning |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -42,15 +48,21 @@ of a rule one step stronger. The mode does **not** change a word limit.
 Reports 27 words and 11 word groups that have a shorter replacement, for
 example "utilize" and "in order to".
 
-**Limits.** A person wrote the list by hand. It is not the ASD-STE100
-approved-word dictionary, and this tool cannot tell you if a word is in that
-dictionary. Rule 1.1 also has parts that need the dictionary: the approved
-part of speech (rule 1.2) and the approved meaning (rule 1.3). This tool
-checks neither. See [upstream-audit.md](upstream-audit.md).
+**The full dictionary.** A person wrote the list of 38 terms by hand, and it
+is not the approved-word dictionary. `ste dict import` reads your own copy
+of the specification and writes an index. `--use-dict` then makes this rule
+report each word that the dictionary does not approve, with the approved
+alternatives of the entry. See [upstream-audit.md](upstream-audit.md) for
+the reason that the tool cannot ship the data.
+
+**Limits.** Rule 1.1 also has parts that need more than the word list: the
+approved part of speech (rule 1.2) and the approved meaning (rule 1.3). This
+tool checks neither. With `--use-dict`, the rule uses a determiner to see
+that a word is a noun, and it does not use a part-of-speech tagger.
 
 **Control.** `allow.nouns` and `allow.verbs` in the glossary remove a term
 from this rule. Rule 1.8 tells writers to use the technical nouns of their
-company or industry, thus a project glossary agrees with the standard.
+company or industry. A project glossary agrees with the standard.
 
 ## STE-1.14 British spelling
 
@@ -107,11 +119,11 @@ writing, and only when the agent is unknown.
 **Limits.**
 
 - Rule 3.3 makes a past participle an adjective when the dictionary gives it
-  as an adjective. This tool has no dictionary, thus it uses a list of 35
+  as an adjective. This tool has no dictionary. It uses a list of 35
   participles that are usually adjectives, such as "configured" and
   "enabled". It does not report them, but it does report them when a "by"
   agent follows. The "by" test is the test that the standard itself gives.
-- The tool thus does not find a passive sentence with no agent when the
+- The tool does not find a passive sentence with no agent when the
   participle is in that list. This is a known miss.
 - A hyphenated form, such as "MIT-licensed", is an adjective for this tool.
 - When the same words also give an `STE-3.4` finding, and no "by" agent
@@ -148,7 +160,7 @@ limit from the type of the sentence, and **not** from the mode:
 | A note | 25 words | 5.5 |
 | Descriptive text | 25 words | 6.3 |
 
-The tool has no part-of-speech tagger, thus it uses the structure of the
+The tool has no part-of-speech tagger. It uses the structure of the
 Markdown: **a numbered list item is an instruction in a procedure.** A
 bulleted list is not, because a bulleted list is usually a list of items and
 not a sequence of steps. A line that starts with "NOTE:" is a note, and it
@@ -167,7 +179,7 @@ obeys these:
 
 **Limits.** Rule 8.6 also makes a multi-word title, a multi-word proper
 noun, and a multi-word alphanumeric identifier one word. The tool cannot
-find these without a dictionary, thus it counts each of their words. The
+find these without a dictionary, and it counts each of their words. The
 count can therefore be too high for a sentence that has a long title or a
 long name. Rule 8.5 also makes the text in parentheses a separate sentence
 with its own limit. The tool does not check that sentence.
@@ -193,18 +205,80 @@ phrasal verb from two words.
 - The verb and its particle must touch. The tool does not find a separated
   form, such as "turn the pump on".
 - The list is short on purpose. The dictionary gives single words, not
-  combinations, thus a hand-written list is the only method.
+  combinations. A hand-written list is the only method.
 
 ## STE-GR-6 Latin abbreviation
 
 Reports "e.g.", "i.e.", "etc.", and 5 more Latin abbreviations. GR-6 is a
-general recommendation, thus the severity is `info`, and no mode and no flag
+general recommendation. The severity is `info`, and no mode and no flag
 makes it an error.
 
 **Limits.** A Latin abbreviation is lower-case and it ends with a period.
-The tool obeys both conditions, thus it does not report the name "VS Code"
-and it does not report "vs" as a column title. Before version 0.5.0, the
+The tool obeys both conditions. It does not report the name "VS Code", and
+it does not report "vs" as a column title. Before version 0.5.0, the
 name "VS Code" gave 147 wrong findings in one repository.
+
+## STE-4.3 A list with two constructions
+
+Reports an item of a vertical list that does not agree with the other items.
+The test is the first letter: a list that starts some items with a capital
+letter and other items with a small letter mixes two constructions. Rule 4.3
+tells you to keep one construction for each list.
+
+**Limits.**
+
+- The rule reads one list at a time. Two lists that are separated by a
+  paragraph do not join, and they can disagree with each other.
+- An item of less than three words is not a sentence, and the rule ignores
+  it. "go" and "stop" are examples.
+- The rule ignores an item that starts with code, a link, or an image. The
+  parser replaced that part with spaces, and the first letter of the prose
+  is not the first letter of the item.
+- The first letter is a weak proof of the construction. The rule cannot see
+  that one item is a command and another item is a noun phrase. The severity
+  is `info` for this reason.
+- An early version reported each item of each list that did not agree with
+  the first item. It gave 174 findings on one repository. The rule now
+  reports only the items that are in the minority of their own list, which
+  gave 10.
+
+## STE-5.5 An instruction in a note
+
+Reports a note that tells the reader to do something. Rule 5.5 makes a note
+give information only. An instruction belongs to a step of the procedure,
+where the reader can find it in the correct order.
+
+The rule reads `**NOTE:**`, `NOTE:`, and the GitHub form `> [!NOTE]`. A
+sentence is an instruction when it has one of these 5 words: "must",
+"shall", "always", "never", and "do" with "not" after it.
+
+**Limits.**
+
+- The list of 5 words is the whole test. A command with none of them, such
+  as "Disconnect the power", stays hidden.
+- A warning, a caution, and a danger block can hold an instruction, and the
+  rule does not read them. Rule 7.3 reads those.
+
+## STE-6.6 Paragraph too long
+
+Reports a paragraph of more than 6 sentences. Rule 6.6 gives that limit for
+descriptive text. The confidence is 1.00, because the count is a count.
+
+**Limits.** A vertical list is not a paragraph, and the rule does not count
+its items. Two paragraphs of 4 sentences are two paragraphs, and not one
+paragraph of 8.
+
+## STE-7.3 A safety instruction with no explanation
+
+Reports a warning, a caution, or a danger block that gives no reason. Rule
+7.3 tells you to give the risk, so the reader knows what happens when they
+do not obey. The rule reports a block of one sentence that has 12 words or
+less. A second sentence, or a longer first one, is the explanation.
+
+**Limits.** The rule counts sentences and words. It cannot read the sentence
+to see that it truly gives a risk, and a long instruction with no reason
+gives no finding. A note and a tip are not safety instructions, and the rule
+ignores them.
 
 <!-- ste-enable -->
 
@@ -227,7 +301,7 @@ table row is a different sentence. This is a decision of this tool, and not
 a rule of the standard.
 
 When you give a directory, the tool does not read a file that git ignores.
-It asks git for the list, thus the full syntax of `.gitignore` applies. It
+It asks git for the list, and the full syntax of `.gitignore` applies. It
 also does not go into a directory that holds build output or dependencies:
 `node_modules`, `vendor`, `dist`, `build`, `target`, `bin`, `obj`, `out`,
 `coverage`, `__pycache__`, and each directory whose name starts with a
@@ -239,7 +313,7 @@ The tool always reads a file or a directory that you give by its path. The
 ## How to silence a finding
 
 No rule set is correct for every sentence. A wrong finding must not stop the
-work, thus the tool gives four methods:
+work. The tool gives four methods:
 
 | Method | Use it for |
 |---|---|
@@ -264,14 +338,12 @@ not try to check them, because a guess would only make noise:
 | 2.1, 2.2 | Multi-word nouns of 3 words maximum | Needs a part of speech to find where the noun starts |
 | 3.1 | The verb forms of the dictionary | Needs the dictionary |
 | 4.2 (part) | Omitted words | Needs a parser |
-| 4.3 | Vertical list construction | Possible later. Not built |
 | 4.5 | Articles and demonstrative adjectives | The exceptions of the standard make a check too noisy |
 | 5.2 | One instruction for each sentence | Cannot separate simultaneous actions |
 | 5.3 | The imperative form | Needs a verb list |
 | 5.4 | The condition before the instruction | Possible later, as info. Not built |
 | 6.1, 6.2, 6.5 | Key words, one topic for each paragraph | Needs semantics |
-| 6.6 | 6 sentences maximum in a paragraph | Too many false reports in software documentation |
-| 7.1, 7.2, 7.3 | Safety instructions | Possible later for admonition blocks. Not built |
+| 7.1, 7.2 | The words and the order of a safety instruction | Needs the risk level of the subject field |
 | 9.1, 9.2, 9.4 | Consistent style | Needs semantics |
 
 ## Limits of the tool

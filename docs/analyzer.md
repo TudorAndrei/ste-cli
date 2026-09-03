@@ -37,14 +37,14 @@ To make it work:
   /usr/bin/python3 -m spacy download en_core_web_sm
 ```
 
-The binary holds the analyzer, thus you need no file from this repository.
+The binary holds the analyzer. You need no file from this repository.
 The tool writes it to the cache directory and starts it. `$STE_PYTHON`
 gives a different interpreter, and `analyzer: true` in the config makes
 `--analyze` the default.
 
-The command starts the program one time for each run, thus the model loads
+The command starts the program one time for each run, and the model loads
 one time. The command sends only the sentences of a possible finding, and it
-keeps the answer for each sentence, thus a large repository stays fast.
+keeps the answer for each sentence. A large repository stays fast.
 
 | Run of 180 files | Findings | Time |
 |---|---|---|

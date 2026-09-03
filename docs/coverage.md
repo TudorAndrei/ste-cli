@@ -68,8 +68,8 @@ already.
 | 8.6 | A multi-word name that counts as one word |
 
 The `--analyzer` flag gives this group a path. An external program gives the
-grammar of a sentence. Rule 3.6 uses it as a veto today, thus a finding goes
-when the parser sees no passive relation. On a repository of 180 files, the
+grammar of a sentence. Rule 3.6 uses it as a veto today: a finding goes when
+the parser sees no passive relation. On a repository of 180 files, the
 analyzer removed 26 wrong findings and the run went from 0.24s to 1.30s.
 Refer to [the analyzer](analyzer.md).
 

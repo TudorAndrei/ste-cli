@@ -66,9 +66,9 @@ Thus they add no noise. The word counts are lower than the first
 measurement, because the tool now counts a quantity with its unit as one
 word.
 
-**This measurement gives no recall.** The documents have no labels, thus
+**This measurement gives no recall.** The documents have no labels, and
 nobody knows how many violations the tool did not find. The true recall on
-new text is much less than 1.00. The tool has 11 checks, and the standard
+new text is much less than 1.00. The tool has 15 checks, and the standard
 has 53 rules.
 
 ### The false positives that this measurement found
@@ -80,7 +80,7 @@ defect, and each defect now has a test:
 |---|---|---|
 | `STE-3.6` on "is MIT-licensed" | A hyphenated adjective ends with "ed". | `isCompound` in `rules/verbs.go`. |
 | `STE-1.1` on `Additional documentation` | An indented code block was prose. | Indented-block mask in `checker/document.go`. |
-| 3 × `STE-5.1` on a 26 to 35-word "sentence" | Inline code after a period hid the start of the next sentence, thus two sentences became one. | The look-ahead in `endsSentence` uses the source text. |
+| 3 × `STE-5.1` on a 26 to 35-word "sentence" | Inline code after a period hid the start of the next sentence, and two sentences became one. | The look-ahead in `endsSentence` uses the source text. |
 | `STE-5.1` on a 34-word "sentence" | The cells of a Markdown table row became one sentence. | A cell separator is a sentence boundary. |
 
 ## 3. Known limits of the measurement
@@ -90,7 +90,7 @@ defect, and each defect now has a test:
   measured the tool on aircraft maintenance procedures, which is the first
   purpose of ASD-STE100.
 - This evaluation does not measure recall on new text.
-- The tool has no dictionary rule, thus this evaluation says nothing about
+- The tool has no dictionary rule. This evaluation says nothing about
   the largest part of ASD-STE100: the approved-word list.
 
 ## 4. Audit against Issue 9
@@ -145,7 +145,7 @@ findings.
 
 | Group | Findings | Verdict |
 |---|---|---|
-| Front matter | 127 | **Wrong.** 169 of the 180 files start with YAML front matter. CommonMark has no front matter, thus the parser read the keys as a sentence. |
+| Front matter | 127 | **Wrong.** 169 of the 180 files start with YAML front matter. CommonMark has no front matter, and the parser read the keys as a sentence. |
 | The name "VS Code" | 147 | **Wrong.** The rule for a Latin abbreviation matched the name. |
 | Semicolons, passive voice, long sentences | ~1000 | Correct on a sample of each rule. |
 

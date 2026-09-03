@@ -33,8 +33,8 @@ project:
 mise finds the correct asset for your platform without an option. The
 archive names use the words that its asset matcher knows, for example
 `ste-0.7.0-darwin-arm64.tar.gz` and `ste-0.7.0-linux-x64.tar.gz`. Each
-release also has a `checksums.txt` file, thus mise can verify the download
-and write it to `mise.lock`.
+Each release also has a `checksums.txt` file. mise verifies the download
+against it and records the result in `mise.lock`.
 
 The releases give binaries for macOS (arm64, x64), Linux (arm64, x64), and
 Windows (x64).
@@ -73,8 +73,8 @@ A path can be a file or a directory. A directory gives all `.md`,
 
 A walk of a directory does not give:
 
-- a file that git ignores, in a git repository. The tool asks git, thus the
-  full syntax of `.gitignore` applies.
+- a file that git ignores, in a git repository. The tool asks git itself,
+  so the full syntax of `.gitignore` applies.
 - `node_modules`, `vendor`, `dist`, `build`, `target`, `bin`, `obj`, `out`,
   `coverage`, `__pycache__`, or a directory whose name starts with a
   period.
@@ -134,10 +134,9 @@ team removes. This tool is an aid, and not a gate:
 - It exits with code 0 even when it finds something. It blocks only when you
   ask for a gate with `--fail-on-new`, `--warnings-as-errors`, or
   `--fail-over`.
-- A baseline accepts the findings that exist today, thus only a new finding
-  comes to your attention.
-- Each rule has its own severity, thus you can accept the rules one at a
-  time.
+- A baseline accepts the findings that exist today. Only a new finding
+  reaches you after that.
+- Each rule has its own severity. You can accept the rules one at a time.
 - A wrong finding has three escape hatches: a comment in the text, a rule in
   the config, or a path in `exclude`.
 
@@ -176,7 +175,7 @@ no `ste-enable` applies to the end of the file.
 | `--warnings-as-errors` | A finding has the warning severity, which becomes an error. An info finding stays advice. |
 | `--fail-over <n>` | The score for each 100 words is more than n |
 
-A gate reads the report after the baseline, thus an accepted finding never
+A gate reads the report after the baseline. An accepted finding never
 blocks. You can give more than one gate.
 
 ## The dictionary
@@ -188,8 +187,8 @@ standard does not approve, each with its approved alternative. Rule 1.1 needs th
 **This tool does not ship the dictionary.** The specification is the
 property of ASD, and its terms permit no reproduction or publication without
 written authority. But ASD gives the specification **free of charge** to
-each writer and user at [asd-ste100.org](https://www.asd-ste100.org), thus
-you can make the index from your own copy:
+each writer and user at [asd-ste100.org](https://www.asd-ste100.org). You
+make the index from your own copy:
 
 ```bash
 # 1. Get your own copy from asd-ste100.org, then make the text:
@@ -209,8 +208,8 @@ info` shows the index, and `ste dict remove` deletes it.
 
 The index is global. Import it one time, and each project on that machine
 reads the same file. No lint run reads the specification again: the run
-reads a JSON index of about 135 kB, thus the dictionary adds no measurable
-time.
+reads a JSON index of about 135 kB. The dictionary adds no measurable
+time to a run.
 
 The index is data, and not a cache, because this tool cannot make it again
 without your copy. Thus it goes in the data directory of the XDG
@@ -261,8 +260,8 @@ approve the **verb** "graph", but "a graph" is a correct technical noun.
 The tool uses the shape of the sentence in place of a tagger: a determiner
 in the same noun phrase makes the word a noun. Thus "The dependency graph
 is large" gives no finding, and "Graph the test results" gives one. A modal
-verb ends the phrase, thus "The tool can graph the results" gives a finding
-too.
+A modal verb ends the phrase, and "The tool can graph the results" gives a
+finding.
 
 The test is not perfect. A word that the dictionary has only as a verb gets
 a confidence of 0.60. The other words get 0.95. Thus `min_confidence: 0.7`
@@ -286,7 +285,7 @@ mode: flavored          # or strict
 
 rules:                  # off, info, warning, or error
   STE-8.1: error        # your text already obeys this rule
-  STE-3.6: info         # this rule needs a rewrite, thus only advice today
+  STE-3.6: info         # this rule needs a rewrite. Advice for today.
   STE-5.1: off          # this rule comes later
 
 exclude:                # the tool also skips the files that git ignores
@@ -304,7 +303,8 @@ fail_over: 2.5          # without this key, the tool never blocks
 warnings_as_errors: false
 ```
 
-An unknown key is an error, thus a spelling mistake does not stay hidden.
+An unknown key is an error. A spelling mistake in the file never stays
+hidden.
 
 ## Output
 
@@ -353,8 +353,8 @@ and its limits. The numbers are the rule numbers of Issue 9.
 | [pflag](https://github.com/spf13/pflag) | BSD-3-Clause | Reads the command flags. |
 | [xdg](https://github.com/adrg/xdg) | MIT | Gives the data directory of the user for each system. |
 
-All 4 are pure Go, thus the build needs no C compiler and it stays one
-binary for each platform.
+All 4 are pure Go. The build needs no C compiler, and it gives one binary
+for each platform.
 
 ## More exact rules with an analyzer
 
@@ -365,7 +365,7 @@ Some rules need the grammar of a sentence. "The demand is measured" and
 the difference.
 
 <!-- ste-enable STE-3.6 --> Go has no library that gives the grammar of English with a
-trained model, thus an external program gives it:
+trained model. An external program gives it:
 
 ```bash
 ste analyzer                 # what it needs, and how to install it
@@ -376,7 +376,7 @@ The command sends only the sentences of a possible finding, and it keeps
 each answer. On a repository of 180 files, the analyzer removed 26 wrong
 findings of rule 3.6, and the run went from 0.24s to 1.30s.
 
-The analyzer is never necessary. Each rule also works without it, thus the
+The analyzer is never necessary. Each rule also works without it, and the
 command stays one binary with no runtime.
 
 ## For an agent
@@ -459,11 +459,14 @@ not as a defect.
 
 - The tool has no part-of-speech tagger. It uses word lists and short word
   sequences.
-- The tool does **not** have the ASD-STE100 approved-word dictionary. It
-  cannot tell you if the standard approves a word. See
-  [docs/upstream-audit.md](docs/upstream-audit.md) for the reason.
+- The tool does **not** ship the ASD-STE100 approved-word dictionary. Its
+  own list holds 27 words and 11 word groups. `ste dict import` makes an
+  index from your copy
+  of the specification, and `--use-dict` then gives rule 1.1 the full list.
+  See [docs/upstream-audit.md](docs/upstream-audit.md) for the reason that
+  the tool cannot ship it.
 - Precision and recall are in [docs/evaluation.md](docs/evaluation.md).
-  Recall on new text is low, because the tool has 11 checks and the standard
+  Recall on new text is low, because the tool has 15 checks and the standard
   has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

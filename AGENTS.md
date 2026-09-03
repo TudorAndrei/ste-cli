@@ -130,4 +130,4 @@ ste lint --fail-on-new --format json --limit 20 .
 ```
 
 The baseline holds the findings of today. After it, only a new finding comes
-to the report, thus the work of the user does not stop.
+to the report, and the work of the user does not stop.
