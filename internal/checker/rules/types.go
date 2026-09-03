@@ -105,6 +105,42 @@ type Syntax interface {
 	// construction. The second value is false when the analyzer gives no
 	// answer, and the rule then keeps its own result.
 	PassiveAt(sentence string, offset int) (passive bool, known bool)
+	// Grammar gives one item for each word of the sentence. The second
+	// value is false when the analyzer gives no answer.
+	Grammar(sentence string) ([]SyntaxToken, bool)
+}
+
+// SyntaxToken is one word with its grammar. An external program gives it,
+// and the fields are the fields of that program.
+type SyntaxToken struct {
+	// Index is the position of the word in the sentence.
+	Index int
+	Text  string
+	// POS is the coarse part of speech: NOUN, VERB, ADJ, and more.
+	POS string
+	// Tag is the fine part of speech: NN, VB, VBG, VBN, and more.
+	Tag string
+	// Dep is the relation of the word to its head: nsubj, amod, compound,
+	// advcl, and more.
+	Dep string
+	// Head is the index of the word that this word depends on.
+	Head int
+	// Start is the offset of the word in the sentence.
+	Start int
+}
+
+// grammarOf gives the grammar of a sentence, or nil when there is no
+// analyzer. A rule of the syntax group reports nothing when it gets nil,
+// because a guess is worse than silence.
+func grammarOf(opts Options, s Sentence) []SyntaxToken {
+	if opts.Syntax == nil {
+		return nil
+	}
+	tokens, ok := opts.Syntax.Grammar(s.Text)
+	if !ok {
+		return nil
+	}
+	return tokens
 }
 
 // DictionaryResult is what the dictionary says about a word that it does
@@ -304,6 +340,9 @@ func All() []Rule {
 		VerticalList,
 		ConditionOrder,
 		OneName,
+		Imperative,
+		NounCluster,
+		Gerund,
 	}
 }
 

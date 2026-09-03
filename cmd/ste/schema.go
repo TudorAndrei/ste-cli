@@ -144,5 +144,7 @@ func ruleCatalog() []ruleDoc {
 		{rules.RuleSafetyExplanation, "A safety instruction with no explanation", "7.3", "warning", []float64{0.7}, "The rule reads a warning, a caution, and a danger block."},
 		{rules.RuleConditionOrder, "A condition after the command", "5.4", "info", []float64{0.7}, "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it."},
 		{rules.RuleOneName, "Two names for the same item", "1.11", "warning", []float64{0.95}, "The rule reports nothing until the prefer key of the config gives the names. No tool can know that two nouns mean the same item."},
+		{rules.RuleImperative, "An instruction that is not a command", "5.3", "warning", []float64{0.75}, "The rule needs the analyzer. It reads a numbered step, and it steps over a condition clause."},
+		{rules.RuleNounCluster, "A noun of more than three words", "2.1", "warning", []float64{0.8}, "The rule needs the analyzer. A name of many words is one unit by rule 8.6, thus the rule does not report it."},
 	}
 }

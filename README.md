@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 4 dependencies. It has 17 checks. The standard has
+It is one Go binary with 4 dependencies. It has 19 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -472,7 +472,7 @@ not as a defect.
   See [docs/upstream-audit.md](docs/upstream-audit.md) for the reason that
   the tool cannot ship it.
 - Precision and recall are in [docs/evaluation.md](docs/evaluation.md).
-  Recall on new text is low, because the tool has 17 checks and the standard
+  Recall on new text is low, because the tool has 19 checks and the standard
   has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

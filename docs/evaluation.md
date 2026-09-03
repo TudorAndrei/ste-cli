@@ -45,8 +45,9 @@ give. A file with no expectation file must give no findings.
 | `STE-GR-6` | 1 | 0 | 0 | 1.00 | 1.00 |
 | **all** | **29** | **0** | **0** | **1.00** | **1.00** |
 
-10 fixture files, 4 valid and 6 invalid. Each of the 17 rules has at least
-one labeled example.
+10 fixture files, 4 valid and 6 invalid. Each of the 15 rules that need no
+analyzer has at least one labeled example. The corpus does not measure the 4
+rules that need the analyzer, because the corpus runs with no Python.
 
 The 4 valid files are the guard against a wrong finding. Each of them must
 give 0 findings. They hold the constructions that gave a wrong finding
@@ -94,7 +95,7 @@ word.
 
 **This measurement gives no recall.** The documents have no labels, and
 nobody knows how many violations the tool did not find. The true recall on
-new text is much less than 1.00. The tool has 17 checks, and the standard
+new text is much less than 1.00. The tool has 19 checks, and the standard
 has 53 rules.
 
 ### The false positives that this measurement found
@@ -118,6 +119,35 @@ defect, and each defect now has a test:
 - This evaluation does not measure recall on new text.
 - The tool has no dictionary rule. This evaluation says nothing about
   the largest part of ASD-STE100: the approved-word list.
+- The labeled corpus does not measure the rules that need the analyzer.
+  Section 5 gives what a person read on two real repositories.
+
+## 5. The analyzer rules on two repositories
+
+Rules 2.1, 3.5, 5.3, and part of 3.6 need the grammar of a sentence. A
+person read the findings of `--analyze` on two repositories of software
+documentation.
+
+| Repository | Files | Without the analyzer | With the analyzer |
+|---|---|---|---|
+| criv | 180 | 1065 | 1534 |
+| ouro | 84 | 699 | 878 |
+
+Rule 5.3 gave 69 findings on criv at first, and a person found that 68 of
+them were wrong. Three defects made them:
+
+| Wrong finding | Cause | Correction |
+|---|---|---|
+| "One semantic source change creates..." | A numbered list of requirements is not a procedure. | The rule reads a list only when more than half of its items are commands. |
+| "Atomically replace the file" | An adverb comes before the verb. | The rule steps over an adverb, and over a phrase that ends with a comma. |
+| "Delete quarantined files" | The analyzer reads a short step with no context, and it gives "Delete" as an adjective. | The rule reads the sentence again with "please" at its start. |
+| "Do not enable the mode" | The first word is an auxiliary, and not the verb. | The rule accepts a command in the negative form. |
+
+After the 4 corrections, rule 5.3 gives 0 findings on criv and 11 on ouro.
+
+**The cost.** The run on criv went from 0.11s to 14.9s, because each
+sentence of a possible finding goes to the model. The analyzer is off by
+default for this reason.
 
 ## 4. Audit against Issue 9
 

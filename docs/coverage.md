@@ -13,9 +13,10 @@ mechanical answer.
 
 | Group | Rules | Who checks it |
 |---|---|---|
-| **Built** | 18 | `ste lint` |
+| **Built** | 20 | `ste lint` |
 | **Possible with no new library** | 2 | `ste lint`, later |
-| **Possible with a part-of-speech tagger** | 11 | an optional analyzer, later |
+| **Built, and they need the analyzer** | 4 of those 20 | `ste lint --analyze` |
+| **Possible with a part-of-speech tagger** | 8 | an optional analyzer, later |
 | **A judgment of a reader** | 13 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill) |
 | **Partial only** | 9 | both |
 
@@ -26,13 +27,15 @@ mechanical answer.
 | 1.1 | An approved word |
 | 1.14 | American spelling |
 | 3.4 | A complex verb construction |
-| 3.5 | The progressive "-ing" form (the part after "to be") |
+| 3.5 | The "-ing" form. The analyzer finds it in each position. |
 | 3.6 | The passive voice |
 | 3.7 | A noun for an action |
 | 4.2 | A contraction (the other parts of the rule need a parser) |
 | 5.1, 6.3 | The length of a sentence |
 | 1.11 | Two names for the same item (the config gives the names) |
+| 2.1 | A noun of more than three words (needs the analyzer) |
 | 4.3 | A list with two constructions |
+| 5.3 | An instruction that is not a command (needs the analyzer) |
 | 5.4 | A condition after the command |
 | 5.5 | An instruction in a note |
 | 6.6 | 6 sentences in a paragraph |
@@ -58,19 +61,25 @@ already.
 |---|---|
 | 1.2 | The approved part of speech |
 | 1.7, 1.13 | A technical noun as a verb, and a technical verb as a noun |
-| 2.1 | A multi-word noun of more than 3 words |
-| 3.5 | The other parts of the "-ing" rule |
 | 4.2 | An omitted word |
 | 5.2 | One instruction in each sentence |
-| 5.3 | The imperative form |
 | 7.2 | A command or a condition at the start |
 | 8.2 | A hyphen in a compound adjective |
 | 8.6 | A multi-word name that counts as one word |
 
-The `--analyzer` flag gives this group a path. An external program gives the
-grammar of a sentence. Rule 3.6 uses it as a veto today: a finding goes when
-the parser sees no passive relation. On a repository of 180 files, the
-analyzer removed 26 wrong findings and the run went from 0.24s to 1.30s.
+The `--analyze` flag gives this group a path. An external program gives the
+grammar of a sentence, and 4 rules use it:
+
+| Rule | What the grammar gives |
+|---|---|
+| 2.1 | The words of a noun cluster |
+| 3.5 | An "-ing" word that is a verb, and not a noun or a modifier |
+| 3.6 | A veto: a finding goes when the parser sees no passive relation |
+| 5.3 | The part of speech of the first word of a step |
+
+On a repository of 180 files, the analyzer removed 26 wrong findings for
+rule 3.6, and the other 3 rules gave 502 more findings. The run went from
+0.11s to 14.9s, because each sentence goes to the model.
 Refer to [the analyzer](analyzer.md).
 
 Each rule of this group can use the same path. A rule must also work without

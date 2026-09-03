@@ -1,13 +1,14 @@
 ---
 title: Rules
-description: The 17 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
+description: The 19 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
 ---
 
 # Rules
 
 [Back to the start page](index.md)
 
-This tool has 17 checks. ASD-STE100 Issue 9 has 53 rules and a dictionary of
+This tool has 19 checks. 4 of them need the analyzer of the grammar, and
+they give no finding without it. ASD-STE100 Issue 9 has 53 rules and a dictionary of
 approved words. The tool does not ship the dictionary. `ste dict import`
 makes an index from your own copy of the specification, and `--use-dict`
 then gives rule 1.1 the full word list.
@@ -38,6 +39,8 @@ severity, and strict mode does not make it an error.
 | `STE-7.3` | A safety instruction with no explanation | 0.70 | warning |
 | `STE-5.4` | A condition after the command | 0.70 | info |
 | `STE-1.11` | Two names for the same item | 0.95 | warning |
+| `STE-2.1` | A noun of more than three words | 0.80 | warning |
+| `STE-5.3` | An instruction that is not a command | 0.75 | warning |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -100,11 +103,16 @@ Reports a form of "to be" and then a verb that ends with "-ing". Example:
 "is running", "is still running", "was not reading". Rule 3.5 permits the
 "-ing" form only as a technical noun or as a modifier in a technical noun.
 
+**With the analyzer**, the rule also finds an "-ing" verb in each other
+position, such as "Before starting the pump" and "by using the network". The
+analyzer separates a verb from a noun and from a modifier, which rule 3.5
+permits. On a repository of 180 files, this part gave 354 more findings.
+
 **Limits.** The tool has a list of "-ing" words that are adjectives or
 nouns, such as "missing" and "existing". It does not report them. It does
 not report "is being", because that is the passive voice and rule 3.6
-reports it. The tool does not find the other parts of rule 3.5. An example
-is an "-ing" clause at the start of a sentence, which needs a parser.
+reports it. Without the analyzer, the tool finds only the form after "to
+be".
 
 ## STE-3.6 Passive voice
 
@@ -226,6 +234,50 @@ makes it an error.
 The tool obeys both conditions. It does not report the name "VS Code", and
 it does not report "vs" as a column title. Before version 0.5.0, the
 name "VS Code" gave 147 wrong findings in one repository.
+
+## STE-2.1 A noun of more than three words
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Reports a group of more than three nouns that follow each other. Rule 2.1
+gives that limit, because a long noun cluster has more than one meaning:
+"engine fuel pump control unit" does not say which word belongs to which.
+
+**Limits.**
+
+- A name of many words is one unit by rule 8.6, and the rule does not report
+  it. Each word must be a name for that test.
+- `allow.nouns` removes a cluster from the rule.
+- Software documentation has many long noun clusters. On a repository of 180
+  files, the rule gave 141 findings.
+
+## STE-5.3 An instruction that is not a command
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Reports a step of a procedure that does not start with a command verb. Rule
+5.3 tells you to write an instruction in the imperative form, so the reader
+knows that the sentence is an action and not a description.
+
+A numbered list does not always hold a procedure. A design record uses one
+for its requirements, and those are descriptions. The rule reads a list only
+when more than half of its items are commands, thus a list of steps with one
+description gives a finding, and a list of requirements gives none.
+
+**Limits.**
+
+- The rule steps over a phrase that ends with a comma: "When the light comes
+  on, set the switch" and "In the pull request, give the date" are commands.
+  It also steps over an adverb: "Atomically replace the file".
+- "Do not touch the surface" is a command in the negative form, and the rule
+  accepts it.
+- The analyzer reads a short step with no context, and it then gives a wrong
+  part of speech: "Delete quarantined files" looks like an adjective and a
+  noun. The rule reads the sentence again with "please" at its start, which
+  makes a command with no doubt. This method removed 68 of the 69 findings
+  on one repository, and each of those 68 was wrong.
+- A step of two words, such as "Complete preflight", stays ambiguous. The
+  rule can report it.
 
 ## STE-4.3 A list with two constructions
 
