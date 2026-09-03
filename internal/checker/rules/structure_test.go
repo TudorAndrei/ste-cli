@@ -152,3 +152,27 @@ func TestMaskedCodeDoesNotJoinTwoWords(t *testing.T) {
 		})
 	}
 }
+
+func TestVerticalListIgnoresANonLetterStart(t *testing.T) {
+	// A changelog starts each item with a version number or a mark. Those
+	// items give no proof of the construction, thus the rule ignores them.
+	cases := []struct {
+		name string
+		src  string
+		want int
+	}{
+		{"each item starts with a digit",
+			"- 0.4.0 gives the new parser\n- 0.3.0 gives the first rules\n- fix the count of words\n", 0},
+		{"each item starts with a mark",
+			"- (a) open the valve of the pump\n- (b) start the pump of the system\n", 0},
+		{"a digit item does not change the letter items",
+			"- 3 of the tests are new\n- Open the valve of the pump\n- Start the pump of the system\n", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := findingsOf(t, tc.src, "STE-4.3"); len(got) != tc.want {
+				t.Errorf("got %d findings, want %d: %+v", len(got), tc.want, got)
+			}
+		})
+	}
+}

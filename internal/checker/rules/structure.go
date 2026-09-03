@@ -172,7 +172,14 @@ func VerticalList(doc Document, opts Options) []Diagnostic {
 	for _, group := range lists(doc) {
 		upper, lower := 0, 0
 		for _, s := range group {
-			if isLowerRune(firstRune(s.Text)) {
+			// An item that starts with a digit or a mark gives no proof of
+			// the construction. A changelog that starts each item with a
+			// version number is an example.
+			r := firstRune(s.Text)
+			if !isLetterRune(r) {
+				continue
+			}
+			if isLowerRune(r) {
 				lower++
 			} else {
 				upper++
@@ -185,7 +192,7 @@ func VerticalList(doc Document, opts Options) []Diagnostic {
 		reportLower := lower <= upper
 		for _, s := range group {
 			r := firstRune(s.Text)
-			if isLowerRune(r) != reportLower {
+			if !isLetterRune(r) || isLowerRune(r) != reportLower {
 				continue
 			}
 			shape := "a small letter"
@@ -262,3 +269,9 @@ func firstRune(s string) rune {
 }
 
 func isLowerRune(r rune) bool { return r >= 'a' && r <= 'z' }
+
+// isLetterRune tells if the rune is a letter of the English alphabet. Only a
+// letter shows the construction of a list item.
+func isLetterRune(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
+}
