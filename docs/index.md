@@ -573,7 +573,20 @@ commit, and the decision for each one.
 
 ## License and the specification
 
-The specification is the property of the AeroSpace and Defence Industries
-Association of Europe. To get it, go to
-[asd-ste100.org](https://www.asd-ste100.org/). This tool does not give you
-the specification, and it does not give you certification.
+Two different licenses apply, and they cover different things.
+
+The code of this tool is under the MIT license. You can use it, change it,
+and put it in a product. The file is
+[LICENSE](https://github.com/TudorAndrei/ste-cli/blob/main/LICENSE).
+
+The specification is not ours, and the MIT license does not touch it.
+ASD-STE100 is the property of the AeroSpace and Defence Industries
+Association of Europe. Its copyright notice does not permit reproduction in
+whole or in part without written authority. This tool holds no text of the
+specification, and it holds no part of the dictionary. It holds rule
+numbers, numeric limits, and our own words.
+
+To get the specification, go to
+[asd-ste100.org](https://www.asd-ste100.org/), where ASD gives it free of
+charge to each writer and user. This tool does not give you the
+specification, and it does not give you certification.

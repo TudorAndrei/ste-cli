@@ -471,3 +471,15 @@ not as a defect.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not
   contain the specification.
+
+## License
+
+The code of this tool is under the MIT license. See [LICENSE](LICENSE).
+
+The MIT license covers the code only. ASD-STE100 is the property of the
+AeroSpace and Defence Industries Association of Europe. Its copyright notice
+does not permit reproduction in whole or in part without written authority.
+This repository holds no text of the specification and no part of the
+dictionary. It holds rule numbers, numeric limits, and our own words.
+ASD gives the specification free of charge to each writer and user at
+[asd-ste100.org](https://www.asd-ste100.org/).
