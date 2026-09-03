@@ -497,6 +497,17 @@ all           20     0     0       1.00     1.00
 [evaluation.md](evaluation.md) gives the measurements and says why the
 number on a self-written corpus is weak.
 
+## What the tool does not check
+
+ASD-STE100 has 53 rules. This tool checks 11 of them today, and about 31 can
+have a mechanical answer. The other rules need a reader: "Make sure that each
+paragraph has only one topic" is an example.
+
+[coverage.md](coverage.md) gives each rule and its group. The
+[ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill)
+gives the rules of judgment to an agent, which reports them as advice, and
+not as a defect.
+
 ## Limits
 
 - The tool has no part-of-speech tagger. It uses word lists and short word

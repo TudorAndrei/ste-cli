@@ -415,6 +415,17 @@ The version in the binary comes from the tag:
 `go build -ldflags "-X main.Version=0.6.0"`. A build from the source
 without that flag says `dev`.
 
+## What the tool does not check
+
+ASD-STE100 has 53 rules. This tool checks 11 of them today, and about 31 can
+have a mechanical answer. The other rules need a reader: "Make sure that each
+paragraph has only one topic" is an example.
+
+[docs/coverage.md](docs/coverage.md) gives each rule and its group. The
+[ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill)
+gives the rules of judgment to an agent, which reports them as advice, and
+not as a defect.
+
 ## Limits
 
 - The tool has no part-of-speech tagger. It uses word lists and short word
