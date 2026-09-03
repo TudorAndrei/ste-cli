@@ -96,6 +96,39 @@ func nextContent(s Sentence, i int) int {
 	return j
 }
 
+// joined tells if two tokens are in the same construction. The parser
+// replaces code, a link target, and HTML with spaces, thus two words that
+// are far from each other can look adjacent. "The command is `a.sh`,
+// exposed through the API" is an example: "is" and "exposed" are not one
+// verb construction.
+func joined(s Sentence, from, to int) bool {
+	if to <= from {
+		return false
+	}
+	// The test looks at each pair of words that follow each other. A word
+	// between them, such as the adverb of "is still running", is a token
+	// of its own, thus it is not in a gap.
+	for k := from; k < to; k++ {
+		start := s.Tokens[k].End - s.Start
+		stop := s.Tokens[k+1].Start - s.Start
+		if start < 0 || stop > len(s.Text) || start > stop {
+			return false
+		}
+		for _, r := range s.Text[start:stop] {
+			// A letter or a digit in the gap was masked, thus it is code
+			// or a link, and the two words are not one construction.
+			if isWordRuneForGap(r) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isWordRuneForGap(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9'
+}
+
 func isInterrupter(word string) bool {
 	if interrupters[word] {
 		return true
@@ -106,7 +139,7 @@ func isInterrupter(word string) bool {
 // matchPerfect finds "has|have|had (been) <participle>".
 func matchPerfect(s Sentence, i int) (Diagnostic, bool) {
 	j := nextContent(s, i+1)
-	if j >= len(s.Tokens) {
+	if j >= len(s.Tokens) || !joined(s, i, j) {
 		return Diagnostic{}, false
 	}
 	// "have to" is an obligation, not a perfect tense.
@@ -143,7 +176,7 @@ func perfectDiag(s Sentence, from, to int, confidence float64) Diagnostic {
 // matchProgressive finds "is|was|are (still) <verb>ing".
 func matchProgressive(s Sentence, i int, opts Options) (Diagnostic, bool) {
 	j := nextContent(s, i+1)
-	if j >= len(s.Tokens) || j == i {
+	if j >= len(s.Tokens) || !joined(s, i, j) {
 		return Diagnostic{}, false
 	}
 	w := s.Tokens[j].Lower
@@ -170,7 +203,7 @@ func matchProgressive(s Sentence, i int, opts Options) (Diagnostic, bool) {
 // confidence when a "by" agent follows.
 func matchPassive(s Sentence, i int, opts Options) (Diagnostic, bool, bool) {
 	j := nextContent(s, i+1)
-	if j >= len(s.Tokens) || j == i {
+	if j >= len(s.Tokens) || !joined(s, i, j) {
 		return Diagnostic{}, false, false
 	}
 	w := s.Tokens[j].Lower
@@ -189,6 +222,19 @@ func matchPassive(s Sentence, i int, opts Options) (Diagnostic, bool, bool) {
 		confidence = 0.95
 	case irregularParticiples[w]:
 		confidence = 0.85
+	}
+	// An analyzer gives the grammar of the sentence. It is a veto: when it
+	// says that the word is not the verb of a passive construction, the
+	// finding goes. "there is measured user demand" is an example, where
+	// "measured" is an adjective of "demand".
+	if opts.Syntax != nil {
+		passive, known := opts.Syntax.PassiveAt(s.Text, s.Tokens[j].Start-s.Start)
+		if known && !passive {
+			return Diagnostic{}, false, false
+		}
+		if known && passive && confidence < 0.9 {
+			confidence = 0.9
+		}
 	}
 	return Diagnostic{
 		RuleID:     RulePassiveVoice,

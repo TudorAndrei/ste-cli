@@ -70,6 +70,8 @@ func schema() map[string]any {
 			"--dict":               map[string]any{"type": "path"},
 			"--all":                map[string]any{"type": "boolean", "note": "read every file, including the files that git ignores"},
 			"--dry-run":            map[string]any{"type": "boolean", "note": "for the baseline command: show the plan and write nothing"},
+			"--preset":             map[string]any{"type": "string", "values": []string{"software"}, "note": "add the technical nouns of a subject field"},
+			"--analyzer":           map[string]any{"type": "string", "note": "command of an external program that gives the grammar of a sentence; it makes rule 3.6 more exact"},
 		},
 
 		"config_keys": map[string]any{
@@ -85,6 +87,7 @@ func schema() map[string]any {
 			"warnings_as_errors": map[string]any{"type": "boolean"},
 			"dictionary":         map[string]any{"type": "boolean"},
 			"disable_rules":      map[string]any{"type": "list of rule identifiers"},
+			"presets":            map[string]any{"type": "list", "values": []string{"software"}},
 		},
 		"config_files": []string{".ste.yml", ".ste.yaml", "glossary.yml", "docs/glossary.yml"},
 
@@ -131,5 +134,9 @@ func ruleCatalog() []ruleDoc {
 		{rules.RuleSemicolon, "Semicolon", "8.1", "warning", []float64{1.0}, ""},
 		{rules.RulePhrasalVerb, "Phrasal verb", "9.3", "warning", []float64{0.85}, ""},
 		{rules.RuleLatinAbbreviation, "Latin abbreviation", "GR-6", "info", []float64{0.9}, "A general recommendation is advice and not a rule, thus no mode and no flag makes it an error."},
+		{rules.RuleVerticalList, "A list with two constructions", "4.3", "info", []float64{0.8}, "The rule reports a list that starts some items with a capital letter and other items with a small letter."},
+		{rules.RuleNoteInstruction, "An instruction in a note", "5.5", "warning", []float64{0.8}, ""},
+		{rules.RuleParagraphLength, "Paragraph too long", "6.6", "warning", []float64{1.0}, "6 sentences maximum."},
+		{rules.RuleSafetyExplanation, "A safety instruction with no explanation", "7.3", "warning", []float64{0.7}, "The rule reads a warning, a caution, and a danger block."},
 	}
 }

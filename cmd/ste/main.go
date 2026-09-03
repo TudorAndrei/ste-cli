@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/TudorAndrei/ste-cli/internal/analyzer"
 	"github.com/TudorAndrei/ste-cli/internal/baseline"
 	"github.com/TudorAndrei/ste-cli/internal/checker"
 	"github.com/TudorAndrei/ste-cli/internal/config"
@@ -70,6 +71,9 @@ Lint flags:
   --max-words     Replace the sentence limit
   --use-dict      Use the imported ASD-STE100 dictionary for rule STE-1.1
   --preset        Add the technical nouns of a subject field: "software"
+  --analyzer      Command of an external analyzer that gives the grammar of
+                  a sentence, such as
+                  "python3 analyzer/ste_analyzer.py"
   --dict          Path of the dictionary index
   --all           Read every file, and not only the files that git shows
 
@@ -133,6 +137,7 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	dictPath := fs.String("dict", "", "path of the dictionary index")
 	useDict := fs.Bool("use-dict", false, "use the imported ASD-STE100 dictionary for rule STE-1.1")
 	preset := fs.String("preset", "", "add the technical nouns of a subject field, such as \"software\"")
+	analyzerCmd := fs.String("analyzer", "", "command of an external analyzer that gives the grammar of a sentence")
 	dryRun := fs.Bool("dry-run", false, "for the baseline command: show the plan and write nothing")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
@@ -175,6 +180,17 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	}
 	if *warnAsError {
 		opts.WarningsAsErrors = true
+	}
+	// The analyzer is optional. Each rule works without it, thus a failure
+	// to start it is an error of the command line, and not a silent loss.
+	if *analyzerCmd != "" {
+		client, err := analyzer.Start(*analyzerCmd)
+		if err != nil {
+			fmt.Fprintf(stderr, "ste: the analyzer did not start: %v\n", err)
+			return exitError
+		}
+		defer client.Close()
+		opts.Syntax = client
 	}
 	if *preset != "" {
 		nouns, found := config.Preset(*preset)

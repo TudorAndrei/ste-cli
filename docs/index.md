@@ -14,7 +14,7 @@ each finding. A person or a machine can then make the correction.
 
 The rule numbers agree with ASD-STE100 Issue 9.
 
-**It is an aid for a writer. It is not an ASD-certified checker.** It has 11
+**It is an aid for a writer. It is not an ASD-certified checker.** It has 15
 checks. The specification has 53 rules and a dictionary of approved words,
 and this tool does not contain that dictionary. Read
 [the limits](#limits) before you use it.
@@ -415,6 +415,10 @@ as one word.
 | `STE-3.6` | Passive voice | "was approved by the manager" |
 | `STE-3.7` | A noun for an action | "do a check of" |
 | `STE-4.2` | Contraction | "isn't" |
+| `STE-4.3` | A list with two constructions | one item of three starts differently |
+| `STE-5.5` | An instruction in a note | "NOTE: You must..." |
+| `STE-6.6` | Paragraph too long | a paragraph of 7 sentences |
+| `STE-7.3` | A safety instruction with no explanation | a warning of one sentence |
 | `STE-5.1` | Sentence too long | a 26-word sentence |
 | `STE-8.1` | Semicolon | "Open the valve; then start the pump" |
 | `STE-9.3` | Phrasal verb | "carry out the test" |
@@ -428,6 +432,29 @@ the `info` severity.
 
 [rules.md](rules.md) gives each rule, its confidence values, and its known
 limits.
+
+## More exact rules with an analyzer
+
+<!-- ste-disable STE-3.6 -->
+
+Some rules need the grammar of a sentence. "The demand is measured" and
+"there is measured demand" have the same words, and only the grammar gives
+the difference.
+
+<!-- ste-enable STE-3.6 --> Go has no library that gives the grammar of English with a
+trained model, thus an external program gives it:
+
+```bash
+uv pip install spacy && python -m spacy download en_core_web_sm
+ste lint --analyzer "python3 analyzer/ste_analyzer.py" docs/
+```
+
+The command sends only the sentences of a possible finding, and it keeps
+each answer. On a repository of 180 files, the analyzer removed 26 wrong
+findings of rule 3.6, and the run went from 0.24s to 1.30s.
+
+The analyzer is never necessary. Each rule also works without it, thus the
+command stays one binary with no runtime.
 
 ## For an agent
 
@@ -471,6 +498,7 @@ ste help                      Print the usage
 | `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
 | `--use-dict` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
 | `--preset` | Add the technical nouns of a subject field: `software` |
+| `--analyzer` | Command of an external program that gives the grammar of a sentence |
 | `--dict` | Path of the dictionary index |
 | `--all` | Read every file, and not only the files that git shows |
 
@@ -499,7 +527,7 @@ number on a self-written corpus is weak.
 
 ## What the tool does not check
 
-ASD-STE100 has 53 rules. This tool checks 11 of them today, and about 31 can
+ASD-STE100 has 53 rules. This tool checks 15 of them today, and about 31 can
 have a mechanical answer. The other rules need a reader: "Make sure that each
 paragraph has only one topic" is an example.
 

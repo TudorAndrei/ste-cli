@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 4 dependencies. It has 11 checks. The standard has
+It is one Go binary with 4 dependencies. It has 15 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -98,6 +98,7 @@ The tool always reads a file or a directory that you give by its path.
 | `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
 | `--use-dict` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
 | `--preset` | Add the technical nouns of a subject field: `software` |
+| `--analyzer` | Command of an external program that gives the grammar of a sentence |
 | `--dict` | Path of the dictionary index |
 | `--all` | Read every file, and not only the files that git shows |
 
@@ -333,6 +334,10 @@ and its limits. The numbers are the rule numbers of Issue 9.
 | `STE-3.6` | Passive voice |
 | `STE-3.7` | A noun for an action |
 | `STE-4.2` | Contraction |
+| `STE-4.3` | A list with two constructions |
+| `STE-5.5` | An instruction in a note |
+| `STE-6.6` | Paragraph too long |
+| `STE-7.3` | A safety instruction with no explanation |
 | `STE-5.1` | Sentence too long |
 | `STE-8.1` | Semicolon |
 | `STE-9.3` | Phrasal verb |
@@ -349,6 +354,29 @@ and its limits. The numbers are the rule numbers of Issue 9.
 
 All 4 are pure Go, thus the build needs no C compiler and it stays one
 binary for each platform.
+
+## More exact rules with an analyzer
+
+<!-- ste-disable STE-3.6 -->
+
+Some rules need the grammar of a sentence. "The demand is measured" and
+"there is measured demand" have the same words, and only the grammar gives
+the difference.
+
+<!-- ste-enable STE-3.6 --> Go has no library that gives the grammar of English with a
+trained model, thus an external program gives it:
+
+```bash
+uv pip install spacy && python -m spacy download en_core_web_sm
+ste lint --analyzer "python3 analyzer/ste_analyzer.py" docs/
+```
+
+The command sends only the sentences of a possible finding, and it keeps
+each answer. On a repository of 180 files, the analyzer removed 26 wrong
+findings of rule 3.6, and the run went from 0.24s to 1.30s.
+
+The analyzer is never necessary. Each rule also works without it, thus the
+command stays one binary with no runtime.
 
 ## For an agent
 
@@ -417,7 +445,7 @@ without that flag says `dev`.
 
 ## What the tool does not check
 
-ASD-STE100 has 53 rules. This tool checks 11 of them today, and about 31 can
+ASD-STE100 has 53 rules. This tool checks 15 of them today, and about 31 can
 have a mechanical answer. The other rules need a reader: "Make sure that each
 paragraph has only one topic" is an example.
 

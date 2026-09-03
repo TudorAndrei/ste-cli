@@ -10,6 +10,8 @@ import (
 	"github.com/yuin/goldmark/extension"
 	east "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
+
+	"github.com/TudorAndrei/ste-cli/internal/checker/rules"
 )
 
 // markdown is the parser. goldmark follows CommonMark, thus this tool does
@@ -42,8 +44,8 @@ func Parse(src string) Document {
 	masked := string(buf)
 
 	doc := Document{Source: src, Masked: masked}
-	for _, b := range blocks {
-		doc.Sentences = append(doc.Sentences, b.sentences(src, masked)...)
+	for i, b := range blocks {
+		doc.Sentences = append(doc.Sentences, b.sentences(src, masked, i)...)
 	}
 	return doc
 }
@@ -111,7 +113,15 @@ type block struct {
 	segments   []text.Segment
 	procedural bool
 	note       bool
+	kind       Kind
+	admonition string
+	// paragraph is the number of the group of blocks that a rule counts
+	// as one paragraph. A list gives one number to each of its items.
+	paragraph int
 }
+
+// Kind is the type of a leaf block.
+type Kind = rules.BlockKind
 
 // collectBlocks walks the AST and gives one block for each leaf block, with
 // the text segments of its prose.
@@ -125,16 +135,85 @@ func collectBlocks(root ast.Node, source []byte) []block {
 		if len(segments) == 0 {
 			return ast.WalkSkipChildren, nil
 		}
+		// The label of an admonition can be more than one text node:
+		// goldmark reads "[!WARNING]" as three nodes. Thus the detector
+		// reads the raw source at the start of the block.
+		first := leadingSource(source, segments[0].Start)
 		b := block{
 			segments:   segments,
 			procedural: inOrderedListItem(n),
+			kind:       blockKind(n),
+			admonition: admonitionWord(first),
 		}
-		b.note = startsNote(string(source[segments[0].Start:segments[0].Stop]))
+		b.note = b.admonition == "note" || b.admonition == "notes"
 		blocks = append(blocks, b)
 		// The children are inline nodes, and proseSegments read them.
 		return ast.WalkSkipChildren, nil
 	})
 	return blocks
+}
+
+// blockKind gives the type of a leaf block.
+func blockKind(n ast.Node) Kind {
+	switch n.Kind() {
+	case ast.KindHeading:
+		return rules.BlockHeading
+	case east.KindTableCell:
+		return rules.BlockTableCell
+	}
+	// A paragraph or a text block inside a list item is a list item.
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		if p.Kind() == ast.KindListItem {
+			return rules.BlockListItem
+		}
+	}
+	return rules.BlockParagraph
+}
+
+// leadingSource gives the first bytes of the block, for a label.
+func leadingSource(source []byte, start int) string {
+	end := start + 48
+	if end > len(source) {
+		end = len(source)
+	}
+	return string(source[start:end])
+}
+
+// admonitions are the words that start a note or a safety instruction.
+// Rule 7.1 tells you to identify the level of a safety instruction with a
+// word such as "warning" or "caution".
+var admonitions = map[string]bool{
+	"warning": true, "caution": true, "danger": true, "note": true,
+	"notes": true, "important": true, "attention": true, "tip": true,
+	"info": true,
+}
+
+// admonitionWord gives the word that starts a block, when that word
+// identifies a note or a safety instruction. It reads the forms of Markdown
+// that a writer uses: "WARNING:", "**Warning:**", "> [!WARNING]", and
+// ":::warning".
+func admonitionWord(text string) string {
+	trimmed := strings.TrimLeft(text, " \t*_>:!-[")
+	end := 0
+	for end < len(trimmed) && isLetterByte(trimmed[end]) {
+		end++
+	}
+	word := strings.ToLower(trimmed[:end])
+	if !admonitions[word] {
+		return ""
+	}
+	// The word must be a label, thus a mark must follow it.
+	rest := strings.TrimLeft(trimmed[end:], " \t")
+	switch {
+	case strings.HasPrefix(rest, ":"), strings.HasPrefix(rest, "]"),
+		strings.HasPrefix(rest, "*"), strings.HasPrefix(rest, "!"), rest == "":
+		return word
+	}
+	return ""
+}
+
+func isLetterByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
 // isLeafBlock tells if the node is a block that holds prose. A list item
@@ -187,21 +266,8 @@ func inOrderedListItem(n ast.Node) bool {
 	return false
 }
 
-// startsNote tells if the text starts a note. Rule 5.5 gives a note the
-// longer limit, because a note gives information and not an instruction.
-func startsNote(s string) bool {
-	trimmed := strings.TrimLeft(s, " \t*_")
-	for _, prefix := range []string{"NOTE", "Note", "note", "NOTES", "Notes"} {
-		if strings.HasPrefix(trimmed, prefix) &&
-			strings.HasPrefix(trimmed[len(prefix):], ":") {
-			return true
-		}
-	}
-	return false
-}
-
 // sentences cuts one block into sentences.
-func (b block) sentences(src, masked string) []Sentence {
+func (b block) sentences(src, masked string, number int) []Sentence {
 	out := []Sentence{}
 	start := b.segments[0].Start
 	end := b.segments[len(b.segments)-1].Stop
@@ -211,6 +277,9 @@ func (b block) sentences(src, masked string) []Sentence {
 		if s, ok := makeSentence(src, masked, segStart, to); ok {
 			s.Procedural = b.procedural
 			s.Note = b.note
+			s.Block = number
+			s.Kind = b.kind
+			s.Admonition = b.admonition
 			out = append(out, s)
 		}
 		segStart = to
@@ -244,6 +313,10 @@ func (b block) sentences(src, masked string) []Sentence {
 	}
 	if segStart < end {
 		flush(end)
+	}
+	if len(out) > 0 {
+		out[0].First = true
+		out[len(out)-1].Last = true
 	}
 	return out
 }

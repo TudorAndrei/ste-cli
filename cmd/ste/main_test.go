@@ -772,8 +772,8 @@ func TestSchemaIsSelfDescribing(t *testing.T) {
 	if s.Tool != "ste" {
 		t.Errorf("tool %q", s.Tool)
 	}
-	if len(s.Rules) != 11 {
-		t.Errorf("rules %d, want 11", len(s.Rules))
+	if len(s.Rules) != 15 {
+		t.Errorf("rules %d, want 15", len(s.Rules))
 	}
 	for _, r := range s.Rules {
 		if !strings.HasPrefix(r.ID, "STE-") || r.Standard == "" {
@@ -840,5 +840,48 @@ func TestDictDryRun(t *testing.T) {
 	}
 	if _, err := os.Stat(index); !os.IsNotExist(err) {
 		t.Fatal("--dry-run wrote the index")
+	}
+}
+
+func TestAnalyzerVetoesAFinding(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 is not on this system")
+	}
+	stub, err := filepath.Abs(filepath.Join("..", "..", "internal", "analyzer", "testdata", "stub_analyzer.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	// The stub calls "signed" a passive verb, and no other word. Thus the
+	// first sentence keeps its finding and the second loses it.
+	path := writeFile(t, dir, "a.md", "The report was signed by the team.\n\nThere is measured user demand.\n")
+
+	_, stdout, _ := runCLI(t, "", "lint", "--no-config", path)
+	if strings.Count(stdout, "STE-3.6") != 2 {
+		t.Fatalf("without the analyzer, want 2 findings: %q", stdout)
+	}
+
+	code, stdout, stderr := runCLI(t, "", "lint", "--no-config", "--analyzer", python+" "+stub, path)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if strings.Count(stdout, "STE-3.6") != 1 {
+		t.Fatalf("with the analyzer, want 1 finding: %q", stdout)
+	}
+	if !strings.Contains(stdout, "signed") {
+		t.Errorf("the analyzer removed the wrong finding: %q", stdout)
+	}
+}
+
+func TestABadAnalyzerCommandIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, "a.md", "The report was signed by the team.\n")
+	code, _, stderr := runCLI(t, "", "lint", "--no-config", "--analyzer", "no-such-analyzer-1234", path)
+	if code != 2 {
+		t.Fatalf("exit %d, want 2", code)
+	}
+	if !strings.Contains(stderr, "analyzer") {
+		t.Errorf("stderr %q", stderr)
 	}
 }

@@ -13,8 +13,8 @@ mechanical answer.
 
 | Group | Rules | Who checks it |
 |---|---|---|
-| **Built** | 11 | `ste lint` |
-| **Possible with no new library** | 9 | `ste lint`, later |
+| **Built** | 15 | `ste lint` |
+| **Possible with no new library** | 5 | `ste lint`, later |
 | **Possible with a part-of-speech tagger** | 11 | an optional analyzer, later |
 | **A judgment of a reader** | 13 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill) |
 | **Partial only** | 9 | both |
@@ -31,6 +31,10 @@ mechanical answer.
 | 3.7 | A noun for an action |
 | 4.2 | A contraction (the other parts of the rule need a parser) |
 | 5.1, 6.3 | The length of a sentence |
+| 4.3 | A list with two constructions |
+| 5.5 | An instruction in a note |
+| 6.6 | 6 sentences in a paragraph |
+| 7.3 | A safety instruction with no explanation |
 | 8.1 | The semicolon |
 | 8.5, 8.7 | The count of words |
 | 9.3 | A phrasal verb |
@@ -43,12 +47,10 @@ already.
 | Rule | Subject | What it needs |
 |---|---|---|
 | 1.9, 1.11 | A short technical noun, one name for each thing | A check of the config |
-| 4.3 | A vertical list | The list items of the parser |
 | 5.4 | The condition before the instruction | A token test, as advice |
-| 5.5 | A note gives information only | A "NOTE:" block and the word "must" |
-| 6.6 | 6 sentences in a paragraph | A group of the sentences of a paragraph |
-| 7.1, 7.3 | A safety instruction | An admonition block |
+| 7.1 | The word that identifies a risk | A list of the permitted words |
 | 8.4 | A colon in a vertical list | A sentence boundary at a colon |
+| 8.5 | The text in parentheses is a sentence | A second sentence for each parenthesis |
 
 ## Possible with a part-of-speech tagger
 
@@ -65,11 +67,15 @@ already.
 | 8.2 | A hyphen in a compound adjective |
 | 8.6 | A multi-word name that counts as one word |
 
-The tool has no tagger today, and a measurement gave the reason to wait. On
-8 sentences with a word that is a noun and a verb, spaCy gave 7 correct
-answers and prose gave 4. The test of the noun phrase in this tool gave 7.
-A tagger is thus not the largest gain, and it costs the speed and the one
-binary. Refer to [evaluation.md](evaluation.md).
+The `--analyzer` flag gives this group a path. An external program gives the
+grammar of a sentence. Rule 3.6 uses it as a veto today, thus a finding goes
+when the parser sees no passive relation. On a repository of 180 files, the
+analyzer removed 26 wrong findings and the run went from 0.24s to 1.30s.
+Refer to
+[the analyzer](https://github.com/TudorAndrei/ste-cli/tree/main/analyzer).
+
+Each rule of this group can use the same path. A rule must also work without
+the analyzer, because the command must stay one binary with no runtime.
 
 ## A judgment of a reader
 

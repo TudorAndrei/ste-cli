@@ -87,6 +87,20 @@ type Options struct {
 	// their own copy. It is nil when there is no import, and then the term
 	// rule uses only its short hand-written list.
 	Dictionary Dictionary
+	// Syntax gives the grammar of a sentence. It is nil when the user
+	// starts no analyzer, and then each rule uses its own test. A rule
+	// must work without it.
+	Syntax Syntax
+}
+
+// Syntax answers a question about the grammar of one sentence. An external
+// program gives the answer, because Go has no library that gives the
+// grammar of English with a trained model.
+type Syntax interface {
+	// PassiveAt tells if the word at the offset is the verb of a passive
+	// construction. The second value is false when the analyzer gives no
+	// answer, and the rule then keeps its own result.
+	PassiveAt(sentence string, offset int) (passive bool, known bool)
 }
 
 // DictionaryResult is what the dictionary says about a word that it does
@@ -210,7 +224,31 @@ type Sentence struct {
 	// Note is true when the sentence is in a note. A note gives
 	// information only, thus it keeps the longer limit.
 	Note bool
+	// Block is the number of the leaf block that holds the sentence. Each
+	// paragraph, heading, list item, and table cell has its own number,
+	// thus a rule can group the sentences of a paragraph.
+	Block int
+	// Kind is the type of that block.
+	Kind BlockKind
+	// Admonition is the word that starts a safety instruction or a note,
+	// in small letters: "warning", "caution", "note", and more. It is
+	// empty when the block is not one of those.
+	Admonition string
+	// First is true for the first sentence of its block.
+	First bool
+	// Last is true for the last sentence of its block.
+	Last bool
 }
+
+// BlockKind is the type of a leaf block.
+type BlockKind string
+
+const (
+	BlockParagraph BlockKind = "paragraph"
+	BlockHeading   BlockKind = "heading"
+	BlockListItem  BlockKind = "list-item"
+	BlockTableCell BlockKind = "table-cell"
+)
 
 // Limit gives the word limit for this sentence.
 func (s Sentence) Limit() int {
@@ -256,6 +294,10 @@ func All() []Rule {
 		Spelling,
 		Nominalizations,
 		LatinAbbreviations,
+		ParagraphLength,
+		NoteInstruction,
+		SafetyInstruction,
+		VerticalList,
 	}
 }
 
