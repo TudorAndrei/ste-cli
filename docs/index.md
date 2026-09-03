@@ -33,7 +33,7 @@ releases of this repository:
 
 ```bash
 mise use -g github:TudorAndrei/ste-cli        # the newest release
-mise use -g github:TudorAndrei/ste-cli@0.6.0  # one version
+mise use -g github:TudorAndrei/ste-cli@0.7.0  # one version
 ste version
 ```
 
