@@ -934,3 +934,43 @@ func TestABadAnalyzerCommandIsAnError(t *testing.T) {
 		t.Errorf("stderr %q", stderr)
 	}
 }
+
+func TestWalkSkipsGeneratedFiles(t *testing.T) {
+	dir := t.TempDir()
+	bad := "The valve isn't open.\n"
+	writeFile(t, dir, "CHANGELOG.md", bad)
+	writeFile(t, dir, "release-notes.md", bad)
+	writeFile(t, dir, "History.txt", bad)
+	writeFile(t, dir, "guide.md", bad)
+
+	code, stdout, stderr := runCLI(t, "", "lint", "--no-config", "--format", "json", dir)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	for _, name := range []string{"CHANGELOG.md", "release-notes.md", "History.txt"} {
+		if strings.Contains(stdout, name) {
+			t.Errorf("the walk read the generated file %s", name)
+		}
+	}
+	if !strings.Contains(stdout, "guide.md") {
+		t.Errorf("the walk did not read guide.md:\n%s", stdout)
+	}
+
+	// A file that you give by its path is always read.
+	code, stdout, stderr = runCLI(t, "", "lint", "--no-config", filepath.Join(dir, "CHANGELOG.md"))
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "CHANGELOG.md") {
+		t.Errorf("an explicit path was not read:\n%s", stdout)
+	}
+
+	// --all removes the filter.
+	code, stdout, stderr = runCLI(t, "", "lint", "--no-config", "--all", "--format", "json", dir)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "CHANGELOG.md") {
+		t.Errorf("--all did not read the generated file:\n%s", stdout)
+	}
+}

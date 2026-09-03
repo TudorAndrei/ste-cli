@@ -477,6 +477,29 @@ var skippedDirs = map[string]bool{
 	"__pycache__":  true,
 }
 
+// generatedFiles are the files that a tool writes, and not a person. A walk
+// does not read them, because a writer cannot correct text that the next
+// release writes again. The name is compared without its extension and
+// without regard to the letter case, thus "CHANGELOG.md" and "changelog.txt"
+// both match. To check one of these files, give its path to the command.
+var generatedFiles = map[string]bool{
+	"changelog":     true,
+	"change_log":    true,
+	"changes":       true,
+	"history":       true,
+	"news":          true,
+	"release-notes": true,
+	"releasenotes":  true,
+	"release_notes": true,
+}
+
+// isGenerated tells if the file is one that a tool writes.
+func isGenerated(path string) bool {
+	name := filepath.Base(path)
+	name = strings.TrimSuffix(name, filepath.Ext(name))
+	return generatedFiles[strings.ToLower(name)]
+}
+
 // textFiles gives the files to check. A directory gives all Markdown and
 // text files below it. A file that git ignores does not come from a
 // directory, but a file that you give by its path is always read.
@@ -520,6 +543,9 @@ func textFiles(path string, all bool, exclude []string) ([]string, error) {
 			if err != nil || !visible[abs] {
 				return nil
 			}
+		}
+		if !all && isGenerated(p) {
+			return nil
 		}
 		if matchesAny(p, root, exclude) {
 			return nil

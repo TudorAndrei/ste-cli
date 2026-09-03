@@ -78,6 +78,9 @@ A walk of a directory does not give:
 - `node_modules`, `vendor`, `dist`, `build`, `target`, `bin`, `obj`, `out`,
   `coverage`, `__pycache__`, or a directory whose name starts with a
   period.
+- a file that a tool writes: `CHANGELOG`, `CHANGES`, `HISTORY`, `NEWS`, and
+  `RELEASE-NOTES`, with any of the 3 extensions. A writer cannot correct
+  text that the next release writes again.
 
 The tool always reads a file or a directory that you give by its path.
 `--all` removes both filters.

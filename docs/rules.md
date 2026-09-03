@@ -369,6 +369,13 @@ also does not go into a directory that holds build output or dependencies:
 `coverage`, `__pycache__`, and each directory whose name starts with a
 period.
 
+The walk also does not read a file that a tool writes: `CHANGELOG`,
+`CHANGES`, `HISTORY`, `NEWS`, and `RELEASE-NOTES`. The tool removes the
+extension from the name, and it ignores the letter case. A writer cannot
+correct text that the next release writes again, and a generated changelog
+gave 11 wrong findings for rule 4.3 on one repository. `--all` reads these
+files, and the tool always reads a path that you give by its name.
+
 The tool always reads a file or a directory that you give by its path. The
 `--all` flag removes both filters.
 
