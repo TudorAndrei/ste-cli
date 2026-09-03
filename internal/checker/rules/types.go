@@ -69,6 +69,10 @@ type Options struct {
 	// must not report.
 	AllowNouns []string
 	AllowVerbs []string
+	// Prefer holds one name for each item, with the other names of that
+	// item. Rule 1.11 uses it. Only the project knows that two nouns mean
+	// the same item, thus the config gives them.
+	Prefer []Preferred
 	// DisableRules holds the rule IDs to remove from the result. The
 	// RuleSeverity map with the value "off" does the same.
 	DisableRules []string
@@ -298,6 +302,8 @@ func All() []Rule {
 		NoteInstruction,
 		SafetyInstruction,
 		VerticalList,
+		ConditionOrder,
+		OneName,
 	}
 }
 

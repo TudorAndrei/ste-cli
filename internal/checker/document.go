@@ -287,6 +287,28 @@ func (b block) sentences(src, masked string, number int) []Sentence {
 
 	for i := start; i < end; i++ {
 		c := masked[i]
+		// Rule 8.4: in a vertical list, a colon has the same effect as a
+		// period. It ends a sentence, and the word count starts again.
+		// A colon with no space after it is not a mark of punctuation:
+		// "12:30" and "http:" are examples.
+		if c == ':' && b.kind == rules.BlockListItem {
+			k := i + 1
+			for k < end && isClosingMark(masked[k]) {
+				k++
+			}
+			if k < end && !isSpaceByte(masked[k]) {
+				continue
+			}
+			// The colon of an admonition label is a part of the label,
+			// and not the end of a sentence. "NOTE: The pump needs
+			// pressure" is one sentence with a label.
+			if b.admonition != "" && isLabelOnly(masked[segStart:i], b.admonition) {
+				continue
+			}
+			flush(k)
+			i = k - 1
+			continue
+		}
 		if c != '.' && c != '!' && c != '?' {
 			continue
 		}
@@ -319,6 +341,16 @@ func (b block) sentences(src, masked string, number int) []Sentence {
 		out[len(out)-1].Last = true
 	}
 	return out
+}
+
+// isLabelOnly tells if the text before a colon is only the admonition word.
+// The marks of the label, such as the asterisks of "**NOTE:**", are not a
+// part of the word.
+func isLabelOnly(text, admonition string) bool {
+	trimmed := strings.TrimFunc(text, func(r rune) bool {
+		return !unicode.IsLetter(r)
+	})
+	return strings.EqualFold(trimmed, admonition)
 }
 
 // endsSentence tells if the period at pos closes a sentence. It rejects the

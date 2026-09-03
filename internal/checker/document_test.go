@@ -284,3 +284,28 @@ func TestSentenceTypeAnnotation(t *testing.T) {
 		}
 	}
 }
+
+// Rule 8.4: in a vertical list, a colon ends a sentence and the word count
+// starts again.
+func TestColonEndsSentenceInAList(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want int
+	}{
+		{"a colon divides a list item", "- The flag: it starts the pump.\n", 2},
+		{"a colon in a paragraph does not divide", "The flag: it starts the pump.\n", 1},
+		{"a colon with no space is not punctuation", "- The run starts at 12:30 each day.\n", 1},
+		{"the label of a note stays with its sentence",
+			"- **NOTE:** The pump needs pressure.\n", 1},
+		{"a colon at the end of the item", "- The flag does this:\n", 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := checker.Parse(tc.src)
+			if got := len(doc.Sentences); got != tc.want {
+				t.Errorf("got %d sentences, want %d: %+v", got, tc.want, doc.Sentences)
+			}
+		})
+	}
+}

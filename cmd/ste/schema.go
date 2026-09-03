@@ -82,6 +82,7 @@ func schema() map[string]any {
 			"exclude":            map[string]any{"type": "list of path patterns"},
 			"allow.nouns":        map[string]any{"type": "list of strings"},
 			"allow.verbs":        map[string]any{"type": "list of strings"},
+			"prefer":             map[string]any{"type": "map", "note": "the key is the name to use, and the list holds the other names of the same item. Rule STE-1.11 reads it."},
 			"min_confidence":     map[string]any{"type": "number", "range": []float64{0, 1}},
 			"max_words":          map[string]any{"type": "integer"},
 			"baseline":           map[string]any{"type": "path"},
@@ -141,5 +142,7 @@ func ruleCatalog() []ruleDoc {
 		{rules.RuleNoteInstruction, "An instruction in a note", "5.5", "warning", []float64{0.8}, ""},
 		{rules.RuleParagraphLength, "Paragraph too long", "6.6", "warning", []float64{1.0}, "6 sentences maximum."},
 		{rules.RuleSafetyExplanation, "A safety instruction with no explanation", "7.3", "warning", []float64{0.7}, "The rule reads a warning, a caution, and a danger block."},
+		{rules.RuleConditionOrder, "A condition after the command", "5.4", "info", []float64{0.7}, "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it."},
+		{rules.RuleOneName, "Two names for the same item", "1.11", "warning", []float64{0.95}, "The rule reports nothing until the prefer key of the config gives the names. No tool can know that two nouns mean the same item."},
 	}
 }

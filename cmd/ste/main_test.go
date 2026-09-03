@@ -772,8 +772,8 @@ func TestSchemaIsSelfDescribing(t *testing.T) {
 	if s.Tool != "ste" {
 		t.Errorf("tool %q", s.Tool)
 	}
-	if len(s.Rules) != 15 {
-		t.Errorf("rules %d, want 15", len(s.Rules))
+	if len(s.Rules) != 17 {
+		t.Errorf("rules %d, want 17", len(s.Rules))
 	}
 	for _, r := range s.Rules {
 		if !strings.HasPrefix(r.ID, "STE-") || r.Standard == "" {

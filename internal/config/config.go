@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -25,16 +26,17 @@ type file struct {
 		Nouns []string `yaml:"nouns"`
 		Verbs []string `yaml:"verbs"`
 	} `yaml:"allow"`
-	DisableRules     []string          `yaml:"disable_rules"`
-	Rules            map[string]string `yaml:"rules"`
-	Exclude          []string          `yaml:"exclude"`
-	MinConfidence    *float64          `yaml:"min_confidence"`
-	FailOver         *float64          `yaml:"fail_over"`
-	WarningsAsErrors *bool             `yaml:"warnings_as_errors"`
-	Dictionary       *bool             `yaml:"dictionary"`
-	Presets          []string          `yaml:"presets"`
-	Analyzer         *bool             `yaml:"analyzer"`
-	Baseline         *string           `yaml:"baseline"`
+	Prefer           map[string][]string `yaml:"prefer"`
+	DisableRules     []string            `yaml:"disable_rules"`
+	Rules            map[string]string   `yaml:"rules"`
+	Exclude          []string            `yaml:"exclude"`
+	MinConfidence    *float64            `yaml:"min_confidence"`
+	FailOver         *float64            `yaml:"fail_over"`
+	WarningsAsErrors *bool               `yaml:"warnings_as_errors"`
+	Dictionary       *bool               `yaml:"dictionary"`
+	Presets          []string            `yaml:"presets"`
+	Analyzer         *bool               `yaml:"analyzer"`
+	Baseline         *string             `yaml:"baseline"`
 }
 
 // Config is the content of the config file.
@@ -59,6 +61,9 @@ type Config struct {
 	// WarningsAsErrors makes each warning an error, and the command then
 	// exits with code 1.
 	WarningsAsErrors bool
+	// Prefer gives one name for each item, with the other names of that
+	// item. Rule 1.11 reports the other names.
+	Prefer []rules.Preferred
 	// Presets are the lists of technical nouns to add to allow.nouns.
 	Presets []string
 	// Analyzer makes the tool start the analyzer of the grammar.
@@ -76,6 +81,7 @@ func (c Config) Options() rules.Options {
 		MaxWords:         c.MaxWords,
 		AllowNouns:       c.AllowNouns,
 		AllowVerbs:       c.AllowVerbs,
+		Prefer:           c.Prefer,
 		DisableRules:     c.DisableRules,
 		RuleSeverity:     c.Rules,
 		MinConfidence:    c.MinConfidence,
@@ -136,6 +142,7 @@ func Parse(text string) (Config, error) {
 	cfg := Config{
 		AllowNouns:   f.Allow.Nouns,
 		AllowVerbs:   f.Allow.Verbs,
+		Prefer:       preferred(f.Prefer),
 		DisableRules: f.DisableRules,
 		Exclude:      f.Exclude,
 		FailOver:     -1,
@@ -207,4 +214,24 @@ func cleanError(err error) error {
 		msg = msg[:i]
 	}
 	return fmt.Errorf("%s", strings.TrimSpace(msg))
+}
+
+// preferred makes the rule 1.11 data from the "prefer" key of the config.
+// The key is the name to use, and the list holds the other names of the
+// same item. The order of the result is stable, because a map has no order
+// and the findings must not move between two runs.
+func preferred(m map[string][]string) []rules.Preferred {
+	if len(m) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(m))
+	for name := range m {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	out := make([]rules.Preferred, 0, len(names))
+	for _, name := range names {
+		out = append(out, rules.Preferred{Name: name, Instead: m[name]})
+	}
+	return out
 }
