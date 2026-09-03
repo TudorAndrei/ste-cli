@@ -98,7 +98,8 @@ The tool always reads a file or a directory that you give by its path.
 | `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
 | `--use-dict` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
 | `--preset` | Add the technical nouns of a subject field: `software` |
-| `--analyzer` | Command of an external program that gives the grammar of a sentence |
+| `--analyze` | Use the analyzer for the rules that need the grammar of a sentence |
+| `--analyzer` | Command of a different analyzer |
 | `--dict` | Path of the dictionary index |
 | `--all` | Read every file, and not only the files that git shows |
 
@@ -367,8 +368,8 @@ the difference.
 trained model, thus an external program gives it:
 
 ```bash
-uv pip install spacy && python -m spacy download en_core_web_sm
-ste lint --analyzer "python3 analyzer/ste_analyzer.py" docs/
+ste analyzer                 # what it needs, and how to install it
+ste lint --analyze docs/     # use it
 ```
 
 The command sends only the sentences of a possible finding, and it keeps

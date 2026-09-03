@@ -48,6 +48,7 @@ func schema() map[string]any {
 			"baseline": "Accept the findings of today, and report only the new ones after that.",
 			"dict":     "Make a local index of the ASD-STE100 dictionary from your own copy.",
 			"eval":     "Measure the rules against a labeled corpus.",
+			"analyzer": "Show the analyzer of the grammar and what it needs.",
 			"schema":   "Print this document.",
 			"version":  "Print the version.",
 		},
@@ -71,7 +72,8 @@ func schema() map[string]any {
 			"--all":                map[string]any{"type": "boolean", "note": "read every file, including the files that git ignores"},
 			"--dry-run":            map[string]any{"type": "boolean", "note": "for the baseline command: show the plan and write nothing"},
 			"--preset":             map[string]any{"type": "string", "values": []string{"software"}, "note": "add the technical nouns of a subject field"},
-			"--analyzer":           map[string]any{"type": "string", "note": "command of an external program that gives the grammar of a sentence; it makes rule 3.6 more exact"},
+			"--analyze":            map[string]any{"type": "boolean", "note": "use the analyzer of the grammar; it makes rule 3.6 more exact. Run \"ste analyzer\" to see what it needs."},
+			"--analyzer":           map[string]any{"type": "string", "note": "command of a different analyzer"},
 		},
 
 		"config_keys": map[string]any{
@@ -88,6 +90,7 @@ func schema() map[string]any {
 			"dictionary":         map[string]any{"type": "boolean"},
 			"disable_rules":      map[string]any{"type": "list of rule identifiers"},
 			"presets":            map[string]any{"type": "list", "values": []string{"software"}},
+			"analyzer":           map[string]any{"type": "boolean", "note": "start the analyzer of the grammar for each run"},
 		},
 		"config_files": []string{".ste.yml", ".ste.yaml", "glossary.yml", "docs/glossary.yml"},
 

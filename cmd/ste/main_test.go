@@ -874,6 +874,55 @@ func TestAnalyzerVetoesAFinding(t *testing.T) {
 	}
 }
 
+func TestAnalyzerCommandReportsWhatItNeeds(t *testing.T) {
+	code, stdout, stderr := runCLI(t, "", "analyzer", "--format", "json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	var s struct {
+		Ready   bool     `json:"ready"`
+		Python  string   `json:"python"`
+		Problem string   `json:"problem"`
+		Fix     []string `json:"fix"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &s); err != nil {
+		t.Fatalf("not JSON: %v", err)
+	}
+	// The answer must be useful in each case: it says that the analyzer is
+	// ready, or it names the problem.
+	if !s.Ready && s.Problem == "" {
+		t.Errorf("the command gives no reason: %s", stdout)
+	}
+	if !s.Ready && len(s.Fix) == 0 && s.Python != "" {
+		t.Errorf("the command gives no correction: %s", stdout)
+	}
+}
+
+func TestTheEmbeddedAnalyzerIsWritten(t *testing.T) {
+	// The binary holds the analyzer, thus a user needs no file from the
+	// repository.
+	code, stdout, _ := runCLI(t, "", "analyzer", "--format", "json")
+	if code != 0 {
+		t.Fatal("the analyzer command failed")
+	}
+	var s struct {
+		Script string `json:"script"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Script == "" {
+		t.Skip("the tool found no python, thus it wrote no script")
+	}
+	raw, err := os.ReadFile(s.Script)
+	if err != nil {
+		t.Fatalf("the script is not on the disk: %v", err)
+	}
+	if !strings.Contains(string(raw), "ste-analyzer") && !strings.Contains(string(raw), "spacy") {
+		t.Errorf("the file is not the analyzer")
+	}
+}
+
 func TestABadAnalyzerCommandIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	path := writeFile(t, dir, "a.md", "The report was signed by the team.\n")

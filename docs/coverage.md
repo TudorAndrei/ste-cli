@@ -71,8 +71,7 @@ The `--analyzer` flag gives this group a path. An external program gives the
 grammar of a sentence. Rule 3.6 uses it as a veto today, thus a finding goes
 when the parser sees no passive relation. On a repository of 180 files, the
 analyzer removed 26 wrong findings and the run went from 0.24s to 1.30s.
-Refer to
-[the analyzer](https://github.com/TudorAndrei/ste-cli/tree/main/analyzer).
+Refer to [the analyzer](analyzer.md).
 
 Each rule of this group can use the same path. A rule must also work without
 the analyzer, because the command must stay one binary with no runtime.

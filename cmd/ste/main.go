@@ -44,6 +44,8 @@ Usage:
   ste lint [flags] [path ...]   Check files, directories, or standard input
   ste baseline [flags] [path]   Accept the findings of today, and report only
                                 the new ones from now
+  ste analyzer                  Show the analyzer of the grammar and what
+                                it needs
   ste dict <command>            Make a local index of the ASD-STE100
                                 dictionary from your own copy
   ste eval [flags] <dir>        Measure the rules against a labeled corpus
@@ -71,9 +73,9 @@ Lint flags:
   --max-words     Replace the sentence limit
   --use-dict      Use the imported ASD-STE100 dictionary for rule STE-1.1
   --preset        Add the technical nouns of a subject field: "software"
-  --analyzer      Command of an external analyzer that gives the grammar of
-                  a sentence, such as
-                  "python3 analyzer/ste_analyzer.py"
+  --analyze       Use the analyzer for the rules that need the grammar of
+                  a sentence. It needs Python and spaCy: run "ste analyzer".
+  --analyzer      Command of a different analyzer
   --dict          Path of the dictionary index
   --all           Read every file, and not only the files that git shows
 
@@ -99,6 +101,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runLint(args[1:], stdin, stdout, stderr, false)
 	case "baseline":
 		return runLint(args[1:], stdin, stdout, stderr, true)
+	case "analyzer":
+		return runAnalyzer(args[1:], stdout, stderr)
 	case "dict":
 		return runDict(args[1:], stdout, stderr)
 	case "eval":
@@ -137,7 +141,8 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	dictPath := fs.String("dict", "", "path of the dictionary index")
 	useDict := fs.Bool("use-dict", false, "use the imported ASD-STE100 dictionary for rule STE-1.1")
 	preset := fs.String("preset", "", "add the technical nouns of a subject field, such as \"software\"")
-	analyzerCmd := fs.String("analyzer", "", "command of an external analyzer that gives the grammar of a sentence")
+	analyze := fs.Bool("analyze", false, "use the analyzer for the rules that need the grammar of a sentence")
+	analyzerCmd := fs.String("analyzer", "", "command of a different analyzer")
 	dryRun := fs.Bool("dry-run", false, "for the baseline command: show the plan and write nothing")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
@@ -183,10 +188,17 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	}
 	// The analyzer is optional. Each rule works without it, thus a failure
 	// to start it is an error of the command line, and not a silent loss.
-	if *analyzerCmd != "" {
-		client, err := analyzer.Start(*analyzerCmd)
+	if *analyze || *analyzerCmd != "" || cfg.Analyzer {
+		var client *analyzer.Client
+		var err error
+		if *analyzerCmd != "" {
+			client, err = analyzer.Start(*analyzerCmd)
+		} else {
+			client, err = analyzer.StartDefault()
+		}
 		if err != nil {
-			fmt.Fprintf(stderr, "ste: the analyzer did not start: %v\n", err)
+			fmt.Fprintf(stderr, "ste: the analyzer did not start.\n%v\n", err)
+			fmt.Fprintf(stderr, "Run \"ste analyzer\" to see what it needs.\n")
 			return exitError
 		}
 		defer client.Close()

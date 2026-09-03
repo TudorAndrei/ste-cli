@@ -33,6 +33,7 @@ type file struct {
 	WarningsAsErrors *bool             `yaml:"warnings_as_errors"`
 	Dictionary       *bool             `yaml:"dictionary"`
 	Presets          []string          `yaml:"presets"`
+	Analyzer         *bool             `yaml:"analyzer"`
 	Baseline         *string           `yaml:"baseline"`
 }
 
@@ -60,6 +61,8 @@ type Config struct {
 	WarningsAsErrors bool
 	// Presets are the lists of technical nouns to add to allow.nouns.
 	Presets []string
+	// Analyzer makes the tool start the analyzer of the grammar.
+	Analyzer bool
 	// Dictionary makes rule STE-1.1 use the imported ASD-STE100
 	// dictionary. It is off by default, because the dictionary approves
 	// about 900 words for aircraft maintenance, thus it reports a large
@@ -148,6 +151,9 @@ func Parse(text string) (Config, error) {
 	}
 	if f.Dictionary != nil {
 		cfg.Dictionary = *f.Dictionary
+	}
+	if f.Analyzer != nil {
+		cfg.Analyzer = *f.Analyzer
 	}
 	// A preset adds the technical nouns of one subject field. Rule 1.5 of
 	// the standard gives 22 categories of technical noun, and category 19

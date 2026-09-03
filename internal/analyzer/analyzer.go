@@ -69,14 +69,24 @@ type Client struct {
 // StartTimeout is the time to wait for the model of the analyzer.
 var StartTimeout = 60 * time.Second
 
-// Start runs the command and waits for its ready line. The command is a
-// shell word list, such as "python3 analyzer/ste_analyzer.py".
+// Start runs a command and waits for its ready line. The command is a word
+// list, such as "python3 ste_analyzer.py". A path with a space in it needs
+// StartArgv.
 func Start(command string) (*Client, error) {
 	fields := strings.Fields(command)
 	if len(fields) == 0 {
 		return nil, fmt.Errorf("the analyzer command is empty")
 	}
-	cmd := exec.Command(fields[0], fields[1:]...)
+	return StartArgv(fields[0], fields[1:]...)
+}
+
+// StartArgv runs the program with its arguments, and it waits for the ready
+// line. Each argument stays one argument, thus a path with a space works.
+func StartArgv(name string, args ...string) (*Client, error) {
+	if name == "" {
+		return nil, fmt.Errorf("the analyzer command is empty")
+	}
+	cmd := exec.Command(name, args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -89,7 +99,7 @@ func Start(command string) (*Client, error) {
 	// missing model gives a message that names the command to run.
 	cmd.Stderr = stderrOf()
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("%s: %w", fields[0], err)
+		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 
 	c := &Client{cmd: cmd, stdin: stdin, reader: bufio.NewReader(stdout), cache: map[string][]Token{}}
