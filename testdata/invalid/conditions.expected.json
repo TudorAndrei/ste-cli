@@ -1,0 +1,7 @@
+{
+  "mode": "flavored",
+  "expect": [
+    { "rule_id": "STE-5.4", "text": "when the light comes on" },
+    { "rule_id": "STE-5.4", "text": "if it does not operate correctly" }
+  ]
+}

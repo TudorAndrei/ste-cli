@@ -14,7 +14,7 @@ each finding. A person or a machine can then make the correction.
 
 The rule numbers agree with ASD-STE100 Issue 9.
 
-**It is an aid for a writer. It is not an ASD-certified checker.** It has 15
+**It is an aid for a writer. It is not an ASD-certified checker.** It has 17
 checks. The specification has 53 rules and a dictionary of approved words,
 and this tool does not contain that dictionary. Read
 [the limits](#limits) before you use it.
@@ -295,6 +295,9 @@ allow:                  # the technical words of your project
   nouns: [parser, webhook]
   verbs: [provision]
 
+prefer:                 # rule STE-1.11: one name for each item
+  "config file": ["settings file", "configuration file"]
+
 min_confidence: 0.6     # remove each finding below this value
 max_words: 25           # replace the sentence limits of the standard
 baseline: .ste-baseline.json
@@ -549,7 +552,7 @@ not as a defect.
   of the specification, and `--use-dict` then gives rule 1.1 the full list.
   [upstream-audit.md](upstream-audit.md) gives the reason that the tool
   cannot ship it.
-- Recall on new text is low, because the tool has 15 checks and the
+- Recall on new text is low, because the tool has 17 checks and the
   standard has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

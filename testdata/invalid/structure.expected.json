@@ -1,0 +1,9 @@
+{
+  "mode": "flavored",
+  "expect": [
+    { "rule_id": "STE-5.5", "text": "must" },
+    { "rule_id": "STE-7.3", "text": "WARNING:** Do not touch the surface." },
+    { "rule_id": "STE-4.3", "text": "r" },
+    { "rule_id": "STE-6.6", "text": "One. Two. Three. Four. Five. Six. Seven." }
+  ]
+}

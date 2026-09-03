@@ -27,19 +27,45 @@ give. A file with no expectation file must give no findings.
 | Rule | TP | FP | FN | Precision | Recall |
 |---|---|---|---|---|---|
 | `STE-1.1` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.11` | 3 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.14` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.4` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.5` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.6` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.7` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-4.2` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-4.3` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-5.1` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.4` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.5` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-6.6` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-7.3` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-8.1` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-9.3` | 4 | 0 | 0 | 1.00 | 1.00 |
 | `STE-GR-6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| **all** | **20** | **0** | **0** | **1.00** | **1.00** |
+| **all** | **29** | **0** | **0** | **1.00** | **1.00** |
 
-5 fixture files, 2 valid and 3 invalid.
+10 fixture files, 4 valid and 6 invalid. Each of the 17 rules has at least
+one labeled example.
+
+The 4 valid files are the guard against a wrong finding. Each of them must
+give 0 findings. They hold the constructions that gave a wrong finding
+before:
+
+- YAML front matter.
+- Code or a link between two words.
+- The name "VS Code".
+- A semicolon in the target of a link.
+- A colon in a time of day.
+- A note with a label.
+- A list that starts each item with a small letter.
+
+`mise run ci` measures the corpus and fails when the precision or the
+recall goes below 1.00:
+
+```bash
+go run ./cmd/ste eval --fail-under 1.0 testdata
+```
 
 **Read these numbers with care.** The same person wrote the rules and the
 fixtures. A score of 1.00 on this corpus shows only that the rules agree
@@ -68,7 +94,7 @@ word.
 
 **This measurement gives no recall.** The documents have no labels, and
 nobody knows how many violations the tool did not find. The true recall on
-new text is much less than 1.00. The tool has 15 checks, and the standard
+new text is much less than 1.00. The tool has 17 checks, and the standard
 has 53 rules.
 
 ### The false positives that this measurement found
@@ -85,7 +111,7 @@ defect, and each defect now has a test:
 
 ## 3. Known limits of the measurement
 
-- The corpus is small: 5 files and 20 labeled findings.
+- The corpus is small: 10 files and 29 labeled findings.
 - The unlabeled documents are all software documentation in English. Nobody
   measured the tool on aircraft maintenance procedures, which is the first
   purpose of ASD-STE100.

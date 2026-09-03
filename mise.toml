@@ -17,13 +17,21 @@ run = "go vet ./..."
 description = "Fail if a file needs gofmt"
 run = 'files="$(gofmt -l .)"; if [ -n "$files" ]; then echo "$files"; exit 1; fi'
 
+[tasks.eval]
+description = "Measure the rules against the labeled corpus"
+run = "go run ./cmd/ste eval --fail-under 1.0 testdata"
+
+[tasks.lint-docs]
+description = "Check the documentation with the tool itself"
+run = "go run ./cmd/ste lint README.md AGENTS.md docs/ skill/"
+
 [tasks.check]
 description = "Format, vet, and test"
 depends = ["fmt", "vet", "test"]
 
 [tasks.ci]
 description = "Check the format, vet, and test without a change to a file"
-depends = ["fmt-check", "vet", "test"]
+depends = ["fmt-check", "vet", "test", "eval", "lint-docs"]
 
 [tasks.build]
 description = "Build the ste binary"

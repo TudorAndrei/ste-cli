@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/TudorAndrei/ste-cli/internal/checker"
+	"github.com/TudorAndrei/ste-cli/internal/checker/rules"
 )
 
 // Expectation is one labeled finding.
@@ -24,8 +25,27 @@ type Expectation struct {
 
 // expectedFile is the content of a "<name>.expected.json" file.
 type expectedFile struct {
-	Mode   string        `json:"mode"`
-	Expect []Expectation `json:"expect"`
+	Mode string `json:"mode"`
+	// Prefer gives the names of rule 1.11, which reports nothing until the
+	// config names them. The key is the name to use.
+	Prefer map[string][]string `json:"prefer"`
+	// AllowNouns gives the project terms of the fixture.
+	AllowNouns []string      `json:"allow_nouns"`
+	Expect     []Expectation `json:"expect"`
+}
+
+// options makes the checker options for one fixture.
+func (e expectedFile) options() checker.Options {
+	opts := checker.Options{Mode: checker.Mode(e.Mode), AllowNouns: e.AllowNouns}
+	names := make([]string, 0, len(e.Prefer))
+	for name := range e.Prefer {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		opts.Prefer = append(opts.Prefer, rules.Preferred{Name: name, Instead: e.Prefer[name]})
+	}
+	return opts
 }
 
 // RuleScore holds the counts for one rule.
@@ -73,7 +93,7 @@ func Run(dir string) (Report, error) {
 		if err != nil {
 			return Report{}, err
 		}
-		opts := checker.Options{Mode: checker.Mode(exp.Mode)}
+		opts := exp.options()
 		got := checker.Lint(source, opts)
 
 		want := append([]Expectation{}, exp.Expect...)

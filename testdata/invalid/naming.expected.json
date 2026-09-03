@@ -1,0 +1,12 @@
+{
+  "mode": "flavored",
+  "prefer": {
+    "config file": ["settings file", "configuration file"],
+    "pump": ["frammis"]
+  },
+  "expect": [
+    { "rule_id": "STE-1.11", "text": "settings file" },
+    { "rule_id": "STE-1.11", "text": "configuration file" },
+    { "rule_id": "STE-1.11", "text": "frammis" }
+  ]
+}

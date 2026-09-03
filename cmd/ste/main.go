@@ -541,6 +541,8 @@ func runEval(args []string, stdout, stderr io.Writer) int {
 	fs := pflag.NewFlagSet("eval", pflag.ContinueOnError)
 	fs.SetOutput(stderr)
 	format := fs.String("format", "text", "text or json")
+	failUnder := fs.Float64("fail-under", -1,
+		"exit with code 1 when the precision or the recall is below this value")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
@@ -562,6 +564,15 @@ func runEval(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
+	}
+	// A gate for the build. The corpus must not lose quality without a
+	// person who decides that it is acceptable.
+	if *failUnder >= 0 {
+		if p, r := rep.Totals.Precision, rep.Totals.Recall; p < *failUnder || r < *failUnder {
+			fmt.Fprintf(stderr,
+				"ste: precision %.2f and recall %.2f, and the limit is %.2f\n", p, r, *failUnder)
+			return exitThreshold
+		}
 	}
 	return exitOK
 }

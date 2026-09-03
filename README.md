@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 4 dependencies. It has 15 checks. The standard has
+It is one Go binary with 4 dependencies. It has 17 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -33,8 +33,8 @@ project:
 mise finds the correct asset for your platform without an option. The
 archive names use the words that its asset matcher knows, for example
 `ste-0.7.0-darwin-arm64.tar.gz` and `ste-0.7.0-linux-x64.tar.gz`. Each
-Each release also has a `checksums.txt` file. mise verifies the download
-against it and records the result in `mise.lock`.
+release also has a `checksums.txt` file. mise verifies the download against
+it and records the result in `mise.lock`.
 
 The releases give binaries for macOS (arm64, x64), Linux (arm64, x64), and
 Windows (x64).
@@ -296,6 +296,9 @@ allow:                  # the technical words of your project
   nouns: [parser, webhook]
   verbs: [provision]
 
+prefer:                 # rule STE-1.11: one name for each item
+  "config file": ["settings file", "configuration file"]
+
 min_confidence: 0.6     # remove each finding below this value
 max_words: 25           # replace the sentence limits of the standard
 baseline: .ste-baseline.json
@@ -466,7 +469,7 @@ not as a defect.
   See [docs/upstream-audit.md](docs/upstream-audit.md) for the reason that
   the tool cannot ship it.
 - Precision and recall are in [docs/evaluation.md](docs/evaluation.md).
-  Recall on new text is low, because the tool has 15 checks and the standard
+  Recall on new text is low, because the tool has 17 checks and the standard
   has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

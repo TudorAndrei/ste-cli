@@ -1,0 +1,25 @@
+name: ci
+
+# Each push and each pull request runs the same checks as a release: the
+# format, the static checks, the tests, the labeled corpus, and the lint of
+# the documentation with the tool itself.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v4
+
+      - name: Check
+        run: mise run ci

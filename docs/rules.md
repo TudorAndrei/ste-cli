@@ -1,13 +1,13 @@
 ---
 title: Rules
-description: The 15 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
+description: The 17 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
 ---
 
 # Rules
 
 [Back to the start page](index.md)
 
-This tool has 15 checks. ASD-STE100 Issue 9 has 53 rules and a dictionary of
+This tool has 17 checks. ASD-STE100 Issue 9 has 53 rules and a dictionary of
 approved words. The tool does not ship the dictionary. `ste dict import`
 makes an index from your own copy of the specification, and `--use-dict`
 then gives rule 1.1 the full word list.
@@ -36,6 +36,8 @@ severity, and strict mode does not make it an error.
 | `STE-5.5` | An instruction in a note | 0.80 | warning |
 | `STE-6.6` | Paragraph too long | 1.00 | warning |
 | `STE-7.3` | A safety instruction with no explanation | 0.70 | warning |
+| `STE-5.4` | A condition after the command | 0.70 | info |
+| `STE-1.11` | Two names for the same item | 0.95 | warning |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -177,6 +179,13 @@ obeys these:
 | Text in parentheses (rule 8.5) | 1 |
 | The number of a step (rule 8.6) | 0 |
 
+**A colon in a vertical list (rule 8.4).** In a vertical list, a colon has
+the same effect as a period: it ends the sentence, and the count starts
+again. The item "The flag: it starts the pump" is two sentences. A colon
+with no space after it is not a mark of punctuation, and "12:30" stays one
+word. The colon of a label keeps its sentence, thus "**NOTE:** The pump
+needs pressure" is one sentence.
+
 **Limits.** Rule 8.6 also makes a multi-word title, a multi-word proper
 noun, and a multi-word alphanumeric identifier one word. The tool cannot
 find these without a dictionary, and it counts each of their words. The
@@ -268,6 +277,54 @@ descriptive text. The confidence is 1.00, because the count is a count.
 its items. Two paragraphs of 4 sentences are two paragraphs, and not one
 paragraph of 8.
 
+## STE-1.11 Two names for the same item
+
+Reports a name that the project replaced with a different name for the same
+item. Rule 1.11 tells you to select one technical noun and to use it in each
+place, so the reader does not ask if two names are two items.
+
+The rule reports nothing until the config gives the names. No tool can know
+that "the config file" and "the settings file" are the same item, and only
+the project can say so:
+
+```yaml
+prefer:
+  "config file": ["settings file", "configuration file"]
+  actuator: ["servo control unit", "control unit"]
+```
+
+The key is the name to use, and the list holds the other names. A name can
+have more than one word, and the letter case does not matter.
+
+**Limits.** The rule reads the config and nothing more. A project that gives
+no `prefer` key gets no finding from this rule. The rule cannot see that two
+names mean the same item in a text that the config does not describe.
+
+## STE-5.4 A condition after the command
+
+Reports an instruction that gives its condition after the command. Rule 5.4
+tells you to write the condition first, then a comma, then the command, so
+the reader knows the condition before they start the work.
+
+"Set the switch to NORMAL when the light comes on" gives a finding. "When
+the light comes on, set the switch to NORMAL" gives none.
+
+**Limits.**
+
+- The rule reads a numbered step only. A tool cannot see that a sentence of
+  descriptive text is an instruction.
+- A condition that follows an infinitive belongs to the infinitive, and the
+  rule does not report it. "Use the flag to stop when you have enough" does
+  not become "When you have enough, use the flag". The test is the word
+  before the condition: a word in small letters after "to" is a verb, and a
+  word in capital letters is a value.
+- "Check if the valve is open" gives no finding. A verb such as "check" or
+  "verify" takes the clause as its object, and not as a condition.
+- The condition must hold a verb of its own. "Close the valve after the
+  test" names a time, and the standard gives no correction for it.
+- The severity is `info`, because the tool has no parser and the test is the
+  position of a word.
+
 ## STE-7.3 A safety instruction with no explanation
 
 Reports a warning, a caution, or a danger block that gives no reason. Rule
@@ -341,7 +398,6 @@ not try to check them, because a guess would only make noise:
 | 4.5 | Articles and demonstrative adjectives | The exceptions of the standard make a check too noisy |
 | 5.2 | One instruction for each sentence | Cannot separate simultaneous actions |
 | 5.3 | The imperative form | Needs a verb list |
-| 5.4 | The condition before the instruction | Possible later, as info. Not built |
 | 6.1, 6.2, 6.5 | Key words, one topic for each paragraph | Needs semantics |
 | 7.1, 7.2 | The words and the order of a safety instruction | Needs the risk level of the subject field |
 | 9.1, 9.2, 9.4 | Consistent style | Needs semantics |
