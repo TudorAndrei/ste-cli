@@ -1,0 +1,14 @@
+# The hook of pre-commit (https://pre-commit.com). pre-commit builds the
+# command from this repository, thus it needs Go and no release.
+#
+# The walk of a directory does not read a file that a tool writes, but a
+# hook gives each file by its path. Thus the exclude pattern below removes
+# the same files.
+- id: ste
+  name: ste
+  description: Find ASD-STE100 violations in Markdown and plain text.
+  entry: ste lint
+  args: [--fail-on-new]
+  language: golang
+  files: \.(md|markdown|txt)$
+  exclude: (?i)(^|/)(changelog|change_log|changes|history|news|release[-_]?notes)\.(md|markdown|txt)$

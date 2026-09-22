@@ -1,0 +1,90 @@
+name: ste
+description: Find ASD-STE100 (Simplified Technical English) violations in Markdown and plain text.
+author: TudorAndrei
+branding:
+  icon: check-square
+  color: blue
+
+# Usage:
+#
+#   - uses: actions/checkout@v7
+#   - uses: TudorAndrei/ste-cli@v0.10.0
+#     with:
+#       args: --fail-on-new .
+#
+# The default format gives each finding on the line of the pull request.
+
+inputs:
+  version:
+    description: The version of ste to install, such as 0.10.0, or "latest".
+    default: latest
+  args:
+    description: The flags and the paths of "ste lint".
+    default: --fail-on-new .
+  format:
+    description: The output format. "github" shows each finding on the line of the pull request.
+    default: github
+
+runs:
+  using: composite
+  steps:
+    - name: Install ste
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        STE_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS" in
+          Linux) os=linux ;;
+          macOS) os=darwin ;;
+          Windows) os=windows ;;
+          *) echo "ste: the runner OS $RUNNER_OS has no release" >&2; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=x64 ;;
+          ARM64) arch=arm64 ;;
+          *) echo "ste: the runner architecture $RUNNER_ARCH has no release" >&2; exit 1 ;;
+        esac
+        ext=tar.gz
+        if [ "$os" = windows ]; then ext=zip; fi
+
+        tag=()
+        if [ "$STE_VERSION" != latest ]; then tag=("v${STE_VERSION#v}"); fi
+        dir="$RUNNER_TEMP/ste"
+        rm -rf "$dir"
+        mkdir -p "$dir"
+        # The bash of macOS is 3.2, and "set -u" there rejects an empty
+        # array without this form.
+        gh release download ${tag[@]+"${tag[@]}"} --repo TudorAndrei/ste-cli \
+          --pattern "ste-*-${os}-${arch}.${ext}" --pattern checksums.txt --dir "$dir"
+
+        cd "$dir"
+        archive="$(ls ste-*-"${os}-${arch}.${ext}")"
+        want="$(awk -v f="$archive" '$2 == f { print $1 }' checksums.txt)"
+        if command -v sha256sum >/dev/null 2>&1; then
+          got="$(sha256sum "$archive" | awk '{ print $1 }')"
+        else
+          got="$(shasum -a 256 "$archive" | awk '{ print $1 }')"
+        fi
+        if [ -z "$want" ] || [ "$want" != "$got" ]; then
+          echo "ste: the checksum of $archive does not agree with checksums.txt" >&2
+          exit 1
+        fi
+
+        if [ "$ext" = zip ]; then
+          pwsh -NoProfile -Command "Expand-Archive -Force -Path '$archive' -DestinationPath ."
+        else
+          tar -xzf "$archive"
+        fi
+        echo "$dir" >>"$GITHUB_PATH"
+
+    - name: Run ste
+      shell: bash
+      env:
+        STE_ARGS: ${{ inputs.args }}
+        STE_FORMAT: ${{ inputs.format }}
+      run: |
+        # The arguments are words, thus the shell divides them.
+        # shellcheck disable=SC2086
+        ste lint --format "$STE_FORMAT" $STE_ARGS
