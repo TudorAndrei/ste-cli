@@ -6,8 +6,9 @@ import (
 )
 
 // matchesAny tells if a path matches one of the exclude patterns of the
-// config. A pattern applies to the path relative to the directory that you
-// give, and also to the file name.
+// config. A pattern applies to the path relative to the project directory,
+// and also to the file name. Thus a pattern gives the same result for each
+// directory that you give to the command.
 //
 //	docs/legacy/**      each file below docs/legacy
 //	**/fixtures/**      each file below a directory named fixtures
@@ -17,11 +18,7 @@ func matchesAny(path, root string, patterns []string) bool {
 	if len(patterns) == 0 {
 		return false
 	}
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		rel = path
-	}
-	rel = filepath.ToSlash(rel)
+	rel := relativeTo(root, path)
 	base := filepath.Base(rel)
 	for _, pattern := range patterns {
 		pattern = strings.TrimPrefix(filepath.ToSlash(pattern), "./")

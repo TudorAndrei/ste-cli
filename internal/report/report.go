@@ -126,6 +126,10 @@ type Summary struct {
 	Truncated bool `json:"truncated"`
 	// Accepted is the number of findings that the baseline holds.
 	Accepted int `json:"accepted,omitempty"`
+	// Stale is the number of accepted findings of the files of this run
+	// that the text no longer has. Write the baseline again to remove
+	// them.
+	Stale int `json:"stale,omitempty"`
 	// Errors is the number of findings with the error severity.
 	Errors int `json:"errors"`
 }

@@ -170,7 +170,17 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 		return exitError
 	}
 
-	cfg, err := loadConfig(*cfgPath, *noConfig)
+	paths := fs.Args()
+	if len(paths) == 0 {
+		paths = []string{"-"}
+	}
+
+	proj, err := findProject(*cfgPath, *noConfig)
+	if err != nil {
+		fmt.Fprintf(stderr, "ste: %v\n", err)
+		return exitError
+	}
+	cfg, err := loadConfig(proj.Config)
 	if err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
@@ -229,10 +239,6 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 	}
 
 	results := []report.FileResult{}
-	paths := fs.Args()
-	if len(paths) == 0 {
-		paths = []string{"-"}
-	}
 	for _, p := range paths {
 		if p == "-" {
 			raw, err := io.ReadAll(stdin)
@@ -240,10 +246,10 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 				fmt.Fprintf(stderr, "ste: standard input: %v\n", err)
 				return exitError
 			}
-			results = append(results, lintOne("(standard input)", string(raw), opts))
+			results = append(results, lintOne(stdinName, string(raw), opts))
 			continue
 		}
-		files, err := textFiles(p, *all, cfg.Exclude)
+		files, err := textFiles(p, *all, proj.Dir, cfg.Exclude)
 		if err != nil {
 			fmt.Fprintf(stderr, "ste: %v\n", err)
 			return exitError
@@ -260,63 +266,75 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 
 	// The baseline holds the findings that the project accepts today, thus
 	// the report shows only the new ones.
+	// A path in the config starts from the project directory, and a path
+	// of a flag starts from the current directory.
 	basePath := *baselinePath
 	if basePath == "" {
-		basePath = cfg.Baseline
+		basePath = proj.resolve(cfg.Baseline)
 	}
 	if basePath == "" {
-		if _, err := os.Stat(baseline.DefaultName); err == nil {
-			basePath = baseline.DefaultName
+		if def := proj.resolve(baseline.DefaultName); fileExists(def) || write {
+			basePath = def
 		}
 	}
+	shown := displayPath(basePath)
 	if write {
-		if basePath == "" {
-			basePath = baseline.DefaultName
-		}
 		total := 0
 		for _, r := range results {
 			total += len(r.Findings)
 		}
-		if *dryRun {
-			return writePlan(stdout, shape.Format, map[string]any{
-				"action":   "baseline",
-				"dry_run":  true,
-				"path":     basePath,
-				"findings": total,
-				"files":    len(results),
-				"exists":   fileExists(basePath),
-			}, fmt.Sprintf("A real run writes %s with %d findings of %d files.\n", basePath, total, len(results)))
-		}
-		if err := saveBaseline(basePath, results); err != nil {
+		entries := baselineResults(basePath, results)
+		merge, err := baseline.Plan(basePath, entries)
+		if err != nil {
 			fmt.Fprintf(stderr, "ste: %v\n", err)
 			return exitError
 		}
-		return writePlan(stdout, shape.Format, map[string]any{
+		plan := map[string]any{
 			"action":   "baseline",
-			"dry_run":  false,
-			"path":     basePath,
+			"dry_run":  *dryRun,
+			"path":     shown,
 			"findings": total,
 			"files":    len(results),
-		}, fmt.Sprintf("%s holds %d findings of %d files.\nThe tool now reports only a new finding. Remove the file to report all.\n", basePath, total, len(results)))
+			"kept":     merge.Kept,
+			"removed":  merge.Removed,
+		}
+		if *dryRun {
+			plan["exists"] = fileExists(basePath)
+			return writePlan(stdout, shape.Format, plan,
+				fmt.Sprintf("A real run writes %s with %d findings of %d files.\n%s", shown, total, len(results), mergeText(merge)))
+		}
+		if err := baseline.Save(basePath, entries, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			fmt.Fprintf(stderr, "ste: %v\n", err)
+			return exitError
+		}
+		return writePlan(stdout, shape.Format, plan,
+			fmt.Sprintf("%s holds %d findings of %d files.\n%sThe tool now reports only a new finding. Remove the file to report all.\n",
+				shown, total, len(results), mergeText(merge)))
 	}
 
-	accepted := 0
+	accepted, stale := 0, 0
 	if basePath != "" && !*noBaseline {
 		set, err := baseline.Load(basePath)
 		if err != nil {
 			fmt.Fprintf(stderr, "ste: %v\n", err)
 			return exitError
 		}
-		results, accepted = applyBaseline(set, results)
+		results, accepted, stale = applyBaseline(set, basePath, results)
 	}
 
 	rep := report.New(string(opts.Normalized().Mode), results, accepted)
+	rep.Summary.Stale = stale
 	if err := report.Write(stdout, rep, shape); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
-	if accepted > 0 && shape.Format == report.FormatText {
-		fmt.Fprintf(stdout, "%d findings are in the baseline %s, thus this report does not show them.\n", accepted, basePath)
+	if shape.Format == report.FormatText {
+		if accepted > 0 {
+			fmt.Fprintf(stdout, "%d findings are in the baseline %s, thus this report does not show them.\n", accepted, shown)
+		}
+		if stale > 0 {
+			fmt.Fprintf(stdout, "%d accepted findings are not in the text now. Run \"ste baseline\" to record the lower number.\n", stale)
+		}
 	}
 	if opts.WarningsAsErrors && rep.Summary.Errors > 0 {
 		fmt.Fprintf(stderr, "ste: %d findings have the error severity\n", rep.Summary.Errors)
@@ -356,15 +374,61 @@ func writePlan(stdout io.Writer, format report.Format, data map[string]any, text
 	return exitOK
 }
 
+// stdinName is the file name of the text of standard input.
+const stdinName = "(standard input)"
+
+// displayPath gives a path relative to the current directory when that is
+// shorter, for a message to a person.
+func displayPath(path string) string {
+	if path == "" || !filepath.IsAbs(path) {
+		return path
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return path
+	}
+	rel, err := filepath.Rel(cwd, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return path
+	}
+	return rel
+}
+
+// mergeText tells a person what a new baseline does to the old entries.
+func mergeText(m baseline.Merge) string {
+	text := ""
+	if m.Kept > 0 {
+		text += fmt.Sprintf("It keeps %d accepted findings of the files that this run did not read.\n", m.Kept)
+	}
+	if m.Removed > 0 {
+		text += fmt.Sprintf("It removes %d accepted findings of the files that do not exist now.\n", m.Removed)
+	}
+	return text
+}
+
+// baselineKey gives the file name of a finding in the baseline: the path
+// relative to the directory of the baseline file. Thus the key does not
+// change with the current directory or with the spelling of the path.
+func baselineKey(basePath, file string) string {
+	if file == stdinName {
+		return file
+	}
+	return relativeTo(filepath.Dir(basePath), file)
+}
+
 // applyBaseline removes the findings that the project accepted before. It
-// gives the new results and the number of accepted findings.
-func applyBaseline(set *baseline.Set, results []report.FileResult) ([]report.FileResult, int) {
+// gives the new results, the number of accepted findings, and the number of
+// accepted findings of these files that the text no longer has.
+func applyBaseline(set *baseline.Set, basePath string, results []report.FileResult) ([]report.FileResult, int, int) {
 	accepted := 0
+	read := map[string]bool{}
 	out := make([]report.FileResult, 0, len(results))
 	for _, r := range results {
+		file := baselineKey(basePath, r.Path)
+		read[file] = true
 		kept := make([]report.Finding, 0, len(r.Findings))
 		for _, f := range r.Findings {
-			if set.Take(r.Path, f.RuleID, f.Text) {
+			if set.Take(file, f.RuleID, f.Text) {
 				accepted++
 				continue
 			}
@@ -373,20 +437,21 @@ func applyBaseline(set *baseline.Set, results []report.FileResult) ([]report.Fil
 		r.Findings = kept
 		out = append(out, r)
 	}
-	return out, accepted
+	return out, accepted, set.Stale(read)
 }
 
-// saveBaseline writes the findings of this run as the accepted findings.
-func saveBaseline(path string, results []report.FileResult) error {
+// baselineResults gives the findings of this run in the form that the
+// baseline file holds.
+func baselineResults(basePath string, results []report.FileResult) []baseline.Result {
 	entries := make([]baseline.Result, 0, len(results))
 	for _, r := range results {
 		findings := make([]baseline.Finding, 0, len(r.Findings))
 		for _, f := range r.Findings {
 			findings = append(findings, baseline.Finding{RuleID: f.RuleID, Text: f.Text})
 		}
-		entries = append(entries, baseline.Result{Path: r.Path, Findings: findings})
+		entries = append(entries, baseline.Result{Path: baselineKey(basePath, r.Path), Findings: findings})
 	}
-	return baseline.Save(path, entries, time.Now().UTC().Format(time.RFC3339))
+	return entries
 }
 
 func lintOne(path, source string, opts checker.Options) report.FileResult {
@@ -399,19 +464,11 @@ func lintOne(path, source string, opts checker.Options) report.FileResult {
 	return out
 }
 
-// loadConfig reads the config file, or gives an empty config.
-func loadConfig(cfgPath string, noConfig bool) (config.Config, error) {
-	cfg := config.Config{FailOver: -1}
-	if noConfig {
-		return cfg, nil
-	}
-	path := cfgPath
+// loadConfig reads the config file, or gives an empty config when the path
+// is empty.
+func loadConfig(path string) (config.Config, error) {
 	if path == "" {
-		found, ok := config.Find(".")
-		if !ok {
-			return cfg, nil
-		}
-		path = found
+		return config.Config{FailOver: -1}, nil
 	}
 	return config.Load(path)
 }
@@ -502,13 +559,21 @@ func isGenerated(path string) bool {
 
 // textFiles gives the files to check. A directory gives all Markdown and
 // text files below it. A file that git ignores does not come from a
-// directory, but a file that you give by its path is always read.
-func textFiles(path string, all bool, exclude []string) ([]string, error) {
+// directory, but a file that you give by its path is read.
+//
+// The exclude patterns of the config apply to each file, also to a file
+// that you give by its path. A hook of git gives each changed file by its
+// path, and the config must apply to it. The patterns start from the
+// project directory.
+func textFiles(path string, all bool, projectDir string, exclude []string) ([]string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 	if !info.IsDir() {
+		if matchesAny(path, projectDir, exclude) {
+			return nil, nil
+		}
 		return []string{path}, nil
 	}
 	root := filepath.Clean(path)
@@ -547,7 +612,7 @@ func textFiles(path string, all bool, exclude []string) ([]string, error) {
 		if !all && isGenerated(p) {
 			return nil
 		}
-		if matchesAny(p, root, exclude) {
+		if matchesAny(p, projectDir, exclude) {
 			return nil
 		}
 		out = append(out, p)

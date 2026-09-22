@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -65,13 +67,17 @@ func (s *Set) Take(file, ruleID, text string) bool {
 	return true
 }
 
-// Remaining gives the number of accepted findings that no run matched. A
-// value of more than 0 means that the text improved, thus you can write the
-// baseline again.
-func (s *Set) Remaining() int {
+// Stale gives the number of accepted findings of the given files that no
+// finding of this run took. A value of more than 0 means that the text
+// improved, thus you can write the baseline again. Call it after each Take
+// of the run. A file that the run did not read does not count, because its
+// findings are not known.
+func (s *Set) Stale(files map[string]bool) int {
 	n := 0
-	for _, c := range s.counts {
-		n += c
+	for k, c := range s.counts {
+		if files[strings.SplitN(k, "\x00", 2)[0]] {
+			n += c
+		}
 	}
 	return n
 }
@@ -79,35 +85,65 @@ func (s *Set) Remaining() int {
 // Load reads a baseline file. A file that does not exist gives an empty set
 // and no error, thus the first run needs no file.
 func Load(path string) (*Set, error) {
-	raw, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return New(), nil
-	}
+	f, err := read(path)
 	if err != nil {
 		return nil, err
 	}
-	var f File
-	if err := json.Unmarshal(raw, &f); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
 	set := New()
 	for _, e := range f.Entries {
-		count := e.Count
-		if count <= 0 {
-			count = 1
-		}
-		set.counts[key(e.File, e.RuleID, e.Text)] += count
+		set.counts[key(e.File, e.RuleID, e.Text)] += e.Count
 	}
 	return set, nil
 }
 
-// Save writes the findings of a run as the new baseline.
-func Save(path string, results []Result, created string) error {
+// read gives the entries of a baseline file, with a clean file name and a
+// count of 1 or more. A file that does not exist gives no entries.
+func read(path string) (File, error) {
+	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return File{}, nil
+	}
+	if err != nil {
+		return File{}, err
+	}
+	var f File
+	if err := json.Unmarshal(raw, &f); err != nil {
+		return File{}, fmt.Errorf("%s: %w", path, err)
+	}
+	for i := range f.Entries {
+		f.Entries[i].File = Clean(f.Entries[i].File)
+		if f.Entries[i].Count <= 0 {
+			f.Entries[i].Count = 1
+		}
+	}
+	return f, nil
+}
+
+// Clean gives the form of a file name that a key uses: forward slashes and
+// no "./" or "..". A baseline of Windows and a baseline of Linux thus agree.
+func Clean(file string) string {
+	return path.Clean(filepath.ToSlash(file))
+}
+
+// Save writes the findings of a run as the new baseline. The paths of the
+// results must be relative to the directory of the baseline file.
+//
+// The entries of a file that the run did not read stay in the baseline,
+// thus a run on one directory does not remove the findings of a different
+// directory. An entry of a file that no longer exists goes.
+func Save(file string, results []Result, created string) error {
+	plan, err := Plan(file, results)
+	if err != nil {
+		return err
+	}
 	set := New()
 	for _, r := range results {
 		for _, d := range r.Findings {
-			set.Add(r.Path, d.RuleID, d.Text)
+			set.Add(Clean(r.Path), d.RuleID, d.Text)
 		}
+	}
+	for _, e := range plan.kept {
+		set.counts[key(e.File, e.RuleID, e.Text)] += e.Count
 	}
 	f := File{Version: 1, Created: created, Entries: []Entry{}}
 	for k, count := range set.counts {
@@ -127,7 +163,44 @@ func Save(path string, results []Result, created string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(raw, '\n'), 0o644)
+	return os.WriteFile(file, append(raw, '\n'), 0o644)
+}
+
+// Merge tells what Save does to the entries that exist in the file.
+type Merge struct {
+	// Kept is the number of accepted findings of the files that the run
+	// did not read. Save keeps them.
+	Kept int
+	// Removed is the number of accepted findings of the files that no
+	// longer exist. Save removes them.
+	Removed int
+	kept    []Entry
+}
+
+// Plan gives the result of Save and changes nothing.
+func Plan(file string, results []Result) (Merge, error) {
+	old, err := read(file)
+	if err != nil {
+		return Merge{}, err
+	}
+	run := map[string]bool{}
+	for _, r := range results {
+		run[Clean(r.Path)] = true
+	}
+	dir := filepath.Dir(file)
+	m := Merge{}
+	for _, e := range old.Entries {
+		if run[e.File] {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(e.File))); err != nil {
+			m.Removed += e.Count
+			continue
+		}
+		m.Kept += e.Count
+		m.kept = append(m.kept, e)
+	}
+	return m, nil
 }
 
 // Result is the part of a file result that the baseline needs. The report

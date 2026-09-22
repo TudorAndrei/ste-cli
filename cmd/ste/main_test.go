@@ -87,6 +87,8 @@ type lintReport struct {
 		Shown     int     `json:"shown"`
 		Truncated bool    `json:"truncated"`
 		Errors    int     `json:"errors"`
+		Accepted  int     `json:"accepted"`
+		Stale     int     `json:"stale"`
 	} `json:"summary"`
 }
 
