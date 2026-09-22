@@ -114,8 +114,8 @@ func schema() map[string]any {
 
 		"output": map[string]any{
 			"finding_fields": report.Fields(),
-			"summary_fields": []string{"files", "words", "findings", "score", "shown", "truncated", "accepted", "errors"},
-			"note":           "json gives one object with a flat findings list. ndjson gives one object for each line, each with a type of finding or summary.",
+			"summary_fields": []string{"files", "words", "findings", "score", "shown", "truncated", "accepted", "stale", "errors"},
+			"note":           "json gives one object with a flat findings list. ndjson gives one object for each line, each with a type of finding or summary. sarif gives SARIF 2.1.0 for code scanning. github gives one workflow command of GitHub Actions for each finding. sarif and github give each path from the top of the git work tree, and they do not use --fields.",
 		},
 
 		"agent_notes": []string{

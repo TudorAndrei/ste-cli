@@ -3,8 +3,10 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/TudorAndrei/ste-cli/internal/config"
+	"github.com/TudorAndrei/ste-cli/internal/report"
 )
 
 // project is the directory that the config applies to. A relative path in
@@ -61,6 +63,46 @@ func (p project) resolve(path string) string {
 		return path
 	}
 	return filepath.Join(p.Dir, path)
+}
+
+// repoRoot gives the top of the git work tree that holds dir, or dir when
+// there is no work tree.
+func repoRoot(dir string) string {
+	for d := dir; ; {
+		if _, err := os.Stat(filepath.Join(d, ".git")); err == nil {
+			return d
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return dir
+		}
+		d = parent
+	}
+}
+
+// pathsFrom gives each file of the results as a path from dir. A file that
+// is not below dir keeps its path.
+func pathsFrom(dir string, results []report.FileResult) []report.FileResult {
+	out := make([]report.FileResult, 0, len(results))
+	for _, r := range results {
+		if r.Path == stdinName {
+			out = append(out, r)
+			continue
+		}
+		rel := relativeTo(dir, r.Path)
+		if strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
+			out = append(out, r)
+			continue
+		}
+		findings := make([]report.Finding, len(r.Findings))
+		for i, f := range r.Findings {
+			f.File = rel
+			findings[i] = f
+		}
+		r.Path, r.Findings = rel, findings
+		out = append(out, r)
+	}
+	return out
 }
 
 // relativeTo gives path relative to dir, with forward slashes. A path that

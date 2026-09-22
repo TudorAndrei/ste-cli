@@ -157,6 +157,24 @@ func TestABaselineOfOneDirectoryKeepsTheOthers(t *testing.T) {
 	}
 }
 
+func TestTheCodeHostFormatsGivePathsFromTheRepository(t *testing.T) {
+	dir := newProject(t)
+	t.Chdir(filepath.Join(dir, "docs"))
+
+	code, stdout, stderr := runCLI(t, "", "lint", "--format", "github", filepath.Join(dir, "docs", "a.md"))
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if !strings.HasPrefix(stdout, "::warning file=docs/a.md,") {
+		t.Errorf("github format:\n%s", stdout)
+	}
+
+	_, stdout, _ = runCLI(t, "", "lint", "--format", "sarif", "a.md")
+	if !strings.Contains(stdout, `"uri": "docs/a.md"`) {
+		t.Errorf("sarif format:\n%s", stdout)
+	}
+}
+
 func TestTheReportCountsStaleEntries(t *testing.T) {
 	dir := newProject(t)
 	if code, _, stderr := runCLI(t, "", "baseline", "."); code != 0 {

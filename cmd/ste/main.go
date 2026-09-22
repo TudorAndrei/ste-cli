@@ -335,6 +335,15 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 		results, accepted, stale = applyBaseline(set, basePath, results)
 	}
 
+	if shape.Format == report.FormatSARIF || shape.Format == report.FormatGitHub {
+		// A code host finds a file by its path from the top of the
+		// repository.
+		results = pathsFrom(repoRoot(proj.Dir), results)
+		shape.ToolVersion = Version
+		for _, r := range ruleCatalog() {
+			shape.Rules = append(shape.Rules, report.Rule{ID: r.ID, Name: r.Name, DefaultSeverity: r.DefaultSeverity})
+		}
+	}
 	rep := report.New(string(opts.Normalized().Mode), results, accepted)
 	rep.Summary.Stale = stale
 	if err := report.Write(stdout, rep, shape); err != nil {

@@ -26,10 +26,15 @@ const (
 	// FormatNDJSON is one object for each line. A reader can stop at any
 	// line, thus a large result does not need memory for all of it.
 	FormatNDJSON Format = "ndjson"
+	// FormatSARIF is SARIF 2.1.0, for code scanning.
+	FormatSARIF Format = "sarif"
+	// FormatGitHub gives one workflow command of GitHub Actions for each
+	// finding. GitHub shows each one on the line of the pull request.
+	FormatGitHub Format = "github"
 )
 
 // Formats gives the names of the formats.
-func Formats() []string { return []string{"text", "json", "ndjson"} }
+func Formats() []string { return []string{"text", "json", "ndjson", "sarif", "github"} }
 
 // ValidFormat tells if the name is a format.
 func ValidFormat(name string) bool {
@@ -49,6 +54,19 @@ type Finding struct {
 	Line   int    `json:"line"`
 	Column int    `json:"column"`
 	Text   string `json:"text"`
+	// region is the span in lines and in characters, for the formats of
+	// an editor or a code host. Column counts bytes, and a code host
+	// counts characters.
+	region region
+}
+
+// region is a span of text. The columns count Unicode characters, and the
+// first line and the first column are 1.
+type region struct {
+	StartLine   int `json:"startLine"`
+	StartColumn int `json:"startColumn"`
+	EndLine     int `json:"endLine"`
+	EndColumn   int `json:"endColumn"`
 }
 
 // Fields gives the names of the fields of a finding, for --fields.
@@ -154,6 +172,17 @@ type Options struct {
 	Fields []string
 	// SummaryOnly removes the findings from the output.
 	SummaryOnly bool
+	// Rules describes each rule, for the rule list of SARIF.
+	Rules []Rule
+	// ToolVersion is the version of the tool, for SARIF.
+	ToolVersion string
+}
+
+// Rule describes one rule for a reader of SARIF.
+type Rule struct {
+	ID              string
+	Name            string
+	DefaultSeverity string
 }
 
 // New makes a report from the per-file results.
@@ -190,7 +219,33 @@ func MakeFinding(path, source string, d checker.Diagnostic) Finding {
 	if d.Start >= 0 && d.End <= len(source) && d.Start < d.End {
 		text = source[d.Start:d.End]
 	}
-	return Finding{Diagnostic: d, File: path, Line: line, Column: column, Text: oneLine(text)}
+	startLine, startCol := charPosition(source, d.Start)
+	endLine, endCol := charPosition(source, d.End)
+	return Finding{
+		Diagnostic: d, File: path, Line: line, Column: column, Text: oneLine(text),
+		region: region{StartLine: startLine, StartColumn: startCol, EndLine: endLine, EndColumn: endCol},
+	}
+}
+
+// charPosition gives the line and the column of a byte offset. The column
+// counts Unicode characters.
+func charPosition(source string, offset int) (int, int) {
+	if offset > len(source) {
+		offset = len(source)
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	line, column := 1, 1
+	for _, r := range source[:offset] {
+		if r == '\n' {
+			line++
+			column = 1
+			continue
+		}
+		column++
+	}
+	return line, column
 }
 
 func position(source string, offset int) (int, int) {
@@ -263,6 +318,10 @@ func Write(w io.Writer, r Report, opts Options) error {
 		return writeNDJSON(w, r, opts)
 	case FormatJSON:
 		return writeJSON(w, r, opts)
+	case FormatSARIF:
+		return writeSARIF(w, r, opts)
+	case FormatGitHub:
+		return writeGitHub(w, r, opts)
 	default:
 		return WriteText(w, r, opts)
 	}
