@@ -18,7 +18,7 @@ GitHub releases of this repository:
 
 ```bash
 mise use -g github:TudorAndrei/ste-cli        # the newest release
-mise use -g github:TudorAndrei/ste-cli@0.10.1 # one version
+mise use -g github:TudorAndrei/ste-cli@<version>  # one version
 ste version
 ```
 
@@ -30,9 +30,8 @@ project:
 "github:TudorAndrei/ste-cli" = "latest"
 ```
 
-mise finds the correct asset for your platform without an option. The
-archive names use the words that its asset matcher knows, for example
-`ste-0.10.1-darwin-arm64.tar.gz` and `ste-0.10.1-linux-x64.tar.gz`. Each
+mise finds the correct asset for your platform without an option, because
+the archive names use the words that its asset matcher knows. Each
 release also has a `checksums.txt` file. mise verifies the download against
 it and records the result in `mise.lock`.
 
@@ -513,20 +512,15 @@ A tag that starts with `v` starts the release workflow in
 archives for the 5 platforms, and makes the GitHub release with a
 `checksums.txt` file.
 
-```bash
-git tag v0.10.1
-git push origin v0.10.1
-```
-
 To make the same archives on your computer:
 
 ```bash
 mise run dist       # writes dist/
 ```
 
-The version in the binary comes from the tag:
-`go build -ldflags "-X main.Version=0.10.1"`. A build from the source
-without that flag says `dev`.
+The version in the binary comes from the tag, through
+`-ldflags "-X main.Version=<version>"`. A build from the source without
+that flag says `dev`.
 
 ## What the tool does not check
 
