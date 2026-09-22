@@ -13,12 +13,12 @@ mechanical answer.
 
 | Group | Rules | Who checks it |
 |---|---|---|
-| **Built** | 21 | `ste lint` |
-| **Possible with no new library** | 1 | `ste lint`, later |
-| **Built, and they need the analyzer** | 4 of those 21 | `ste lint --analyze` |
-| **Possible with a part-of-speech tagger** | 8 | an optional analyzer, later |
-| **A judgment of a reader** | 13 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill) |
-| **Partial only** | 9 | both |
+| Built | 21 | `ste lint` |
+| Possible with no new library | 1 | `ste lint`, later |
+| Built, and they use the analyzer | 4 of those 21 | `ste lint --analyze` |
+| Possible with a part-of-speech tagger | 8 | an optional analyzer, later |
+| A judgment of a reader | 13 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill) |
+| Partial only | 9 | both |
 
 ## Built
 
@@ -67,14 +67,14 @@ already.
 | 8.2 | A hyphen in a compound adjective |
 | 8.6 | A multi-word name that counts as one word |
 
-The `--analyze` flag gives this group a path. An external program gives the
-grammar of a sentence, and 4 rules use it:
+With the `--analyze` flag, an external program gives the grammar of a
+sentence. 4 rules use it today:
 
 | Rule | What the grammar gives |
 |---|---|
 | 2.1 | The words of a noun cluster |
 | 3.5 | An "-ing" word that is a verb, and not a noun or a modifier |
-| 3.6 | A veto: a finding goes when the parser sees no passive relation |
+| 3.6 | A veto. A finding goes when the parser sees no passive relation. |
 | 5.3 | The part of speech of the first word of a step |
 
 On a repository of 180 files, the analyzer removed 26 wrong findings for
@@ -82,8 +82,9 @@ rule 3.6, and the other 3 rules gave 502 more findings. The run went from
 0.11s to 14.9s, because each sentence goes to the model.
 Refer to [the analyzer](analyzer.md).
 
-Each rule of this group can use the same path. A rule must also work without
-the analyzer, because the command must stay one binary with no runtime.
+Each rule of this group can use the analyzer in the same way. A rule must
+also work without the analyzer, because the command must stay one binary
+with no runtime.
 
 ## A judgment of a reader
 

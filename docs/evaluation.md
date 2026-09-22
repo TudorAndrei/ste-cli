@@ -50,8 +50,8 @@ give. A file with no expectation file must give no findings.
 analyzer has at least one labeled example. The corpus does not measure the 4
 rules that need the analyzer, because the corpus runs with no Python.
 
-The 4 valid files are the guard against a wrong finding. Each of them must
-give 0 findings. They hold the constructions that gave a wrong finding
+The 4 valid files test for wrong findings. Each of them must give 0
+findings. They hold the constructions that gave a wrong finding
 before:
 
 - YAML front matter.
@@ -84,19 +84,19 @@ read each finding and gave it a verdict.
 | Document | Words | Findings | False positives | Precision |
 |---|---|---|---|---|
 | `idea.md` (the plan of this project) | 1256 | 13 | 0 | 1.00 |
-| README of `stazelabs/ste` | 803 | 0 | 0 | — |
+| README of `stazelabs/ste` | 803 | 0 | 0 | none |
 | README of `openste/openste` | 395 | 2 | 0 | 1.00 |
 | **Total** | **2454** | **15** | **0** | **1.00** |
 
 The measurement ran again after the audit against Issue 9. The 3 new rules
 (`STE-1.14`, `STE-3.7`, `STE-GR-6`) gave no finding on these documents.
-Thus they add no noise. The word counts are lower than the first
+Thus they add no wrong finding. The word counts are lower than the first
 measurement, because the tool now counts a quantity with its unit as one
 word.
 
 **This measurement gives no recall.** The documents have no labels, and
 nobody knows how many violations the tool did not find. The true recall on
-new text is much less than 1.00. The tool has 19 checks, and the standard
+new text is much less than 1.00. The tool has 20 checks, and the standard
 has 53 rules.
 
 ### The false positives that this measurement found
@@ -111,19 +111,7 @@ defect, and each defect now has a test:
 | 3 × `STE-5.1` on a 26 to 35-word "sentence" | Inline code after a period hid the start of the next sentence, and two sentences became one. | The look-ahead in `endsSentence` uses the source text. |
 | `STE-5.1` on a 34-word "sentence" | The cells of a Markdown table row became one sentence. | A cell separator is a sentence boundary. |
 
-## 3. Known limits of the measurement
-
-- The corpus is small: 10 files and 29 labeled findings.
-- The unlabeled documents are all software documentation in English. Nobody
-  measured the tool on aircraft maintenance procedures, which is the first
-  purpose of ASD-STE100.
-- This evaluation does not measure recall on new text.
-- The tool has no dictionary rule. This evaluation says nothing about
-  the largest part of ASD-STE100: the approved-word list.
-- The labeled corpus does not measure the rules that need the analyzer.
-  Section 5 gives what a person read on two real repositories.
-
-## 5. The analyzer rules on two repositories
+## 3. The analyzer rules on two repositories
 
 Rules 2.1, 3.5, 5.3, and part of 3.6 need the grammar of a sentence. A
 person read the findings of `--analyze` on two repositories of software
@@ -158,9 +146,9 @@ true numbers and found 6 defects. This version corrects all 6.
 
 | Defect | Correction |
 |---|---|
-| The phrasal-verb rule had the number 1.4. Rule 1.4 is about the forms of verbs and adjectives. | The rule is **9.3**. |
-| The perfect-tense rule had the number 3.1. Rule 3.1 is about the verb forms of the dictionary. | The rule is **3.4**. |
-| The passive-voice rule had the number 3.2. Rule 3.2 only lists the permitted forms. | The rule is **3.6**. |
+| The phrasal-verb rule had the number 1.4. Rule 1.4 is about the forms of verbs and adjectives. | The rule is 9.3. |
+| The perfect-tense rule had the number 3.1. Rule 3.1 is about the verb forms of the dictionary. | The rule is 3.4. |
+| The passive-voice rule had the number 3.2. Rule 3.2 only lists the permitted forms. | The rule is 3.6. |
 | The word count counted a quantity and its unit as 2 words, a quoted string as many words, and text in parentheses as many words. Section 8 counts each as 1 word. Thus `STE-5.1` reported sentences that are inside the limit. | The count obeys rules 8.5 to 8.7. |
 | The mode selected the sentence limit (20 in strict, 25 in flavored). The standard selects the limit from the type of the sentence. | A numbered step gets 20 words (rule 5.1), a note and descriptive text get 25 (rules 5.5 and 6.3). The mode changes only the severity and the confidence filter. |
 | The message for `STE-8.1` said that the standard permits 6 punctuation marks. Rule 8.1 permits all standard marks, but not the semicolon. | The message states the ban of one mark. |
@@ -196,15 +184,15 @@ checkable. The tool does not try to check them.
 ### The tool on a repository of 180 files
 
 Version 0.4.0 ran on a repository of software documentation that is not part
-of this project: 180 files, 93654 words, mostly architecture decision
-records. The run gave 1295 findings in 0.09 seconds. A person then read the
+of this project. It has 180 files and 93654 words. Most of the files are
+architecture decision records. The run gave 1295 findings in 0.09 seconds. A person then read the
 findings.
 
 | Group | Findings | Verdict |
 |---|---|---|
-| Front matter | 127 | **Wrong.** 169 of the 180 files start with YAML front matter. CommonMark has no front matter, and the parser read the keys as a sentence. |
-| The name "VS Code" | 147 | **Wrong.** The rule for a Latin abbreviation matched the name. |
-| Semicolons, passive voice, long sentences | ~1000 | Correct on a sample of each rule. |
+| Front matter | 127 | Wrong. 169 of the 180 files start with YAML front matter. CommonMark has no front matter, and the parser read the keys as a sentence. |
+| The name "VS Code" | 147 | Wrong. The rule for a Latin abbreviation matched the name. |
+| Semicolons, passive voice, long sentences | About 1000 | Correct on a sample of each rule. |
 
 Version 0.5.0 corrects both defects, and the same repository now gives 1037
 findings. The correction is 258 findings, or 20% of the first result.
@@ -214,7 +202,19 @@ that gives 1295 findings on its first day is a tool that a team removes,
 even when 80% of the findings are correct. The baseline, the severity of
 each rule, and the directives in the text give a team a way to start.
 
-## 5. The rule for a new rule
+## 5. Known limits of the measurement
+
+- The corpus is small. It has 10 files and 30 labeled findings.
+- The unlabeled documents are all software documentation in English. Nobody
+  measured the tool on aircraft maintenance procedures, which is the first
+  purpose of ASD-STE100.
+- This evaluation does not measure recall on new text.
+- The tool has no dictionary rule. This evaluation says nothing about the
+  approved-word list, which is the largest part of ASD-STE100.
+- The labeled corpus does not measure the rules that need the analyzer.
+  Section 3 gives what a person read on two real repositories.
+
+## 6. The rule for a new rule
 
 A new rule must not ship without:
 

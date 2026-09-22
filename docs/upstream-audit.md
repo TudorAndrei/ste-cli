@@ -40,7 +40,7 @@ before the first import of an upstream data file.
 | Language | Python |
 | Code license | Apache-2.0 |
 | Vocabulary path | `ste100/` data modules, extracted from the specification |
-| Result | **do not use** (data), **borrow design only** (interfaces) |
+| Result | `do not use` (data), `borrow design only` (interfaces) |
 
 The repository holds `ASD-STE100-ISSUE-9.pdf` at its root. This is the
 specification, which is under copyright. The repository says that it commits
@@ -57,9 +57,9 @@ the later MCP and LSP interfaces.
 |---|---|
 | Commit | `3adb827991ee` (2026-08-21) |
 | Language | Rust |
-| Code license | **Blue Oak Model License 1.0.0** |
+| Code license | Blue Oak Model License 1.0.0 |
 | Vocabulary path | `ste_checker/src/wordset.rs` with the openste word list |
-| Result | **borrow design only** |
+| Result | `borrow design only` |
 
 Correction to the plan: the license is Blue Oak 1.0.0, not MIT. The MIT
 statement in the plan refers to the openste word list that this project
@@ -77,7 +77,7 @@ a `corpus.truth` file. This project uses the same idea in
 | Language | Python |
 | Code license | MIT |
 | Vocabulary path | `src/data/approved.json`, `unapproved.json`, `technical.json` |
-| Result | **borrow design only** |
+| Result | `borrow design only` |
 
 The repository gives no statement about the source of its three JSON data
 files. The MIT license of the code is not enough proof for the data.
@@ -94,7 +94,7 @@ files.
 | Language | Go |
 | Code license | MIT |
 | Vocabulary path | none. The repository says that it contains no ASD-STE100 specification data. |
-| Result | **borrow design only** |
+| Result | `borrow design only` |
 
 This is the nearest implementation reference: a Go CLI with no
 dependencies, byte spans, JSON output, and a score for each 100 words. This
@@ -112,28 +112,29 @@ found false positives. See `docs/evaluation.md`.
 | Language | data only |
 | Code license | MIT (`LICENSE`, "Copyright (c) 2026 openSTE.org") |
 | Vocabulary path | `vocabulary/openste.json`, 436 kB |
-| Result | **do not use in v1.** Possible `reuse` after a provenance review. |
+| Result | `do not use` in v1. Possible `reuse` after a provenance review. |
 
 Content of the file: `set_name` "openste - v1.01", 1951 word records (909
 `approved`, 1042 `unapproved`), each with a `spacypos` part of speech, and
 1589 alternative-word records.
 
-This is the strongest vocabulary lead, but two facts stop its use in v1:
+This is the best source of words of the 5 projects, but two facts stop its
+use in v1:
 
 - The repository gives no statement about the source of the word list. The
   README and the `vocabulary/README.md` describe the idea of a controlled
   vocabulary, but they do not say who made the list or from what.
 - The `CHANGELOG.md` puts the "Controlled vocabulary list" in its
-  **Planned** section, but `vocabulary/openste.json` already holds 1951
-  records with an approved/unapproved status. The structure is very near to
-  the structure of the specification dictionary.
+  "Planned" section, but `vocabulary/openste.json` already holds 1951
+  records with an approved or unapproved status. The structure is almost the
+  same as the structure of the specification dictionary.
 
 The MIT license is a statement by the openste project. It is not proof of
 the provenance of the data. Because v1 does not need a full dictionary
 rule, the safe decision is to wait.
 
-**Condition for a later `reuse`:** the openste project states the source of
-its word list. As an alternative, the user imports the list with a command.
+A later `reuse` needs one of two conditions. The openste project states the
+source of its word list, or the user imports the list with a command.
 In both cases, write `THIRD_PARTY_NOTICES.md` first.
 
 ### TechScribe term checker (design page)
@@ -142,7 +143,7 @@ In both cases, write `THIRD_PARTY_NOTICES.md` first.
 |---|---|
 | Source | <https://www.simplified-english.co.uk/design.html> |
 | License | commercial and proprietary |
-| Result | **borrow design only** |
+| Result | `borrow design only` |
 
 Kept as an idea only: a technical noun and a technical verb need different
 project configuration. `docs/glossary.yml` has the two lists `allow.nouns`
@@ -159,11 +160,11 @@ What entered this repository from that work:
 
 - **Rule numbers and the subject of each rule.** A rule number is a fact
   about the specification. It is not the text of the specification.
-- **Numeric limits**, such as the 20-word and 25-word sentence limits, and
-  the count rules of section 8.
-- **Statements in our own words** about what each rule requires.
+- Numeric limits, such as the 20-word and 25-word sentence limits, and the
+  count rules of section 8.
+- Statements in our own words about what each rule requires.
 
-What did **not** enter this repository:
+What did not enter this repository:
 
 - The text of the specification, its tables, and its example sentences.
 - **The dictionary of part 2.** Part 2 gives about 2000 words in a
@@ -171,7 +172,7 @@ What did **not** enter this repository:
   the specification, and it stays out of this repository.
 
 The local copy and its Markdown conversion are in `.standard/`, which
-`.gitignore` excludes. This repository is public, and git must never see
+`.gitignore` excludes. This repository is public, and git must never track
 that directory.
 
 ### The terms of ASD, in detail
@@ -181,7 +182,7 @@ repository can hold:
 
 <!-- ste-disable STE-3.6 -->
 
-1. **The bar.** "no reproduction or publication of it, in whole or in part,
+1. **The ban.** "no reproduction or publication of it, in whole or in part,
    shall be made without the written authority of an officer" of ASD.
 2. **Distribution.** ASD gives the specification free of charge to each
    writer and user through asd-ste100.org. But: "Unauthorized distribution
@@ -193,9 +194,9 @@ repository can hold:
 3. **Special usage rights.** ASD gives irrevocable permission to 8 groups.
    They can use, reproduce, or publish the document, in whole or in part,
    free of charge. The groups include the member companies of ASD, AIA,
-   AIAC, and ICCAIA. They also include the **customers** of those
-   companies, and **universities and research institutes for educational
-   purposes**. The owner of this repository is not in one of those groups.
+   AIAC, and ICCAIA. They also include the customers of those companies,
+   and universities and research institutes for educational purposes. The
+   owner of this repository is not in one of those groups.
 
 Statement 2 is the reason that this repository holds no dictionary. Two
 paths can change that: written permission from the STEMG, or an owner who

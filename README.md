@@ -133,7 +133,7 @@ The score is the number of findings for each 100 words.
 | `flavored` | Confidence of 0.60 or more | as given by the rule |
 | `strict` | all | one step stronger |
 
-The mode does **not** change the sentence limit. ASD-STE100 selects the
+The mode does not change the sentence limit. ASD-STE100 selects the
 limit from the type of the sentence. An instruction in a procedure gets 20
 words (rule 5.1). A note and descriptive text get 25 words (rules 5.5 and
 6.3). The tool reads the structure of the Markdown: a numbered list item is
@@ -141,8 +141,8 @@ an instruction. `--max-words` replaces both limits.
 
 ## How to adopt it
 
-A checker that reports 1000 findings on its first day is a checker that a
-team removes. This tool is an aid, and not a gate:
+On a repository that has documentation, the first run can give 1000
+findings. Thus the tool does not block a team by default:
 
 - It exits with code 0 even when it finds something. It blocks only when you
   ask for a gate with `--fail-on-new`, `--warnings-as-errors`, or
@@ -150,8 +150,8 @@ team removes. This tool is an aid, and not a gate:
 - A baseline accepts the findings that exist today. Only a new finding
   reaches you after that.
 - Each rule has its own severity. You can accept the rules one at a time.
-- A wrong finding has three escape hatches: a comment in the text, a rule in
-  the config, or a path in `exclude`.
+- To remove a wrong finding, write a comment in the text, set the rule to
+  `off` in the config, or add the path to `exclude`.
 
 The sequence for a repository that has documentation already:
 
@@ -205,7 +205,7 @@ standard does not approve, each with its approved alternative. Rule 1.1 needs th
 
 **This tool does not ship the dictionary.** The specification is the
 property of ASD, and its terms permit no reproduction or publication without
-written authority. But ASD gives the specification **free of charge** to
+written authority. But ASD gives the specification free of charge to
 each writer and user at [asd-ste100.org](https://www.asd-ste100.org). You
 make the index from your own copy:
 
@@ -248,10 +248,10 @@ specification:
 ASD-STE100 approves about 900 words, for the maintenance of an aircraft. Ordinary software documentation uses many words that this
 dictionary does not approve: "state", "file", "build", "should". On a
 repository of 180 files, the rules of part 1 gave 1037 findings, and the
-same repository with the dictionary gave **9490**.
+same repository with the dictionary gave 9490.
 
-The dictionary is correct. It is also too much for a README. Use it for a
-procedure, and use the baseline and `min_confidence` for the rest.
+Use the dictionary for a procedure. For a README, it gives too many
+findings. Use the baseline and `min_confidence` for the other documents.
 
 ### The technical nouns of your field
 
@@ -274,12 +274,12 @@ findings, and the dictionary with this preset gave 6709.
 
 The dictionary gives a part of speech for each word, and this tool has no
 part-of-speech tagger. "graph" is an example: the dictionary does not
-approve the **verb** "graph", but "a graph" is a correct technical noun.
+approve the verb "graph", but "a graph" is a correct technical noun.
 
 The tool uses the shape of the sentence in place of a tagger: a determiner
 in the same noun phrase makes the word a noun. Thus "The dependency graph
 is large" gives no finding, and "Graph the test results" gives one. A modal
-A modal verb ends the phrase, and "The tool can graph the results" gives a
+verb ends the phrase, and "The tool can graph the results" gives a
 finding.
 
 The test is not perfect. A word that the dictionary has only as a verb gets
@@ -460,8 +460,7 @@ command stays one binary with no runtime.
 
 ## For an agent
 
-An agent is a first-class reader of this tool. `ste schema` prints the full
-interface as JSON. It gives each command and each flag, with the permitted
+`ste schema` prints the full interface as JSON, for an agent. It gives each command and each flag, with the permitted
 values. It also gives each config key, each rule with its number in the
 standard, the fields of a finding, and the exit codes.
 
@@ -540,7 +539,7 @@ not as a defect.
 
 - The tool has no part-of-speech tagger. It uses word lists and short word
   sequences.
-- The tool does **not** ship the ASD-STE100 approved-word dictionary. Its
+- The tool does not ship the ASD-STE100 approved-word dictionary. Its
   own list holds 27 words and 11 word groups. `ste dict import` makes an
   index from your copy
   of the specification, and `--use-dict` then gives rule 1.1 the full list.

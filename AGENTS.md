@@ -14,13 +14,13 @@ The result is JSON of about 14 kB. It gives each command and each flag, with
 its type and its permitted values. It also gives each config key, each rule
 with its number in the standard, the fields of a finding, and the exit
 codes. **Read a rule identifier from that document, and not from the text
-of a message.** A
-message is for a person and it can change. An identifier does not change.
+of a message.** A message is for a person and it can change. An identifier
+does not change.
 
 ## Control the size before you run
 
 The output of a large repository is large. One repository of 180 files gave
-**3.7 MB of JSON**. That is more than a context window, and most of it is
+3.7 MB of JSON. That is more than a context window, and most of it is
 not necessary for a decision.
 
 | Invocation | Bytes |
@@ -45,7 +45,7 @@ removed a finding. Do not report `shown` as the total.
 
 | Code | Condition |
 |---|---|
-| 0 | The tool ran. **Findings alone do not change this code.** |
+| 0 | The tool ran. Findings alone do not change this code. |
 | 1 | A gate failed: `--fail-on-new`, `--warnings-as-errors`, or `--fail-over`. |
 | 2 | A flag, a file, or the config has an error. The message names the problem. |
 
@@ -98,7 +98,7 @@ longer has. Run `ste baseline` to record the lower number.
 }
 ```
 
-The findings are **one flat list**, and each finding names its file. There
+The findings are one flat list, and each finding names its file. There
 is no second list for each file. `files` names only the files of the
 findings in the output.
 
@@ -131,7 +131,7 @@ always has the `info` severity, and no flag makes it an error.
 
 ## The dictionary is off, and this is deliberate
 
-`ste dict import` needs a copy of ASD-STE100 that **the user** supplies. The
+`ste dict import` needs a copy of ASD-STE100 that the user supplies. The
 tool does not ship the dictionary, and an agent must not try to find one on
 the internet or write one from memory. The terms of ASD do not permit
 redistribution.
@@ -148,5 +148,5 @@ ste baseline .                       # accept it
 ste lint --fail-on-new --format json --limit 20 .
 ```
 
-The baseline holds the findings of today. After it, only a new finding comes
-to the report, and the work of the user does not stop.
+The baseline holds the findings of today. After it, the report gives only a
+new finding. Thus a finding that exists today does not block the user.

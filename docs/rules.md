@@ -1,15 +1,15 @@
 ---
 title: Rules
-description: The 19 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
+description: The 20 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
 ---
 
 # Rules
 
 [Back to the start page](index.md)
 
-This tool has 19 checks. 4 of them need the analyzer of the grammar, and
-they give no finding without it. ASD-STE100 Issue 9 has 53 rules and a dictionary of
-approved words. The tool does not ship the dictionary. `ste dict import`
+This tool has 20 checks. 2 of them need the analyzer of the grammar, and
+they give no finding without it. ASD-STE100 Issue 9 has 53 rules and a
+dictionary of approved words. The tool does not ship the dictionary. `ste dict import`
 makes an index from your own copy of the specification, and `--use-dict`
 then gives rule 1.1 the full word list.
 
@@ -45,7 +45,7 @@ severity, and strict mode does not make it an error.
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
-of a rule one step stronger. The mode does **not** change a word limit.
+of a rule one step stronger. The mode does not change a word limit.
 
 <!-- ste-disable -->
 
@@ -61,9 +61,9 @@ report each word that the dictionary does not approve, with the approved
 alternatives of the entry. See [upstream-audit.md](upstream-audit.md) for
 the reason that the tool cannot ship the data.
 
-**Limits.** Rule 1.1 also has parts that need more than the word list: the
-approved part of speech (rule 1.2) and the approved meaning (rule 1.3). This
-tool checks neither. With `--use-dict`, the rule uses a determiner to see
+**Limits.** Rule 1.1 also has parts that need more than the word list. They
+are the approved part of speech (rule 1.2) and the approved meaning (rule
+1.3). This tool checks neither. With `--use-dict`, the rule uses a determiner to see
 that a word is a noun, and it does not use a part-of-speech tagger.
 
 **Control.** `allow.nouns` and `allow.verbs` in the glossary remove a term
@@ -133,22 +133,21 @@ writing, and only when the agent is unknown.
   as an adjective. This tool has no dictionary. It uses a list of 35
   participles that are usually adjectives, such as "configured" and
   "enabled". It does not report them, but it does report them when a "by"
-  agent follows. The "by" test is the test that the standard itself gives.
+  agent follows. The standard gives the same "by" test.
 - The tool does not find a passive sentence with no agent when the
   participle is in that list. This is a known miss.
 - A hyphenated form, such as "MIT-licensed", is an adjective for this tool.
 - When the same words also give an `STE-3.4` finding, and no "by" agent
-  follows, the tool removes the passive finding. One message for one problem
-  is enough.
+  follows, the tool removes the passive finding. Thus one problem gives one
+  message.
 
 ## STE-3.7 A noun for an action
 
 Reports 17 word groups that use a noun for an action, for example "do a
 check of". Rule 3.7 tells you to use an approved verb.
 
-**Limits.** The list is literal and narrow. The tool cannot find a
-nominalization that is not in the list, because it cannot make a verb from a
-noun without a dictionary.
+**Limits.** The tool cannot find a noun for an action that is not in the
+list, because it cannot make a verb from a noun without a dictionary.
 
 ## STE-4.2 Contraction
 
@@ -156,14 +155,14 @@ Reports "n't", "'re", "'ve", "'ll", "'m", "'d", and the known "'s" forms,
 such as "it's".
 
 **Limits.** Rule 4.2 also tells you not to omit a noun, a verb, a subject,
-or an article. The tool checks **only** the contraction part. An omitted
+or an article. The tool checks only the contraction part. An omitted
 word needs a parser. The tool does not report a possessive form, such as
 "the parser's output".
 
 ## STE-5.1 Sentence too long
 
 Reports a sentence that is longer than its limit. The standard selects the
-limit from the type of the sentence, and **not** from the mode:
+limit from the type of the sentence, and not from the mode:
 
 | Sentence | Limit | Rule |
 |---|---|---|
@@ -172,7 +171,7 @@ limit from the type of the sentence, and **not** from the mode:
 | Descriptive text | 25 words | 6.3 |
 
 The tool has no part-of-speech tagger. It uses the structure of the
-Markdown: **a numbered list item is an instruction in a procedure.** A
+Markdown. A numbered list item is an instruction in a procedure. A
 bulleted list is not, because a bulleted list is usually a list of items and
 not a sequence of steps. A line that starts with "NOTE:" is a note, and it
 keeps the longer limit. `max_words` or `--max-words` replaces both limits.
@@ -189,7 +188,7 @@ obeys these:
 | The number of a step (rule 8.6) | 0 |
 
 **A colon in a vertical list (rule 8.4).** In a vertical list, a colon has
-the same effect as a period: it ends the sentence, and the count starts
+the same effect as a period. It ends the sentence, and the count starts
 again. The item "The flag: it starts the pump" is two sentences. A colon
 with no space after it is not a mark of punctuation, and "12:30" stays one
 word. The colon of a label keeps its sentence, thus "**NOTE:** The pump
@@ -241,7 +240,7 @@ name "VS Code" gave 147 wrong findings in one repository.
 **This rule needs the analyzer.** Run `ste lint --analyze`.
 
 Reports a group of more than three nouns that follow each other. Rule 2.1
-gives that limit, because a long noun cluster has more than one meaning:
+gives that limit, because a long noun cluster has more than one meaning.
 "engine fuel pump control unit" does not say which word belongs to which.
 
 **Limits.**
@@ -262,7 +261,7 @@ knows that the sentence is an action and not a description.
 
 A numbered list does not always hold a procedure. A design record uses one
 for its requirements, and those are descriptions. The rule reads a list only
-when more than half of its items are commands, thus a list of steps with one
+when more than half of its items are commands. Thus a list of steps with one
 description gives a finding, and a list of requirements gives none.
 
 **Limits.**
@@ -274,8 +273,8 @@ description gives a finding, and a list of requirements gives none.
   accepts it.
 - The analyzer reads a short step with no context, and it then gives a wrong
   part of speech: "Delete quarantined files" looks like an adjective and a
-  noun. The rule reads the sentence again with "please" at its start, which
-  makes a command with no doubt. This method removed 68 of the 69 findings
+  noun. The rule reads the sentence again with "please" at its start, and
+  "please" makes the sentence a command. This method removed 68 of the 69 findings
   on one repository, and each of those 68 was wrong.
 - A step of two words, such as "Complete preflight", stays ambiguous. The
   rule can report it.
@@ -283,7 +282,7 @@ description gives a finding, and a list of requirements gives none.
 ## STE-4.3 A list with two constructions
 
 Reports an item of a vertical list that does not agree with the other items.
-The test is the first letter: a list that starts some items with a capital
+The test is the first letter. A list that starts some items with a capital
 letter and other items with a small letter mixes two constructions. Rule 4.3
 tells you to keep one construction for each list.
 
@@ -317,14 +316,15 @@ sentence is an instruction when it has one of these 5 words: "must",
 **Limits.**
 
 - The list of 5 words is the whole test. A command with none of them, such
-  as "Disconnect the power", stays hidden.
+  as "Disconnect the power", gives no finding.
 - A warning, a caution, and a danger block can hold an instruction, and the
   rule does not read them. Rule 7.3 reads those.
 
 ## STE-6.6 Paragraph too long
 
 Reports a paragraph of more than 6 sentences. Rule 6.6 gives that limit for
-descriptive text. The confidence is 1.00, because the count is a count.
+descriptive text. The confidence is 1.00, because the rule counts sentences
+and does not guess.
 
 **Limits.** A vertical list is not a paragraph, and the rule does not count
 its items. Two paragraphs of 4 sentences are two paragraphs, and not one
@@ -369,7 +369,7 @@ the light comes on, set the switch to NORMAL" gives none.
 - A condition that follows an infinitive belongs to the infinitive, and the
   rule does not report it. "Use the flag to stop when you have enough" does
   not become "When you have enough, use the flag". The test is the word
-  before the condition: a word in small letters after "to" is a verb, and a
+  before the condition. A word in small letters after "to" is a verb, and a
   word in capital letters is a value.
 - "Check if the valve is open" gives no finding. A verb such as "check" or
   "verify" takes the clause as its object, and not as a condition.
@@ -387,8 +387,8 @@ the light comes on, set the switch to NORMAL" gives none.
 
 Reports a note, a tip, an info, an attention, or an important block that
 tells of a risk. Rule 7.1 tells you to use a word that gives the level of
-the risk: "warning" for a risk of injury or death, and "caution" for a risk
-of damage. The words of a risk are "injury", "death", "damage", "hazard",
+the risk. Use "warning" for a risk of injury or death, and "caution" for a
+risk of damage. The words of a risk are "injury", "death", "damage", "hazard",
 "destroy", "corrupt", "data loss", and some forms of them.
 
 ```markdown
@@ -410,7 +410,7 @@ do not obey. The rule reports a block of one sentence that has 12 words or
 less. A second sentence, or a longer first one, is the explanation.
 
 **Limits.** The rule counts sentences and words. It cannot read the sentence
-to see that it truly gives a risk, and a long instruction with no reason
+to see if it gives a risk, and a long instruction with no reason
 gives no finding. A note and a tip are not safety instructions, and the rule
 ignores them.
 
@@ -468,9 +468,9 @@ The [start page](index.md) gives the full config and the other directives.
 
 ## Rules that this tool does not check
 
-An audit of Issue 9 found these rules to be not mechanically checkable
-without a part-of-speech tagger, a parser, or the dictionary. The tool does
-not try to check them, because a guess would only make noise:
+An audit of Issue 9 found no mechanical check for these rules without a
+part-of-speech tagger, a parser, or the dictionary. The tool does not try
+to check them, because a guess gives wrong findings.
 
 | Rule | Subject | Why not |
 |---|---|---|
