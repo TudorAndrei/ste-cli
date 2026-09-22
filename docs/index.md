@@ -203,7 +203,7 @@ make the index from your own copy:
 
 ```bash
 # 1. Get your own copy from asd-ste100.org, then make the text:
-npx -y @firecrawl/anydoc ASD-STE100_ISSUE9.pdf -o ste100.md
+npx -y @firecrawl/anydoc@0.2.4 ASD-STE100_ISSUE9.pdf -o ste100.md
 
 # 2. Make the index. It goes in your cache directory, not in the project.
 ste dict import ste100.md
@@ -211,6 +211,10 @@ ste dict import ste100.md
 # 3. Rule STE-1.1 uses it only when you ask:
 ste lint --use-dict docs/
 ```
+
+The command pins anydoc 0.2.4. That version reads the PDF on your computer,
+two runs give the same bytes, and `ste dict import` reads its output. A
+different version can divide the text in a different way.
 
 `dictionary: true` in the config does the same as `--use-dict`. `ste dict
 info` shows the index, and `ste dict remove` deletes it.

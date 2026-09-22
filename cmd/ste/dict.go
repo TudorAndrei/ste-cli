@@ -13,7 +13,12 @@ import (
 	"github.com/TudorAndrei/ste-cli/internal/dict"
 )
 
-const dictUsage = `ste dict makes a local index of the ASD-STE100 dictionary.
+// anydoc is the converter of the PDF, with the version that makes the text
+// that the importer expects. A different version can divide the text in a
+// different way, thus the command pins it.
+const anydoc = "npx -y @firecrawl/anydoc@0.2.4"
+
+var dictUsage = `ste dict makes a local index of the ASD-STE100 dictionary.
 
 This tool does not ship the dictionary. The specification is the property of
 ASD, and its terms do not permit redistribution. ASD gives the specification
@@ -32,7 +37,7 @@ Usage:
 The file must be the specification in Markdown or in plain text. To make
 that file from the PDF:
 
-  npx -y @firecrawl/anydoc ASD-STE100_ISSUE9.pdf -o ste100.md
+  ` + anydoc + ` ASD-STE100_ISSUE9.pdf -o ste100.md
   ste dict import ste100.md
 
 The index goes in the data directory of the user:
@@ -113,7 +118,7 @@ func runDict(args []string, stdout, stderr io.Writer) int {
 func dictImport(source, path, format string, dryRun bool, stdout, stderr io.Writer) int {
 	if strings.EqualFold(filepath.Ext(source), ".pdf") {
 		fmt.Fprintf(stderr, "ste: %s is a PDF. This tool reads text, thus make the Markdown first:\n", source)
-		fmt.Fprintf(stderr, "  npx -y @firecrawl/anydoc %s -o ste100.md\n", source)
+		fmt.Fprintf(stderr, "  %s %s -o ste100.md\n", anydoc, source)
 		fmt.Fprintf(stderr, "  ste dict import ste100.md\n")
 		return exitError
 	}
