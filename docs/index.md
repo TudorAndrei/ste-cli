@@ -414,10 +414,10 @@ against `checksums.txt`, and runs `ste lint` with the `github` format:
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: TudorAndrei/ste-cli@v0.10.0
+- uses: TudorAndrei/ste-cli@main
   with:
+    version: latest               # the release of ste to install
     args: --fail-on-new docs/     # the default is --fail-on-new .
-    version: latest               # or one version, such as 0.10.0
 ```
 
 For GitHub code scanning, write SARIF and send it with the
@@ -439,7 +439,7 @@ hook builds the command with Go, and it gives `--fail-on-new`:
 ```yaml
 repos:
   - repo: https://github.com/TudorAndrei/ste-cli
-    rev: v0.10.0
+    rev: main                     # "pre-commit autoupdate" gives the newest tag
     hooks:
       - id: ste
 ```

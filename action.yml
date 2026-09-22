@@ -8,15 +8,16 @@ branding:
 # Usage:
 #
 #   - uses: actions/checkout@v7
-#   - uses: TudorAndrei/ste-cli@v0.10.0
+#   - uses: TudorAndrei/ste-cli@main
 #     with:
+#       version: latest
 #       args: --fail-on-new .
 #
 # The default format gives each finding on the line of the pull request.
 
 inputs:
   version:
-    description: The version of ste to install, such as 0.10.0, or "latest".
+    description: The version of ste to install, "latest" or one version of a release.
     default: latest
   args:
     description: The flags and the paths of "ste lint".
