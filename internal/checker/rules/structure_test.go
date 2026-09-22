@@ -86,6 +86,40 @@ func TestSafetyExplanation(t *testing.T) {
 	}
 }
 
+func TestSafetyWord(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{"a note that tells of damage", "**NOTE:** A high voltage can damage the unit.\n", "damage"},
+		{"an alert of GitHub", "> [!IMPORTANT]\n> This step can cause data loss.\n", "data"},
+		{"a tip that tells of an injury", "Tip: The blade can cause an injury.\n", "injury"},
+		{"one finding for each block", "**NOTE:** It can damage the unit. It can destroy the fuse.\n", "damage"},
+		{"a note with no risk", "**NOTE:** The capacitor keeps a charge.\n", ""},
+		{"a caution gives the level", "**CAUTION:** A high voltage can damage the unit.\n", ""},
+		{"a warning gives the level", "WARNING: The blade can cause an injury.\n", ""},
+		{"text outside a label", "A high voltage can damage the unit.\n", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := findingsOf(t, tc.src, "STE-7.1")
+			if tc.want == "" {
+				if len(got) != 0 {
+					t.Fatalf("got %d findings, want 0: %+v", len(got), got)
+				}
+				return
+			}
+			if len(got) != 1 {
+				t.Fatalf("got %d findings, want 1: %+v", len(got), got)
+			}
+			if span := tc.src[got[0].Start:got[0].End]; span != tc.want {
+				t.Errorf("span %q, want %q", span, tc.want)
+			}
+		})
+	}
+}
+
 func TestVerticalList(t *testing.T) {
 	cases := []struct {
 		name string

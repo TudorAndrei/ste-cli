@@ -146,6 +146,7 @@ func ruleCatalog() []ruleDoc {
 		{rules.RuleNoteInstruction, "An instruction in a note", "5.5", "warning", []float64{0.8}, ""},
 		{rules.RuleParagraphLength, "Paragraph too long", "6.6", "warning", []float64{1.0}, "6 sentences maximum."},
 		{rules.RuleSafetyExplanation, "A safety instruction with no explanation", "7.3", "warning", []float64{0.7}, "The rule reads a warning, a caution, and a danger block."},
+		{rules.RuleSafetyWord, "A safety instruction with no word for the level of the risk", "7.1", "warning", []float64{0.7}, "The rule reads a note, a tip, an info, an attention, and an important block. It reports one that tells of an injury, of damage, or of a loss of data."},
 		{rules.RuleConditionOrder, "A condition after the command", "5.4", "info", []float64{0.7}, "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it."},
 		{rules.RuleOneName, "Two names for the same item", "1.11", "warning", []float64{0.95}, "The rule reports nothing until the prefer key of the config gives the names. No tool can know that two nouns mean the same item."},
 		{rules.RuleImperative, "An instruction that is not a command", "5.3", "warning", []float64{0.75}, "The rule needs the analyzer. It reads a numbered step, and it steps over a condition clause."},

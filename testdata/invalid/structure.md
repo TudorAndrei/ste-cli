@@ -4,6 +4,11 @@
 
 **WARNING:** Do not touch the surface.
 
+> [!IMPORTANT]
+> A high voltage can damage the unit.
+
+**CAUTION:** A high voltage can damage the unit. The fuse opens.
+
 - Open the valve of the pump
 - Start the pump of the system
 - Close the valve of the tank

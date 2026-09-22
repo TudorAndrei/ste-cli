@@ -152,6 +152,55 @@ func SafetyInstruction(doc Document, opts Options) []Diagnostic {
 	return out
 }
 
+// riskWords tell of a risk of injury or of damage. A block that has one of
+// them is a safety instruction.
+var riskWords = map[string]bool{
+	"injury": true, "injuries": true, "injure": true, "death": true,
+	"fatal": true, "damage": true, "damages": true, "hazard": true,
+	"hazardous": true, "dangerous": true, "destroy": true, "destroys": true,
+	"corrupt": true, "corrupts": true, "corruption": true,
+}
+
+// SafetyWord reports a safety instruction whose label does not give the
+// level of the risk. Rule 7.1 says to use a word such as "warning" or
+// "caution" for this. A note, a tip, or an "important" block that tells
+// of an injury or of damage is a safety instruction with the wrong word.
+//
+// The rule reports each block one time, at the first word of the risk.
+func SafetyWord(doc Document, opts Options) []Diagnostic {
+	out := []Diagnostic{}
+	reported := map[int]bool{}
+	for _, s := range doc.Sentences {
+		if s.Admonition == "" || safetyWords[s.Admonition] || reported[s.Block] {
+			continue
+		}
+		for i, t := range s.Tokens {
+			risk := riskWords[t.Lower]
+			// "data loss" and "lose data" tell of damage to the data.
+			if !risk && i+1 < len(s.Tokens) {
+				next := s.Tokens[i+1].Lower
+				risk = (t.Lower == "data" && next == "loss") ||
+					((t.Lower == "lose" || t.Lower == "loses") && next == "data")
+			}
+			if !risk {
+				continue
+			}
+			reported[s.Block] = true
+			out = append(out, Diagnostic{
+				RuleID:     RuleSafetyWord,
+				Message:    "The " + s.Admonition + " tells of a risk (\"" + t.Text + "\"), but its label does not give the level of the risk.",
+				Severity:   SeverityWarning,
+				Confidence: 0.7,
+				Start:      t.Start,
+				End:        t.End,
+				Suggestion: "Use \"warning\" for a risk of injury or death, and \"caution\" for a risk of damage.",
+			})
+			break
+		}
+	}
+	return out
+}
+
 func words(group []Sentence) int {
 	n := 0
 	for _, s := range group {

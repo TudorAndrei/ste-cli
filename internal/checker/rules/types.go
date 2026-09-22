@@ -337,6 +337,7 @@ func All() []Rule {
 		ParagraphLength,
 		NoteInstruction,
 		SafetyInstruction,
+		SafetyWord,
 		VerticalList,
 		ConditionOrder,
 		OneName,
