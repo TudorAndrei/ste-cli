@@ -2,8 +2,8 @@ title: ste
 tagline: Simplified Technical English for your docs
 description: >-
   A deterministic ASD-STE100 checker for Markdown and plain text. It reports
-  the passive voice, long sentences, phrasal verbs, and 8 more rules, with the
-  exact span of each one. Start with a baseline, and block only a new
+  the passive voice, long sentences, phrasal verbs, and 17 more checks, with
+  the exact span of each one. Start with a baseline, and block only a new
   violation.
 theme: jekyll-theme-primer
 url: https://tudorandrei.github.io

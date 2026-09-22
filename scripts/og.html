@@ -1,0 +1,30 @@
+<!doctype html>
+<!--
+  The share card of the site, docs/assets/og.png, at 1200x630. Change the
+  count in the last line when the number of checks changes, then write the
+  image again:
+
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+    --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 \
+    --screenshot="$PWD/docs/assets/og.png" "file://$PWD/scripts/og.html"
+-->
+<html><head><meta charset="utf-8"><title>ste card</title>
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; background: #0d1117; overflow: hidden; }
+  body { border-top: 10px solid #f0883e; box-sizing: border-box; padding: 0 80px;
+         font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  h1 { margin: 100px 0 0; font-size: 132px; font-weight: 400; color: #e6edf3; line-height: 1; letter-spacing: -2px; }
+  .tag { margin-top: 24px; font-size: 40px; color: #8b949e; }
+  hr { border: 0; border-top: 2px solid #21262d; margin: 34px 0 30px; }
+  pre { margin: 0; font: 26px/40px Menlo, "SF Mono", monospace; color: #8b949e; }
+  .foot { margin-top: 36px; font-size: 30px; color: #58a6ff; }
+  .foot span { margin: 0 12px; }
+</style></head>
+<body>
+  <h1>ste</h1>
+  <div class="tag">Simplified Technical English for your docs</div>
+  <hr>
+  <pre>guide.md:12:31: warning [STE-3.6] "was approved" is passive.
+guide.md:14:8:  warning [STE-9.3] "carry out" is phrasal.</pre>
+  <div class="foot">ASD-STE100 Issue 9<span>·</span>20 checks<span>·</span>baseline adoption<span>·</span>one Go binary</div>
+</body></html>
