@@ -12,6 +12,9 @@ import (
 // place of the documentation, thus it never has to guess a rule identifier,
 // a config key, a field name, or an exit code.
 func runSchema(args []string, stdout, stderr io.Writer) int {
+	if !noArgs(stderr, "schema", args) {
+		return exitError
+	}
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(schema()); err != nil {

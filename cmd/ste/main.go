@@ -110,6 +110,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "schema":
 		return runSchema(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
+		if !noArgs(stderr, "version", args[1:]) {
+			return exitError
+		}
 		fmt.Fprintf(stdout, "ste %s\n", Version)
 		return exitOK
 	case "help", "--help", "-h":
@@ -170,8 +173,18 @@ func runLint(args []string, stdin io.Reader, stdout, stderr io.Writer, write boo
 		return exitError
 	}
 
+	if *dryRun && !write {
+		fmt.Fprintf(stderr, "ste: --dry-run applies only to the baseline command. The lint command writes no file.\n")
+		return exitError
+	}
 	paths := fs.Args()
 	if len(paths) == 0 {
+		// A person who types "ste lint" with no path does not want the
+		// command to wait for input. A pipe is different.
+		if isTerminal(stdin) {
+			fmt.Fprintf(stderr, "ste: give a file or a directory. Give \"-\" to read standard input.\n")
+			return exitError
+		}
 		paths = []string{"-"}
 	}
 
@@ -376,6 +389,39 @@ func writePlan(stdout io.Writer, format report.Format, data map[string]any, text
 
 // stdinName is the file name of the text of standard input.
 const stdinName = "(standard input)"
+
+// validFormat tells if the format is one of the permitted values. It writes
+// the message for a wrong value, thus a spelling mistake never gives a
+// silent change to the text format.
+func validFormat(stderr io.Writer, format string, permitted ...string) bool {
+	for _, p := range permitted {
+		if format == p {
+			return true
+		}
+	}
+	fmt.Fprintf(stderr, "ste: the format %q is not one of: %s\n", format, strings.Join(permitted, ", "))
+	return false
+}
+
+// noArgs tells if a command that takes no argument got none. It writes the
+// message for an argument.
+func noArgs(stderr io.Writer, command string, args []string) bool {
+	if len(args) == 0 {
+		return true
+	}
+	fmt.Fprintf(stderr, "ste: the %s command takes no argument, and it got %q\n", command, args[0])
+	return false
+}
+
+// isTerminal tells if the reader is a terminal, and not a pipe or a file.
+func isTerminal(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
 
 // displayPath gives a path relative to the current directory when that is
 // shorter, for a message to a person.
@@ -636,6 +682,13 @@ func runEval(args []string, stdout, stderr io.Writer) int {
 		"exit with code 1 when the precision or the recall is below this value")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
+		return exitError
+	}
+	if !validFormat(stderr, *format, "text", "json") {
+		return exitError
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintf(stderr, "ste: the eval command takes one directory, and it got %d\n", fs.NArg())
 		return exitError
 	}
 	dir := "testdata"

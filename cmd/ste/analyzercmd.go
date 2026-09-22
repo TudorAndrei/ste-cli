@@ -21,6 +21,9 @@ func runAnalyzer(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
+	if !validFormat(stderr, *format, "text", "json") || !noArgs(stderr, "analyzer", fs.Args()) {
+		return exitError
+	}
 
 	s := analyzer.Check()
 	if *format == "json" {

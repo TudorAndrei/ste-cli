@@ -332,13 +332,43 @@ func TestBadFlagsGiveExitCode2(t *testing.T) {
 		{"lint", "--format", "xml", "idea.md"},
 		{"lint", "--mode", "pedantic", "idea.md"},
 		{"lint", "--no-config", "does-not-exist.md"},
+		{"lint", "--dry-run", "idea.md"},
+		{"eval", "--format", "xml", "testdata"},
+		{"eval", "a", "b"},
+		{"analyzer", "--format", "xml"},
+		{"analyzer", "extra"},
+		{"dict", "--format", "xml", "path"},
+		{"dict", "path", "extra"},
+		{"schema", "--bogus"},
+		{"version", "extra"},
 		{"nonsense"},
 		{},
 	}
 	for _, args := range cases {
-		if code, _, _ := runCLI(t, "", args...); code != 2 {
+		code, _, stderr := runCLI(t, "", args...)
+		if code != 2 {
 			t.Errorf("args %v: exit %d, want 2", args, code)
 		}
+		if len(args) > 0 && stderr == "" {
+			t.Errorf("args %v: no message", args)
+		}
+	}
+}
+
+func TestLintWithNoPathInATerminalIsAnError(t *testing.T) {
+	// The null device is a character device, as a terminal is, and each
+	// system has one.
+	tty, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tty.Close()
+	var out, errOut bytes.Buffer
+	if code := run([]string{"lint", "--no-config"}, tty, &out, &errOut); code != 2 {
+		t.Fatalf("exit %d, want 2", code)
+	}
+	if !strings.Contains(errOut.String(), "\"-\"") {
+		t.Errorf("the message does not name \"-\": %q", errOut.String())
 	}
 }
 

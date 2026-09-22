@@ -58,6 +58,14 @@ func runDict(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "ste: %v\n", err)
 		return exitError
 	}
+	if !validFormat(stderr, *format, "text", "json") {
+		return exitError
+	}
+	// "import" takes one file, and each other command takes nothing.
+	if want := map[string]int{"import": 2, "info": 1, "path": 1, "remove": 1}[fs.Arg(0)]; want > 0 && fs.NArg() > want {
+		fmt.Fprintf(stderr, "ste: \"ste dict %s\" got an extra argument %q\n", fs.Arg(0), fs.Arg(want))
+		return exitError
+	}
 	path := *out
 	if path == "" {
 		path = dict.DefaultPath()
