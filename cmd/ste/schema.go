@@ -76,9 +76,36 @@ func schema() map[string]any {
 			"--all":                map[string]any{"type": "boolean", "note": "read every file, including the files that git ignores"},
 			"--dry-run":            map[string]any{"type": "boolean", "note": "for the baseline command: show the plan and write nothing"},
 			"--preset":             map[string]any{"type": "string", "values": []string{"software"}, "note": "add the technical nouns of a subject field"},
-			"--analyze":            map[string]any{"type": "boolean", "note": "use the analyzer of the grammar; it makes rule 3.6 more exact. Run \"ste analyzer\" to see what it needs."},
+			"--analyze":            map[string]any{"type": "boolean", "note": "use the analyzer of the grammar. Rules 2.1 and 5.3 need it, and it makes rules 3.5 and 3.6 more exact. Run \"ste analyzer\" to see what it needs."},
 			"--analyzer":           map[string]any{"type": "string", "note": "command of a different analyzer"},
 		},
+
+		"command_flags": map[string]any{
+			"baseline": map[string]any{
+				"note":      "the baseline command takes each flag of lint, and --dry-run. The dry run gives the plan: the path, the findings, the files, and the accepted findings that the new file keeps and removes.",
+				"--dry-run": map[string]any{"type": "boolean"},
+			},
+			"init": map[string]any{
+				"--dry-run": map[string]any{"type": "boolean"},
+				"--force":   map[string]any{"type": "boolean", "note": "write the file also when a config exists"},
+				"--format":  map[string]any{"type": "string", "values": []string{"text", "json"}, "default": "text"},
+			},
+			"eval": map[string]any{
+				"--format":     map[string]any{"type": "string", "values": []string{"text", "json"}, "default": "text"},
+				"--fail-under": map[string]any{"type": "number", "note": "exit 1 when the precision or the recall is less"},
+			},
+			"dict": map[string]any{
+				"subcommands": []string{"import <file>", "info", "path", "remove"},
+				"--out":       map[string]any{"type": "path", "note": "the path of the index"},
+				"--dry-run":   map[string]any{"type": "boolean", "note": "for import and remove"},
+				"--format":    map[string]any{"type": "string", "values": []string{"text", "json"}, "default": "text"},
+			},
+			"analyzer": map[string]any{
+				"--format": map[string]any{"type": "string", "values": []string{"text", "json"}, "default": "text"},
+			},
+		},
+
+		"paths": "The project directory is the first directory, from the current directory upward, that holds a config file. The search stops at the top of the git work tree. A path in the config, each exclude pattern, and the default baseline start from the project directory. A key of the baseline is the path from the directory of the baseline file.",
 
 		"config_keys": map[string]any{
 			"mode":               map[string]any{"type": "string", "values": []string{"flavored", "strict"}},

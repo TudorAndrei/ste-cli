@@ -38,7 +38,8 @@ const (
 const usage = `ste finds ASD-STE100 violations in Markdown and plain text.
 
 The tool is an aid, and not a gate. It exits with code 0 even when it finds
-something, until you ask for a gate with --fail-over or --fail-on-new.
+something, until you ask for a gate with --fail-on-new, --warnings-as-errors,
+or --fail-over.
 
 Usage:
   ste lint [flags] [path ...]   Check files, directories, or standard input
@@ -56,12 +57,14 @@ Usage:
 
 Lint flags:
   --mode          "flavored" (default) or "strict"
-  --format        "text" (default), "json", or "ndjson"
+  --format        "text" (default), "json", "ndjson", "sarif", or "github"
   --limit         Maximum number of findings in the output
   --fields        The fields of a finding to give, separated by a comma
   --summary       Give only the summary
   --config        Path of the config file. The default is the first of
-                  .ste.yml, .ste.yaml, glossary.yml, or docs/glossary.yml.
+                  .ste.yml, .ste.yaml, glossary.yml, or docs/glossary.yml,
+                  from the current directory up to the top of the git
+                  work tree.
   --no-config     Do not read a config file
   --baseline      Path of the file of accepted findings
   --no-baseline   Report every finding, and not only the new ones
@@ -79,12 +82,14 @@ Lint flags:
   --analyzer      Command of a different analyzer
   --dict          Path of the dictionary index
   --all           Read every file, and not only the files that git shows
+  --dry-run       For the baseline command: show the plan and write nothing
 
 Examples:
   ste lint README.md
   ste baseline .                          # accept what exists today
   ste lint --fail-on-new docs/            # block only a new violation
   ste lint --mode strict --format json docs/
+  ste lint --format sarif . > ste.sarif   # for code scanning
   cat draft.md | ste lint -
 `
 
