@@ -49,6 +49,7 @@ func schema() map[string]any {
 		"commands": map[string]any{
 			"lint":     "Check files, directories, or standard input.",
 			"baseline": "Accept the findings of today, and report only the new ones after that.",
+			"init":     "Write a start config, .ste.yml, in the current directory. It takes --dry-run, --force, and --format.",
 			"dict":     "Make a local index of the ASD-STE100 dictionary from your own copy.",
 			"eval":     "Measure the rules against a labeled corpus.",
 			"analyzer": "Show the analyzer of the grammar and what it needs.",

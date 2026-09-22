@@ -44,7 +44,8 @@ Usage:
   ste lint [flags] [path ...]   Check files, directories, or standard input
   ste baseline [flags] [path]   Accept the findings of today, and report only
                                 the new ones from now
-  ste analyzer                  Show the analyzer of the grammar and what
+  ste init [--dry-run]          Write a start config, .ste.yml
+  ste analyzer                 Show the analyzer of the grammar and what
                                 it needs
   ste dict <command>            Make a local index of the ASD-STE100
                                 dictionary from your own copy
@@ -101,6 +102,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runLint(args[1:], stdin, stdout, stderr, false)
 	case "baseline":
 		return runLint(args[1:], stdin, stdout, stderr, true)
+	case "init":
+		return runInit(args[1:], stdout, stderr)
 	case "analyzer":
 		return runAnalyzer(args[1:], stdout, stderr)
 	case "dict":
