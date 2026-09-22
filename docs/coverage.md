@@ -13,9 +13,9 @@ mechanical answer.
 
 | Group | Rules | Who checks it |
 |---|---|---|
-| **Built** | 20 | `ste lint` |
-| **Possible with no new library** | 2 | `ste lint`, later |
-| **Built, and they need the analyzer** | 4 of those 20 | `ste lint --analyze` |
+| **Built** | 21 | `ste lint` |
+| **Possible with no new library** | 1 | `ste lint`, later |
+| **Built, and they need the analyzer** | 4 of those 21 | `ste lint --analyze` |
 | **Possible with a part-of-speech tagger** | 8 | an optional analyzer, later |
 | **A judgment of a reader** | 13 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill) |
 | **Partial only** | 9 | both |
@@ -39,6 +39,7 @@ mechanical answer.
 | 5.4 | A condition after the command |
 | 5.5 | An instruction in a note |
 | 6.6 | 6 sentences in a paragraph |
+| 7.1 | A word for the level of the risk. The rule reads a labeled block that tells of a risk. |
 | 7.3 | A safety instruction with no explanation |
 | 8.1 | The semicolon |
 | 8.4 | A colon ends a sentence in a vertical list |
@@ -47,13 +48,12 @@ mechanical answer.
 
 ## Possible with no new library
 
-Each of these needs the structure of the Markdown, which the parser gives
+This rule needs the structure of the Markdown, which the parser gives
 already.
 
 | Rule | Subject | What it needs |
 |---|---|---|
 | 1.9 | A short technical noun | A limit for the length, which the standard does not give |
-| 7.1 | The word that identifies a risk | A test that a block is a safety instruction |
 
 ## Possible with a part-of-speech tagger
 

@@ -39,13 +39,14 @@ give. A file with no expectation file must give no findings.
 | `STE-5.4` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-5.5` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-6.6` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-7.1` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-7.3` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-8.1` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-9.3` | 4 | 0 | 0 | 1.00 | 1.00 |
 | `STE-GR-6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| **all** | **29** | **0** | **0** | **1.00** | **1.00** |
+| **all** | **30** | **0** | **0** | **1.00** | **1.00** |
 
-10 fixture files, 4 valid and 6 invalid. Each of the 15 rules that need no
+10 fixture files, 4 valid and 6 invalid. Each of the 16 rules that need no
 analyzer has at least one labeled example. The corpus does not measure the 4
 rules that need the analyzer, because the corpus runs with no Python.
 

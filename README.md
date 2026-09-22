@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 4 dependencies. It has 19 checks. The standard has
+It is one Go binary with 4 dependencies. It has 20 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -60,6 +60,7 @@ mise run build      # writes bin/ste
 
 ```bash
 ste lint README.md
+ste init                          # write a start config, .ste.yml
 ste dict import ste100.md         # your own copy of the standard
 ste baseline .                    # accept the findings of today
 ste lint --fail-on-new docs/      # block only a new violation
@@ -70,6 +71,8 @@ ste eval testdata
 
 A path can be a file or a directory. A directory gives all `.md`,
 `.markdown`, and `.txt` files below it. A path of `-` reads standard input.
+With no path, the command reads standard input from a pipe. In a terminal,
+it asks for a path.
 
 A walk of a directory does not give:
 
@@ -82,15 +85,19 @@ A walk of a directory does not give:
   `RELEASE-NOTES`, with any of the 3 extensions. A writer cannot correct
   text that the next release writes again.
 
-The tool always reads a file or a directory that you give by its path.
-`--all` removes both filters.
+The tool always reads a file or a directory that you give by its path. Only
+`exclude` of the config applies to such a file, because a git hook gives
+each changed file by its path. `--all` removes the other filters.
 
 ### Flags of the lint command
 
 | Flag | Function |
 |---|---|
 | `--mode` | `flavored` (default) or `strict` |
-| `--format` | `text` (default) or `json` |
+| `--format` | `text` (default), `json`, `ndjson`, `sarif`, or `github` |
+| `--limit` | Maximum number of findings in the output |
+| `--fields` | The fields of a finding to give, separated by a comma |
+| `--summary` | Give only the summary |
 | `--fail-over` | Exit with code 1 when the score is more than this value |
 | `--max-words` | Replace the sentence limit of both sentence types |
 | `--config` | Path of the glossary file |
@@ -105,13 +112,16 @@ The tool always reads a file or a directory that you give by its path.
 | `--analyzer` | Command of a different analyzer |
 | `--dict` | Path of the dictionary index |
 | `--all` | Read every file, and not only the files that git shows |
+| `--dry-run` | For the baseline command: show the plan and write nothing |
+
+A flag that a command does not use is an error.
 
 ### Exit codes
 
 | Code | Condition |
 |---|---|
 | 0 | The tool ran. Findings do not change this code. |
-| 1 | You gave a gate (`--fail-on-new` or `--fail-over`) and the text does not pass it. |
+| 1 | You gave a gate (`--fail-on-new`, `--warnings-as-errors`, or `--fail-over`) and the text does not pass it. |
 | 2 | A flag, a file, or the glossary has an error. |
 
 The score is the number of findings for each 100 words.
@@ -152,7 +162,13 @@ ste lint --fail-on-new .      # from now, only a new violation fails
 ```
 
 The number in the baseline goes down when you correct the text. Write the
-file again with `ste baseline .` to record the new, lower number.
+file again with `ste baseline .` to record the new, lower number. The
+report gives the number of accepted findings that the text no longer has.
+
+A baseline of one directory keeps the accepted findings of the other
+directories, and it removes the accepted findings of a deleted file. The
+file holds each path from its own directory. Thus a run from a
+subdirectory, or a run with an absolute path, finds the same findings.
 
 ### Silence one finding in the text
 
@@ -280,8 +296,15 @@ allow:
 
 ## Config
 
+`ste init` writes a start config, `.ste.yml`. The file changes nothing
+until you edit it.
+
 The tool reads the first of `.ste.yml`, `.ste.yaml`, `glossary.yml`, or
-`docs/glossary.yml`. Every key is optional.
+`docs/glossary.yml`. It looks in the current directory, then in each
+directory above it, and it stops at the top of the git work tree. The
+directory where the search stops is the project directory. A path in the
+config and each `exclude` pattern start from that directory. Every key is
+optional.
 
 ```yaml
 mode: flavored          # or strict
@@ -309,6 +332,9 @@ fail_over: 2.5          # without this key, the tool never blocks
 warnings_as_errors: false
 ```
 
+`disable_rules: [STE-5.1]` removes a list of rules. It does the same as
+`off` in `rules`.
+
 An unknown key is an error. A spelling mistake in the file never stays
 hidden.
 
@@ -327,6 +353,47 @@ The JSON format gives the rule identifier, the message, the severity, the
 confidence, the byte offsets, the line and the column, and the suggestion.
 A CI job can read it.
 
+| Format | Reader |
+|---|---|
+| `text` | A person |
+| `json` | A program. One object for the run, with one flat list of findings. |
+| `ndjson` | A program that reads one finding for each line |
+| `sarif` | GitHub code scanning, and each editor that reads SARIF 2.1.0 |
+| `github` | GitHub Actions. Each finding shows on its line in the pull request. |
+
+`sarif` and `github` give each path from the top of the git work tree, and
+each column counts characters, because a code host counts so.
+
+## Use in CI
+
+This repository is also a GitHub Action. It installs a release, verifies it
+against `checksums.txt`, and runs `ste lint` with the `github` format:
+
+```yaml
+- uses: actions/checkout@v7
+- uses: TudorAndrei/ste-cli@v0.10.0
+  with:
+    args: --fail-on-new docs/     # the default is --fail-on-new .
+```
+
+For GitHub code scanning, write SARIF and send it with the
+`github/codeql-action/upload-sarif` action:
+
+```bash
+ste lint --format sarif . > ste.sarif
+```
+
+The repository also has a hook for [pre-commit](https://pre-commit.com).
+The hook builds the command with Go, and it gives `--fail-on-new`:
+
+```yaml
+repos:
+  - repo: https://github.com/TudorAndrei/ste-cli
+    rev: v0.10.0
+    hooks:
+      - id: ste
+```
+
 ## Rules
 
 See [docs/rules.md](docs/rules.md) for each check, its confidence values,
@@ -335,17 +402,22 @@ and its limits. The numbers are the rule numbers of Issue 9.
 | Rule | Name |
 |---|---|
 | `STE-1.1` | Unapproved word or word group |
+| `STE-1.11` | Two names for the same item |
 | `STE-1.14` | British spelling |
+| `STE-2.1` | A noun of more than three words (needs the analyzer) |
 | `STE-3.4` | Complex verb construction (perfect tense) |
 | `STE-3.5` | Progressive "-ing" form |
 | `STE-3.6` | Passive voice |
 | `STE-3.7` | A noun for an action |
 | `STE-4.2` | Contraction |
 | `STE-4.3` | A list with two constructions |
+| `STE-5.1` | Sentence too long |
+| `STE-5.3` | An instruction that is not a command (needs the analyzer) |
+| `STE-5.4` | A condition after the command |
 | `STE-5.5` | An instruction in a note |
 | `STE-6.6` | Paragraph too long |
+| `STE-7.1` | A safety instruction with no word for the level of the risk |
 | `STE-7.3` | A safety instruction with no explanation |
-| `STE-5.1` | Sentence too long |
 | `STE-8.1` | Semicolon |
 | `STE-9.3` | Phrasal verb |
 | `STE-GR-6` | Latin abbreviation (a general recommendation, not a rule) |
@@ -414,7 +486,9 @@ internal/checker/rules/   the rules and their data
 internal/config/          the glossary reader
 internal/dict/            the reader of the dictionary of the user
 internal/eval/            the measurement of the rules
-internal/report/          the text and JSON output
+internal/report/          the output: text, JSON, NDJSON, SARIF, and GitHub
+internal/baseline/        the file of accepted findings
+internal/analyzer/        the client of the analyzer of the grammar
 testdata/                 the labeled corpus
 docs/                     the rules, the audit, and the measurement
 ```
@@ -426,7 +500,7 @@ mise run check      # gofmt, go vet, go test
 mise run ci         # the same, but no file changes: gofmt only reports
 ```
 
-Result on 2026-09-02: all tests pass. 6 packages, 0 failures.
+Result on 2026-09-22: all tests pass. 9 packages, 0 failures.
 
 ## Release
 
@@ -452,7 +526,7 @@ without that flag says `dev`.
 
 ## What the tool does not check
 
-ASD-STE100 has 53 rules. This tool checks 15 of them today, and about 31 can
+ASD-STE100 has 53 rules. This tool checks 21 of them today, and about 31 can
 have a mechanical answer. The other rules need a reader: "Make sure that each
 paragraph has only one topic" is an example.
 
@@ -472,7 +546,7 @@ not as a defect.
   See [docs/upstream-audit.md](docs/upstream-audit.md) for the reason that
   the tool cannot ship it.
 - Precision and recall are in [docs/evaluation.md](docs/evaluation.md).
-  Recall on new text is low, because the tool has 19 checks and the standard
+  Recall on new text is low, because the tool has 20 checks and the standard
   has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

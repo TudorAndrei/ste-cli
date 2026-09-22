@@ -10,7 +10,7 @@ can read [the start page](https://tudorandrei.github.io/ste-cli/) instead.
 ste schema
 ```
 
-The result is JSON of about 6 kB. It gives each command and each flag, with
+The result is JSON of about 14 kB. It gives each command and each flag, with
 its type and its permitted values. It also gives each config key, each rule
 with its number in the standard, the fields of a finding, and the exit
 codes. **Read a rule identifier from that document, and not from the text
@@ -54,17 +54,33 @@ Do not use exit code 0 as proof that a document has no violation. Read
 
 ## Change a file only with a plan
 
-`ste baseline` and `ste dict import` write a file, and `ste dict remove`
-deletes one. Each takes `--dry-run`, which gives the plan as JSON and
-changes nothing:
+`ste baseline`, `ste init`, and `ste dict import` write a file, and
+`ste dict remove` deletes one. Each takes `--dry-run`, which gives the plan
+as JSON and changes nothing:
 
 ```bash
 ste baseline --dry-run --format json .
 # {"action":"baseline","dry_run":true,"path":".ste-baseline.json",
-#  "findings":974,"files":156,"exists":false}
+#  "findings":974,"files":156,"kept":0,"removed":0,"exists":false}
 ```
 
 Run the plan first when you did not write the command yourself.
+
+A baseline of one directory keeps the accepted findings of the other
+directories. `kept` gives their number, and `removed` gives the number of
+accepted findings of the deleted files.
+
+## Paths start from the project
+
+The tool looks for the config from the current directory upward, and it
+stops at the top of the git work tree. A path in the config, each `exclude`
+pattern, and the default baseline start from that directory. Thus you can
+run the command from a subdirectory, or give an absolute path, and the
+result does not change. `exclude` also applies to a file that you give by
+its path.
+
+`summary.stale` gives the number of accepted findings that the text no
+longer has. Run `ste baseline` to record the lower number.
 
 ## The output shape
 
@@ -88,6 +104,9 @@ findings in the output.
 
 `--format ndjson` gives one object for each line. Each line has a `type` of
 `finding` or `summary`, and the summary line is last.
+
+`--format sarif` and `--format github` are for a code host, and not for an
+agent. Use `json` or `ndjson` to read the findings.
 
 ## Do not correct a finding without care
 

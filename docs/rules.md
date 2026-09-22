@@ -36,6 +36,7 @@ severity, and strict mode does not make it an error.
 | `STE-4.3` | A list with two constructions | 0.80 | info |
 | `STE-5.5` | An instruction in a note | 0.80 | warning |
 | `STE-6.6` | Paragraph too long | 1.00 | warning |
+| `STE-7.1` | A safety instruction with no word for the level of the risk | 0.70 | warning |
 | `STE-7.3` | A safety instruction with no explanation | 0.70 | warning |
 | `STE-5.4` | A condition after the command | 0.70 | info |
 | `STE-1.11` | Two names for the same item | 0.95 | warning |
@@ -382,6 +383,25 @@ the light comes on, set the switch to NORMAL" gives none.
 - The severity is `info`, because the tool has no parser and the test is the
   position of a word.
 
+## STE-7.1 A safety instruction with no word for the level of the risk
+
+Reports a note, a tip, an info, an attention, or an important block that
+tells of a risk. Rule 7.1 tells you to use a word that gives the level of
+the risk: "warning" for a risk of injury or death, and "caution" for a risk
+of damage. The words of a risk are "injury", "death", "damage", "hazard",
+"destroy", "corrupt", "data loss", and some forms of them.
+
+```markdown
+> [!IMPORTANT]
+> This step can cause data loss.
+```
+
+The rule reports each block one time, at the first word of the risk.
+
+**Limits.** The rule reads a word list, and not the meaning. "This does not
+damage the file" gives a finding. A block with no label is not a safety
+instruction for the rule, and the rule does not read it.
+
 ## STE-7.3 A safety instruction with no explanation
 
 Reports a warning, a caution, or a danger block that gives no reason. Rule
@@ -428,8 +448,9 @@ correct text that the next release writes again, and a generated changelog
 gave 11 wrong findings for rule 4.3 on one repository. `--all` reads these
 files, and the tool always reads a path that you give by its name.
 
-The tool always reads a file or a directory that you give by its path. The
-`--all` flag removes both filters.
+The tool always reads a file or a directory that you give by its path. Only
+the `exclude` patterns of the config apply to such a file. The `--all` flag
+removes the other filters.
 
 ## How to silence a finding
 
@@ -456,14 +477,13 @@ not try to check them, because a guess would only make noise:
 | 1.2, 1.3 | Approved part of speech and meaning | Needs the dictionary |
 | 1.5, 1.6, 1.8, 1.12 | Technical noun and verb categories | A judgment about the subject field |
 | 1.9, 1.10 | Short, clear, no slang | A human judgment |
-| 2.1, 2.2 | Multi-word nouns of 3 words maximum | Needs a part of speech to find where the noun starts |
+| 2.2 | The full form of a long technical noun | A human judgment |
 | 3.1 | The verb forms of the dictionary | Needs the dictionary |
 | 4.2 (part) | Omitted words | Needs a parser |
 | 4.5 | Articles and demonstrative adjectives | The exceptions of the standard make a check too noisy |
 | 5.2 | One instruction for each sentence | Cannot separate simultaneous actions |
-| 5.3 | The imperative form | Needs a verb list |
 | 6.1, 6.2, 6.5 | Key words, one topic for each paragraph | Needs semantics |
-| 7.1, 7.2 | The words and the order of a safety instruction | Needs the risk level of the subject field |
+| 7.2 | The order of a safety instruction | Needs a parser to find the command or the condition |
 | 9.1, 9.2, 9.4 | Consistent style | Needs semantics |
 
 ## Limits of the tool
