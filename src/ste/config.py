@@ -3,12 +3,17 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 from ste.models import Options, Preferred
 
@@ -379,8 +384,31 @@ def _gates(cfg: Config, raw: dict[str, Any]) -> None:
         cfg.baseline = raw["baseline"]
 
 
+@cache
+def _rule_ids() -> frozenset[str]:
+    """Read the rule identifiers of the bundled schema once."""
+    schema = json.loads(Path(__file__).with_name("schema.json").read_text(encoding="utf-8"))
+    return frozenset(rule["id"] for rule in schema["rules"])
+
+
+def _known_rules(rule_ids: Iterable[object]) -> None:
+    """Reject a rule identifier that is not a string or not in the schema."""
+    ids: list[str] = []
+    for rule in rule_ids:
+        if not isinstance(rule, str):
+            msg = "a rule identifier must be a string"
+            raise _InvalidConfigError(msg)
+        ids.append(rule)
+    known = _rule_ids()
+    if unknown := [rule for rule in ids if rule not in known]:
+        msg = f"unknown rule: {min(unknown)}"
+        raise _InvalidConfigError(msg)
+
+
 def _rules(cfg: Config, raw: dict[str, Any]) -> None:
+    _known_rules(cfg.disable_rules)
     rules = _mapping(raw.get("rules") or {}, "rules must be a mapping")
+    _known_rules(rules)
     for rule, severity in rules.items():
         if severity not in ("off", "info", "warning", "error"):
             reason = (

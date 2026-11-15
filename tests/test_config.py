@@ -28,12 +28,32 @@ OVERRIDE_WORD_LIMIT = 18
         "allow: {verb: [write]}",
         "dictionary: yesplease",
         "allow: {nouns: parser}",
+        "rules: {1: off}",
     ],
 )
 def test_bad_config_is_an_error(text: str) -> None:
     """Check bad config is an error."""
     with pytest.raises(ValueError, match=r".+"):
         config.parse(text)
+
+
+def test_unknown_rule_in_rules_is_an_error() -> None:
+    """Check that an unknown rule identifier in rules names that identifier."""
+    with pytest.raises(ValueError, match=r"unknown rule: STE-99\.9"):
+        config.parse("rules: {STE-4.2: warning, STE-99.9: off}")
+
+
+def test_unknown_rule_in_disable_rules_is_an_error() -> None:
+    """Check that an unknown rule identifier in disable_rules names that identifier."""
+    with pytest.raises(ValueError, match="unknown rule: nope"):
+        config.parse("disable_rules: [STE-4.2, nope]")
+
+
+def test_known_rule_identifiers_load() -> None:
+    """Check that known rule identifiers load in rules and disable_rules."""
+    cfg = config.parse("rules: {STE-4.2: info}\ndisable_rules: [STE-8.1]\n")
+    assert cfg.rules == {"STE-4.2": "info"}
+    assert cfg.disable_rules == ["STE-8.1"]
 
 
 def test_yaml_features_and_options() -> None:
