@@ -19,9 +19,16 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-python@v7
+    - name: Install uv
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       with:
+        version: "0.13.8"
         python-version: "3.13"
+        enable-cache: false
+
+    - name: Install Python
+      shell: bash
+      run: uv python install 3.13
 
     - name: Install ste
       shell: bash
@@ -35,7 +42,7 @@ runs:
         dir="$(mktemp -d "$RUNNER_TEMP/ste-wheel.XXXXXX")"
         gh release download ${tag[@]+"${tag[@]}"} --repo TudorAndrei/ste-cli \
           --pattern 'ste_cli-*-py3-none-any.whl' --pattern checksums.txt --dir "$dir" --clobber
-        python - "$dir" <<'PY'
+        uv run --no-project --python 3.13 python - "$dir" <<'PY'
         import hashlib
         import subprocess
         import sys
@@ -52,10 +59,10 @@ runs:
         if hashlib.sha256(wheel.read_bytes()).hexdigest() != checksums.get(wheel.name):
             raise SystemExit("The wheel checksum does not agree with checksums.txt")
         environment = directory / "venv"
-        subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True)
+        subprocess.run(["uv", "venv", "--python", sys.executable, str(environment)], check=True)
         scripts = environment / ("Scripts" if sys.platform == "win32" else "bin")
         python = scripts / ("python.exe" if sys.platform == "win32" else "python")
-        subprocess.run([str(python), "-m", "pip", "install", str(wheel)], check=True)
+        subprocess.run(["uv", "pip", "install", "--python", str(python), str(wheel)], check=True)
         import os
         with open(os.environ["GITHUB_PATH"], "a") as stream:
             stream.write(str(scripts) + "\n")
