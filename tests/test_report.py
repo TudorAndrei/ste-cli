@@ -52,6 +52,40 @@ def render(rep: report.Report, **kwargs: Unpack[ReportOptions]) -> str:
     return stream.getvalue()
 
 
+def reference_position(source: str, offset: int, *, byte_column: bool) -> tuple[int, int]:
+    """Compute a line and column from the whole prefix, as the slow original did."""
+    prefix = source[: max(0, min(len(source), offset))]
+    tail = prefix.rsplit("\n", 1)[-1]
+    column_text = tail.encode("utf-8") if byte_column else tail
+    return prefix.count("\n") + 1, len(column_text) + 1
+
+
+def test_positions_match_reference_at_every_offset() -> None:
+    """Check line index positions and byte offsets against a straightforward reference."""
+    source = "Café ☕ isn't.\r\nÉtat 😀; now.\n\nLast 🚀 line"
+    for offset in range(len(source) + 1):
+        for byte_column in (False, True):
+            assert report.position(source, offset, byte_column=byte_column) == reference_position(
+                source, offset, byte_column=byte_column
+            )
+        end = min(len(source), offset + 3)
+        finding = report.make_finding(
+            "a.md", source, Diagnostic("STE-4.2", "A test.", "warning", 1, offset, end)
+        )
+        line, column = reference_position(source, offset, byte_column=True)
+        start_line, start_column = reference_position(source, offset, byte_column=False)
+        end_line, end_column = reference_position(source, end, byte_column=False)
+        assert finding.data["start"] == len(source[:offset].encode("utf-8"))
+        assert finding.data["end"] == len(source[:end].encode("utf-8"))
+        assert (finding.data["line"], finding.data["column"]) == (line, column)
+        assert finding.region == {
+            "startLine": start_line,
+            "startColumn": start_column,
+            "endLine": end_line,
+            "endColumn": end_column,
+        }
+
+
 def test_byte_offsets_and_unicode_region() -> None:
     """Check byte offsets and unicode region."""
     finding = sample().files[0].findings[1]
