@@ -59,6 +59,9 @@ testpaths = ["tests"]
 [tool.ty.environment]
 python-version = "3.14"
 
+[tool.ty.src]
+exclude = [".claude/"]
+
 [tool.vulture]
 paths = ["src", "tests"]
 min_confidence = 60

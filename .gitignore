@@ -12,3 +12,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
+
+# Agent worktrees hold old copies of src/. Tools must not read them.
+.claude/worktrees/
