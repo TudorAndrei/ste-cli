@@ -122,3 +122,21 @@ def test_an_index_of_version_one_still_loads(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="forms"):
         load(path)
+
+
+def test_emphasis_around_a_headword_is_removed() -> None:
+    """Check that a bold or an italic headword and its forms give an entry."""
+    text = (
+        "## Part 2 - Dictionary\n"
+        "|Word|Meaning|\n"
+        "|---|---|\n"
+        "|**GLORP** (v), **GLORPS**, GLORPED|To join|\n"
+        "|__SNOOT__ (n)|A tube|\n"
+        "|*sploob* (v)|_GLORP_ (v)|\n"
+    )
+    index = parse(text)
+    assert [(e.word, e.approved, e.pos, e.forms, e.alternatives) for e in index.words] == [
+        ("glorp", True, "v", ["glorps", "glorped"], []),
+        ("snoot", True, "n", [], []),
+        ("sploob", False, "v", [], ["glorp"]),
+    ]

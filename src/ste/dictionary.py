@@ -27,6 +27,8 @@ _HEADWORD = re.compile(
 _ALTERNATIVE = re.compile(r"\b([A-Z][A-Z'\u2019\-]+(?:\s+[A-Z][A-Z'\u2019\-]*)*)\b", re.ASCII)
 _PART_TWO = re.compile(r"part\s*2\s*[\u2013-]\s*dictionary", re.IGNORECASE)
 _BRACKETED = re.compile(r"\([^)]*\)|\[[^\]]*\]")
+# Bold or italic emphasis around a word, such as "**WORD**" or "_WORD_".
+_EMPHASIS = re.compile(r"\*{1,2}|_{1,2}")
 _FORM = re.compile(r"[A-Za-z][A-Za-z'\u2019\-]*")
 
 
@@ -201,7 +203,7 @@ def parse(markdown: str, source: str = "") -> Index:
         cells = _table_row(line)
         if cells is None:
             continue
-        word, meaning = cells
+        word, meaning = (_EMPHASIS.sub("", cell) for cell in cells)
         if not word.strip():
             if last is not None:
                 last.alternatives = list(dict.fromkeys(last.alternatives + _alternatives(meaning)))
