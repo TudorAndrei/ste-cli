@@ -167,6 +167,58 @@ def found(text: str, grammar: Grammar, rule_id: str) -> list[str]:
             },
             [],
         ),
+        (
+            "1. Retain the count; otherwise return the default.\n",
+            {
+                "Retain the count; otherwise return the default.": [
+                    "Retain/VERB/VB/ROOT/0",
+                    "the/DET/DT/det/2",
+                    "count/NOUN/NN/dobj/0",
+                    ";/PUNCT/:/punct/5",
+                    "otherwise/ADV/RB/advmod/5",
+                    "return/VERB/VB/conj/0",
+                    "the/DET/DT/det/7",
+                    "default/NOUN/NN/dobj/5",
+                    "./PUNCT/./punct/5",
+                ]
+            },
+            [],
+        ),
+        (
+            "1. Use oxlint for linting and oxfmt for formatting.\n",
+            {
+                "Use oxlint for linting and oxfmt for formatting.": [
+                    "Use/VERB/VB/ROOT/0",
+                    "oxlint/NOUN/NN/dobj/0",
+                    "for/ADP/IN/prep/1",
+                    "linting/VERB/VBG/pobj/2",
+                    "and/CCONJ/CC/cc/0",
+                    "oxfmt/VERB/VB/conj/0/oxfmt/unknown",
+                    "for/ADP/IN/prep/5",
+                    "formatting/VERB/VBG/pobj/6",
+                    "./PUNCT/./punct/0",
+                ]
+            },
+            [],
+        ),
+        (
+            "1. Use ruff for linting and run pytest for tests.\n",
+            {
+                "Use ruff for linting and run pytest for tests.": [
+                    "Use/VERB/VB/ROOT/0",
+                    "ruff/NOUN/NN/dobj/0",
+                    "for/ADP/IN/prep/1",
+                    "linting/VERB/VBG/pobj/2",
+                    "and/CCONJ/CC/cc/0",
+                    "run/VERB/VB/conj/0",
+                    "pytest/NOUN/NN/dobj/5",
+                    "for/ADP/IN/prep/5",
+                    "tests/NOUN/NNS/pobj/7",
+                    "./PUNCT/./punct/0",
+                ]
+            },
+            ["run"],
+        ),
     ],
 )
 def test_one_instruction_in_each_step(text: str, grammar: Grammar, want: list[str]) -> None:

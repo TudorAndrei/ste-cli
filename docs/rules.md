@@ -440,7 +440,12 @@ steps: "Open the valve" and "Remove the cap".
 - "Push and hold the button" gives no finding. The two verbs have one
   object, and they are one action.
 - "Turn the knob or push the button" gives no finding. The reader does one
-  of the two.
+  of the two. "Otherwise" also gives a choice, as in "Keep the count.
+  Otherwise, return the default."
+- The tagger can read the name of a tool as a verb, as in "Use oxlint for
+  linting and oxfmt for formatting". The rule ignores a second verb that is
+  not in the word list of the model. A word that a prefix or a suffix makes
+  from a word of the list, such as "reconnect" or "tokenize", stays a verb.
 - The rule ignores a verb in capital letters, in quotation marks, or in
   parentheses. "Click Build and Deploy" names a button.
 - A verb after a list of nouns is often the last noun of the list, as in

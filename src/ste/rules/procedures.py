@@ -20,6 +20,9 @@ _CONJ_TAGS = frozenset({"VB", "VBP"})
 # Subordinate words that start a condition clause. "until" and "while" give a
 # duration, and the clause cannot go first.
 _CLAUSE_CONDITIONS = frozenset({"before", "after", "once"})
+# Words that make the second verb a choice, and not a second instruction, as
+# in "retain the count; otherwise return the default".
+_CHOICES = frozenset({"or", "nor", "otherwise"})
 # A command in a note that sends the reader to other text, and is not a task.
 _REFERENCES = frozenset({"see", "refer"})
 
@@ -100,14 +103,20 @@ def _second_instruction(s: Sentence, p: _Parse, root: int) -> int:
         if t.dep == "conj" and p.head(k) in chain:
             chain.append(k)
     if any(
-        p.tokens[j].dep == "cc" and p.tokens[j].text.lower() in {"or", "nor"}
+        p.tokens[j].dep in {"cc", "advmod"} and p.tokens[j].text.lower() in _CHOICES
         for c in chain
         for j in p.children(c)
     ):
         return -1
     for k in chain[1:]:
         # The tagger often reads a second command as a present tense ("VBP").
-        if not p.imperative(k, _CONJ_TAGS) or not _plain_word(s, p.tokens[k]):
+        # A word that the lexicon of the model does not have, such as the
+        # name of a tool, is not an English verb.
+        if (
+            not p.imperative(k, _CONJ_TAGS)
+            or not _plain_word(s, p.tokens[k])
+            or not p.tokens[k].in_lexicon
+        ):
             continue
         # A verb after a list of nouns is often the last noun of the list, as
         # in "freeze the ID, the checksum, and stop limits".

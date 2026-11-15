@@ -606,7 +606,7 @@
       "confidence": [
         0.8
       ],
-      "note": "The rule needs the analyzer. It reads a numbered step that starts with a command, and it reports a second command that joins the first. Actions at the same time, alternatives with \"or\", and two verbs with one object, such as \"push and hold\", give no finding."
+      "note": "The rule needs the analyzer. It reads a numbered step that starts with a command, and it reports a second command that joins the first. Actions at the same time, alternatives with \"or\" or \"otherwise\", a second verb that is not in the word list of the model, and two verbs with one object, such as \"push and hold\", give no finding."
     },
     {
       "id": "STE-7.2",
