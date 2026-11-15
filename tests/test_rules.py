@@ -6,7 +6,8 @@ from __future__ import annotations
 import pytest
 
 from ste.checker import lint
-from ste.models import DictionaryResult, Options, Preferred, SyntaxToken
+from ste.models import DictionaryResult, Options, Preferred
+from tests.grammar import StubSyntax
 from tests.test_rules_cases import STRUCTURE_CASES, SYNTAX_CASES, VERB_CASES, VerbCase
 
 DICTIONARY_CONFIDENCE = 0.95
@@ -43,32 +44,6 @@ def test_structure_cases(
         assert len(got) == want
 
 
-class SpecSyntax:
-    """A token stream fixed independently from the checker rules."""
-
-    def __init__(self, grammar: dict[str, list[str]]) -> None:
-        """Set the independent grammar response."""
-        self.spec = grammar
-
-    def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
-        """Return the specified passive-voice result."""
-        del sentence, offset
-        return False, False
-
-    def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]:
-        """Return the specified grammar for this sentence."""
-        if sentence.strip() not in self.spec:
-            return [], False
-        out = []
-        offset = 0
-        for i, spec in enumerate(self.spec[sentence.strip()]):
-            text, pos, tag, dep, head = spec.split("/")
-            start = sentence.index(text, offset)
-            offset = start + len(text)
-            out.append(SyntaxToken(i, text, pos, tag, dep, int(head) if head else i, start))
-        return out, True
-
-
 @pytest.mark.parametrize(
     ("_name", "rule_id", "text", "grammar", "want"),
     SYNTAX_CASES,
@@ -78,7 +53,7 @@ def test_syntax_cases(
     _name: str, rule_id: str, text: str, grammar: dict[str, list[str]], want: str | int
 ) -> None:
     """Check syntax cases."""
-    got = [d for d in lint(text, Options(syntax=SpecSyntax(grammar))) if d.rule_id == rule_id]
+    got = [d for d in lint(text, Options(syntax=StubSyntax(grammar))) if d.rule_id == rule_id]
     assert len(got) == want
 
 
@@ -201,27 +176,23 @@ def test_dictionary_alternative_has_priority() -> None:
 
 def test_passive_syntax_veto_and_confidence() -> None:
     """Check passive syntax veto and confidence."""
-
-    class PassiveSyntax:
-        """A fixed passive-voice answer for the analyzer contract."""
-
-        def __init__(self, *, passive: bool) -> None:
-            """Set the independent grammar response."""
-            self.passive = passive
-
-        def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]:
-            """Return the specified grammar for this sentence."""
-            del sentence
-            return [], False
-
-        def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
-            """Return the specified passive-voice result."""
-            del sentence, offset
-            return self.passive, True
-
     text = "There is measured user demand."
-    assert lint(text, Options(syntax=PassiveSyntax(passive=False))) == []
-    got = lint("The report was approved.", Options(syntax=PassiveSyntax(passive=True)))
+    adjective = [
+        "There/PRON/EX/expl/1",
+        "is/VERB/VBZ/ROOT/1",
+        "measured/ADJ/JJ/amod/4",
+        "user/NOUN/NN/compound/4",
+        "demand/NOUN/NN/attr/1",
+    ]
+    assert lint(text, Options(syntax=StubSyntax({text: adjective}))) == []
+    passive = [
+        "The/DET/DT/det/1",
+        "report/NOUN/NN/nsubjpass/3",
+        "was/AUX/VBD/auxpass/3",
+        "approved/VERB/VBN/ROOT/3",
+    ]
+    text = "The report was approved."
+    got = lint(text, Options(syntax=StubSyntax({text: passive})))
     assert got[0].confidence == ANALYZER_CONFIDENCE
 
 
@@ -294,7 +265,7 @@ def test_command_forms_in_mixed_procedures(
         **extra,
     }
     findings = [
-        d for d in lint(text, Options(syntax=SpecSyntax(grammar))) if d.rule_id == "STE-5.3"
+        d for d in lint(text, Options(syntax=StubSyntax(grammar))) if d.rule_id == "STE-5.3"
     ]
     assert [text[d.start : d.end] for d in findings] == ["Installation"]
 
@@ -312,7 +283,7 @@ def test_noun_cluster_allowance_and_character_spans() -> None:
             "unit/NOUN/NN/appos/0",
         ]
     }
-    opts = Options(syntax=SpecSyntax(grammar))
+    opts = Options(syntax=StubSyntax(grammar))
     findings = [d for d in lint(text, opts) if d.rule_id == "STE-2.1"]
     assert [text[d.start : d.end] for d in findings] == ["Élan: engine fuel pump control unit"]
     # A project can name a technical noun explicitly.

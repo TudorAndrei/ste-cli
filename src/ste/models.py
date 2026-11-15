@@ -24,13 +24,51 @@ class Diagnostic:
 
 
 @dataclass
+class SyntaxToken:
+    """One analyzer token with its grammar and its offset in the sentence text.
+
+    ``index`` and ``head`` count analyzer tokens, and the analyzer can split
+    a word or give a token for a punctuation mark.
+    """
+
+    index: int
+    text: str
+    pos: str
+    tag: str
+    dep: str
+    head: int
+    start: int
+    lemma: str = ""
+
+
+@dataclass
 class Token:
-    """One prose word with its source span."""
+    """One prose word with its source span and, when known, its grammar.
+
+    The grammar fields stay empty until an analyzer fills the document. A rule
+    must read ``Sentence.tagged`` before it reads them. ``ste.grammar.align``
+    gives the rule that joins the analyzer tokens to these tokens.
+
+    The grammar fields are not arguments of the constructor. Thus a token
+    without grammar keeps only its four source fields in memory.
+    """
 
     text: str
     lower: str
     start: int
     end: int
+    # The universal part of speech, such as "VERB", "NOUN", or "ADJ".
+    pos: str = field(default="", init=False)
+    # The Penn Treebank tag, such as "VB", "VBN", or "NNS".
+    tag: str = field(default="", init=False)
+    # The dependency relation to the head, such as "nsubj" or "ROOT".
+    dep: str = field(default="", init=False)
+    # The index of the head in ``Sentence.tokens``. The root is its own head.
+    # The value is -1 when the head is not a word of the sentence.
+    head: int = field(default=-1, init=False)
+    # The base form, such as "close" for "closed". It is empty when the
+    # analyzer has no lemmatizer.
+    lemma: str = field(default="", init=False)
 
 
 @dataclass
@@ -49,6 +87,14 @@ class Sentence:
     admonition: str = ""
     first: bool = False
     last: bool = False
+    # All analyzer tokens of the sentence, punctuation included, with offsets
+    # from the start of ``text``. It is empty when the grammar is not known.
+    syntax: list[SyntaxToken] = field(default_factory=list)
+
+    @property
+    def tagged(self) -> bool:
+        """Return whether an analyzer gave the grammar of this sentence."""
+        return bool(self.syntax)
 
     def limit(self) -> int:
         """Return the word limit for this sentence type."""
@@ -62,6 +108,8 @@ class Document:
     source: str
     masked: str
     sentences: list[Sentence] = field(default_factory=list)
+    # True after ``ste.grammar.annotate`` ran on this document.
+    analyzed: bool = False
 
     def word_count(self) -> int:
         """Return the total word count of the prose."""
@@ -93,19 +141,6 @@ class Dictionary(Protocol):
         ...
 
 
-@dataclass
-class SyntaxToken:
-    """One word with its grammar and position in a sentence."""
-
-    index: int
-    text: str
-    pos: str
-    tag: str
-    dep: str
-    head: int
-    start: int
-
-
 class Syntax(Protocol):
     """The sentence grammar contract for an NLP analyzer."""
 
@@ -113,8 +148,8 @@ class Syntax(Protocol):
         """Return sentence tokens and whether the grammar is known."""
         ...
 
-    def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
-        """Return whether a word is passive and whether the answer is known."""
+    def grammar_many(self, sentences: list[str]) -> list[list[SyntaxToken]]:
+        """Return the tokens of each sentence, in order. An empty list is not known."""
         ...
 
 

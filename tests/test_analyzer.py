@@ -16,6 +16,8 @@ from ste import analyzer
 from ste.analyzer import ExternalAnalyzer, SpacyAnalyzer
 from ste.checker import lint
 from ste.cli import run
+from ste.document import parse
+from ste.grammar import annotate, passive_at
 from ste.models import Options
 
 SIGNED_CHARACTER_START = 15
@@ -29,9 +31,11 @@ def test_external_analyzer_protocol() -> None:
     try:
         assert client.model == "stub"
         sentence = "The report was signed by the team."
-        assert client.passive_at(sentence, 15) == (True, True)
-        assert client.passive_at(sentence, 4) == (False, True)
-        assert client.passive_at(sentence, 999) == (False, False)
+        doc = parse(sentence)
+        annotate(doc, client)
+        assert passive_at(doc.sentences[0], SIGNED_CHARACTER_START) is True
+        assert passive_at(doc.sentences[0], 4) is False
+        assert passive_at(doc.sentences[0], 999) is None
         grammar, known = client.grammar(sentence)
         assert known
         assert grammar[3].text == "signed"
@@ -76,7 +80,9 @@ def test_local_spacy_grammar() -> None:
     """Check local spacy grammar."""
     client = SpacyAnalyzer()
     sentence = "The report was signed by the team."
-    assert client.passive_at(sentence, 15) == (True, True)
+    doc = parse(sentence)
+    annotate(doc, client)
+    assert passive_at(doc.sentences[0], SIGNED_CHARACTER_START) is True
     grammar, known = client.grammar(sentence)
     assert known
     assert any(t.text == "signed" and t.pos == "VERB" for t in grammar)
@@ -126,8 +132,8 @@ def test_late_answer_does_not_break_the_next_request(monkeypatch: pytest.MonkeyP
         monkeypatch.setattr(analyzer, "RESPONSE_TIMEOUT", 30.0)
         tokens = client.analyze("The report was signed by the team.")
         assert tokens[3].text == "signed"
-        sentence = "The report was signed by the team."
-        assert client.passive_at(sentence, SIGNED_CHARACTER_START) == (True, True)
+        assert tokens[3].start == SIGNED_CHARACTER_START
+        assert any(t.dep == "auxpass" and t.head == tokens[3].index for t in tokens)
     finally:
         client.close()
 

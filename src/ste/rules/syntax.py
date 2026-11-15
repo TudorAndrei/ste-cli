@@ -8,14 +8,6 @@ MIN_PROCEDURE_ITEMS = 2
 MAX_NOUN_WORDS = 3
 
 
-def grammar_of(opts: Options, s: Sentence) -> list[SyntaxToken]:
-    """Return sentence grammar when an analyzer gives a result."""
-    if opts.syntax is None:
-        return []
-    tokens, ok = opts.syntax.grammar(s.text)
-    return tokens if ok else []
-
-
 def syntax_span(s: Sentence, t: SyntaxToken) -> tuple[int, int]:
     """Convert a sentence token position to a document span."""
     start = s.start + t.start
@@ -101,7 +93,7 @@ def imperative(doc: Document, opts: Options) -> list[Diagnostic]:
         items = []
         commands = 0
         for s in group:
-            grammar = grammar_of(opts, s)
+            grammar = s.syntax
             if not grammar:
                 continue
             d = not_imperative(s, grammar, opts)
@@ -119,7 +111,7 @@ def noun_cluster(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report a noun cluster that exceeds its word limit."""
     out = []
     for s in doc.sentences:
-        grammar = grammar_of(opts, s)
+        grammar = s.syntax
         i = 0
         while i < len(grammar):
             if grammar[i].pos not in {"NOUN", "PROPN"}:
@@ -156,7 +148,7 @@ def gerund(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report an ing-form verb outside a permitted noun or modifier."""
     out = []
     for s in doc.sentences:
-        grammar = grammar_of(opts, s)
+        grammar = s.syntax
         for t in grammar:
             if t.tag != "VBG" or t.pos != "VERB" or t.dep not in GERUND_DEPS:
                 continue

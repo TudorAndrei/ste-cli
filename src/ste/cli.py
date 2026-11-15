@@ -21,7 +21,17 @@ import typer
 from typer._click.core import Context, ParameterSource
 from typer.core import TyperCommand, TyperGroup, TyperOption
 
-from ste import __version__, analyzer, baseline, config, dictionary, evaluation, report, review
+from ste import (
+    __version__,
+    analyzer,
+    baseline,
+    config,
+    dictionary,
+    evaluation,
+    grammar_cache,
+    report,
+    review,
+)
 from ste.checker import lint_document
 from ste.document import parse
 
@@ -900,7 +910,16 @@ def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int
     return 0
 
 
-def _run_analyzer(output_format: str, stdout: TextIO) -> int:
+def _run_analyzer(output_format: str, stdout: TextIO, *, clear_cache: bool) -> int:
+    if clear_cache:
+        path = grammar_cache.default_path()
+        removed = grammar_cache.clear(path)
+        data = {"action": "clear-cache", "path": str(path or ""), "removed": removed}
+        text = (
+            f"The grammar cache is clear: {path}\n" if removed else "There is no grammar cache.\n"
+        )
+        _write_plan(stdout, output_format, data, text)
+        return 0
     status = analyzer.check()
     if status["ready"]:
         text = (
@@ -908,6 +927,8 @@ def _run_analyzer(output_format: str, stdout: TextIO) -> int:
             f"{status['python']}"
             "\n  script: "
             f"{status['script']}"
+            "\n  cache:  "
+            f"{status['cache'] or 'off'}"
             '\n\nRun "ste lint --analyze docs/" to use it.\nIt makes rule STE-3.6 '
             "more exact, and it is never necessary.\n"
         )
@@ -1086,9 +1107,14 @@ def analyzer_command(
     output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
+    clear_cache: Annotated[
+        bool, typer.Option("--clear-cache", help="Remove the grammar cache.")
+    ] = False,
 ) -> None:
     """Show the grammar analyzer and what it needs."""
-    raise typer.Exit(_run_analyzer(output_format.value, streams(ctx).stdout))
+    raise typer.Exit(
+        _run_analyzer(output_format.value, streams(ctx).stdout, clear_cache=clear_cache)
+    )
 
 
 @app.command("eval", cls=SteCommand)

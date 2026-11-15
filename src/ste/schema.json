@@ -8,6 +8,10 @@
   ],
   "command_flags": {
     "analyzer": {
+      "--clear-cache": {
+        "note": "remove the disk cache of the grammar. $STE_GRAMMAR_CACHE gives the path of the cache, and the value off stops the cache.",
+        "type": "boolean"
+      },
       "--format": {
         "default": "text",
         "type": "string",

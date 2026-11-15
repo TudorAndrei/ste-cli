@@ -14,15 +14,24 @@ import sys
 import threading
 import time
 from contextlib import suppress
+from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
+
+from ste import grammar_cache
+from ste.analyzer_worker import (
+    BATCH_SIZE,
+    DEFAULT_PARTS,
+    MODEL,
+    excluded,
+    model_identity,
+    model_version,
+)
+from ste.models import SyntaxToken
 
 if TYPE_CHECKING:
     from ste.analyzer_worker import NLPModel
 
-from ste.models import SyntaxToken
-
-MODEL = "en_core_web_sm"
 START_TIMEOUT = 60.0
 RESPONSE_TIMEOUT = 60.0
 _MISSING_MODEL = 3
@@ -38,6 +47,7 @@ class AnalyzerStatus(TypedDict):
     spacy: bool
     problem: str
     fix: list[str]
+    cache: str
 
 
 class _ProtocolError(ValueError):
@@ -78,80 +88,138 @@ def _parse_tokens(raw: object) -> list[SyntaxToken]:
                 dep=_label(token, "dep"),
                 head=_integer(token, "head"),
                 start=_integer(token, "start"),
+                lemma=_label(token, "lemma"),
             )
         )
     return tokens
 
 
 class Analyzer:
-    """Provide cached grammar data for checker rules."""
+    """Provide grammar data for checker rules, with a cache for each run.
+
+    A subclass gives ``analyze`` for one sentence, and it can replace
+    ``analyze_batch`` to analyze many sentences in one request. ``identity``
+    names the model, its version, and its pipeline. When it is not empty,
+    the results also go to the disk cache of ``ste.grammar_cache``.
+    """
+
+    identity = ""
 
     def __init__(self) -> None:
         """Create the sentence cache for one run."""
         self._cache: dict[str, list[SyntaxToken]] = {}
+        self._disk: grammar_cache.GrammarCache | None = None
 
     def analyze(self, text: str) -> list[SyntaxToken]:
         """Return grammar tokens for a sentence."""
         raise NotImplementedError
 
+    def analyze_batch(self, texts: list[str]) -> list[list[SyntaxToken]]:
+        """Return grammar tokens for each sentence. An empty list is not known."""
+        out = []
+        for text in texts:
+            try:
+                out.append(self.analyze(text))
+            except ValueError, OSError, RuntimeError:
+                out.append([])
+        return out
+
     def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]:
         """Return tokens and whether grammar data is available."""
-        try:
-            tokens = self.analyze(sentence)
-            return tokens, bool(tokens)
-        except ValueError, OSError, RuntimeError:
-            return [], False
+        tokens = self.grammar_many([sentence])[0]
+        return tokens, bool(tokens)
 
-    def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
-        """Check passive relations at a sentence character offset."""
-        tokens, known = self.grammar(sentence)
-        if not known:
-            return False, False
-        verb = next((t.index for t in tokens if t.start == offset), None)
-        if verb is None:
-            return False, False
-        return any(
-            t.head == verb and t.dep in {"auxpass", "nsubjpass", "csubjpass"} for t in tokens
-        ), True
+    def grammar_many(self, sentences: list[str]) -> list[list[SyntaxToken]]:
+        """Return the tokens of each sentence. Only the new sentences go to the model."""
+        missing = list(dict.fromkeys(s for s in sentences if s not in self._cache))
+        if missing and self.identity and self._disk is None:
+            self._disk = grammar_cache.GrammarCache(self.identity)
+        if missing and self._disk is not None:
+            self._cache.update(self._disk.get_many(missing))
+            missing = [s for s in missing if s not in self._cache]
+        if missing:
+            try:
+                results = self.analyze_batch(missing)
+            except ValueError, OSError, RuntimeError:
+                results = [[] for _ in missing]
+            found = {text: tokens for text, tokens in zip(missing, results, strict=True) if tokens}
+            self._cache.update(found)
+            if self._disk is not None:
+                self._disk.put_many(found)
+        return [self._cache.get(s, []) for s in sentences]
 
     def close(self) -> None:
         """Release analyzer resources."""
+        if self._disk is not None:
+            self._disk.close()
+            self._disk = None
 
 
-def _load_model() -> NLPModel:
+def _load_model(parts: frozenset[str]) -> NLPModel:
     try:
         spacy = importlib.import_module("spacy")
     except ImportError as err:
         msg = 'spaCy is not installed. Run: uv pip install "ste-cli[nlp]"'
         raise ValueError(msg) from err
     try:
-        return cast("NLPModel", spacy.load(MODEL, exclude=["ner", "lemmatizer", "textcat"]))
+        return cast("NLPModel", spacy.load(MODEL, exclude=excluded(parts)))
     except OSError as err:
         msg = f"the model {MODEL} is not installed. Run: python -m spacy download {MODEL}"
         raise ValueError(msg) from err
 
 
 class SpacyAnalyzer(Analyzer):
-    """Load a model once and retain each sentence result for this run."""
+    """Analyze the sentences of a document in one batch with a local model.
 
-    def __init__(self) -> None:
-        """Load the configured local model once."""
+    ``parts`` selects the optional pipeline parts. ``frozenset()`` loads only
+    the tagger: the tokens then have no dependency relation. The model loads
+    at the first sentence that the disk cache does not hold. Thus a run that
+    reads only the cache does not import spaCy.
+    """
+
+    def __init__(self, parts: frozenset[str] = DEFAULT_PARTS) -> None:
+        """Find the local model and name it, without loading it."""
         super().__init__()
-        self.nlp = _load_model()
+        self._nlp: NLPModel | None = None
+        try:
+            version = model_version()
+        except metadata.PackageNotFoundError:
+            # The load gives the message and the command that installs the part.
+            self._nlp = _load_model(parts)
+            version = model_version()
+        self._parts = parts
         self.model = MODEL
+        self.identity = model_identity(version, parts)
+
+    @property
+    def nlp(self) -> NLPModel:
+        """Return the model, and load it at the first use."""
+        if self._nlp is None:
+            self._nlp = _load_model(self._parts)
+        return self._nlp
 
     def analyze(self, text: str) -> list[SyntaxToken]:
-        """Analyze a sentence with the local model, using its cached result."""
-        if text not in self._cache:
-            self._cache[text] = [
-                SyntaxToken(t.i, t.text, t.pos_, t.tag_, t.dep_, t.head.i, t.idx)
-                for t in self.nlp(text)
+        """Analyze one sentence with the local model."""
+        return self.analyze_batch([text])[0]
+
+    def analyze_batch(self, texts: list[str]) -> list[list[SyntaxToken]]:
+        """Analyze many sentences with one call of ``nlp.pipe``."""
+        return [
+            [
+                SyntaxToken(t.i, t.text, t.pos_, t.tag_, t.dep_, t.head.i, t.idx, t.lemma_)
+                for t in doc
             ]
-        return self._cache[text]
+            for doc in self.nlp.pipe(texts, batch_size=BATCH_SIZE)
+        ]
 
 
 class ExternalAnalyzer(Analyzer):
-    """Run an analyzer with one JSON object per line in each direction."""
+    """Run an analyzer with one JSON object per line in each direction.
+
+    When the ready line gives ``"batch": true``, one request holds many
+    sentences. Otherwise each request holds one sentence. A ready line with
+    a ``"version"`` also enables the disk cache.
+    """
 
     def __init__(self, argv: list[str]) -> None:
         """Start a user-selected command and validate its ready response."""
@@ -166,6 +234,7 @@ class ExternalAnalyzer(Analyzer):
         self._responses: queue.Queue[str | None] = queue.Queue()
         self._lock = threading.Lock()
         self._next = 0
+        self._batch = False
         self._reader = threading.Thread(target=self._read_output, daemon=True)
         self._reader.start()
         try:
@@ -179,7 +248,14 @@ class ExternalAnalyzer(Analyzer):
         if not ready.get("ready"):
             msg = "the analyzer did not give a ready line"
             raise ValueError(msg)
-        return str(ready.get("model", ""))
+        model = str(ready.get("model", ""))
+        self._batch = ready.get("batch") is True
+        version = ready.get("version")
+        pipeline = ready.get("pipeline")
+        if model and isinstance(version, str) and version:
+            parts = ",".join(map(str, pipeline)) if isinstance(pipeline, list) else ""
+            self.identity = f"{model}\x00{version}\x00{parts}"
+        return model
 
     def _read_output(self) -> None:
         stdout = self._process.stdout
@@ -229,27 +305,47 @@ class ExternalAnalyzer(Analyzer):
             msg = "the analyzer gave a different request ID"
             raise ValueError(msg)
 
-    def analyze(self, text: str) -> list[SyntaxToken]:
-        """Request a sentence and retain its validated token response."""
+    def _request(self, payload: dict[str, object]) -> dict[str, object]:
+        """Send one request and return its answer."""
         with self._lock:
-            if text in self._cache:
-                return self._cache[text]
             self._next += 1
             stdin = self._process.stdin
             if stdin is None:
                 msg = "the analyzer input pipe is unavailable"
                 raise RuntimeError(msg)
-            stdin.write(json.dumps({"id": self._next, "text": text}) + "\n")
+            stdin.write(json.dumps({"id": self._next, **payload}) + "\n")
             stdin.flush()
             result = self._response_for(self._next)
-            if result.get("error"):
-                raise ValueError(str(result["error"]))
-            tokens = _parse_tokens(result.get("tokens", []))
-            self._cache[text] = tokens
-            return tokens
+        if result.get("error"):
+            raise ValueError(str(result["error"]))
+        return result
+
+    def analyze(self, text: str) -> list[SyntaxToken]:
+        """Request one sentence and return its validated tokens."""
+        return _parse_tokens(self._request({"text": text}).get("tokens", []))
+
+    def analyze_batch(self, texts: list[str]) -> list[list[SyntaxToken]]:
+        """Request many sentences at a time when the analyzer accepts a batch."""
+        if not self._batch:
+            return super().analyze_batch(texts)
+        out: list[list[SyntaxToken]] = []
+        for i in range(0, len(texts), BATCH_SIZE):
+            chunk = texts[i : i + BATCH_SIZE]
+            results = self._request({"texts": chunk}).get("results")
+            if not isinstance(results, list) or len(results) != len(chunk):
+                msg = "the analyzer gave a different number of results"
+                raise _ProtocolError(msg)
+            for result in results:
+                try:
+                    out.append(_parse_tokens(result))
+                except _ProtocolError:
+                    # An object with "error" is a failed sentence, and not a token list.
+                    out.append([])
+        return out
 
     def close(self) -> None:
         """Stop the external analyzer and close its process pipes."""
+        super().close()
         process = self._process
         if process.stdin and not process.stdin.closed:
             try:
@@ -320,6 +416,7 @@ def check() -> AnalyzerStatus:
     elif code:
         problem = f"spaCy is not installed for {python}"
         fix = ['uv pip install "ste-cli[nlp]"', f"{python} -m spacy download {MODEL}"]
+    cache = grammar_cache.default_path()
     return {
         "ready": not problem,
         "python": python,
@@ -327,4 +424,5 @@ def check() -> AnalyzerStatus:
         "spacy": not problem,
         "problem": problem,
         "fix": fix,
+        "cache": str(cache) if cache else "",
     }

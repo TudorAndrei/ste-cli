@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Verb construction checks."""
 
+from ste.grammar import passive_at
 from ste.models import Diagnostic, Document, Options, Sentence
 from ste.rules.common import span
 from ste.rules.data import (
@@ -122,12 +123,11 @@ def match_passive(s: Sentence, i: int, opts: Options) -> tuple[Diagnostic, bool]
     if w in ADJECTIVAL_PARTICIPLES and not agent:
         return None
     confidence = 0.95 if agent else 0.85 if w in IRREGULAR_PARTICIPLES else 0.7
-    if opts.syntax is not None:
-        passive, known = opts.syntax.passive_at(s.text, s.tokens[j].start - s.start)
-        if known and not passive:
-            return None
-        if known and passive and confidence < SYNTAX_CONFIDENCE:
-            confidence = SYNTAX_CONFIDENCE
+    passive = passive_at(s, s.tokens[j].start - s.start)
+    if passive is False:
+        return None
+    if passive and confidence < SYNTAX_CONFIDENCE:
+        confidence = SYNTAX_CONFIDENCE
     return Diagnostic(
         "STE-3.6",
         f'"{span(s, i, j)}" is the passive voice.',
