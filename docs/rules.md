@@ -28,7 +28,7 @@ severity, and strict mode does not make it an error.
 | `STE-3.5` | Progressive "-ing" form | 0.90 | warning |
 | `STE-3.6` | Passive voice | 0.95, 0.85, or 0.70 | warning |
 | `STE-3.7` | A noun for an action | 0.90, or 0.85 | warning |
-| `STE-4.2` | Contraction, or an omitted article | 0.98, or 0.50 | warning, or info |
+| `STE-4.2` | Contraction, or an omitted article | 0.98, or 0.50 | warning for a contraction, info for an article |
 | `STE-5.1` | Sentence too long | 0.90 | warning |
 | `STE-8.1` | Semicolon | 1.00 | warning |
 | `STE-9.3` | Phrasal verb | 0.85, or 0.70 | warning |
@@ -204,6 +204,18 @@ performed". The confidence is 0.85.
 
 Reports "n't", "'re", "'ve", "'ll", "'m", "'d", and the known "'s" forms,
 such as "it's".
+
+The rule has two parts, and each part has its own severity:
+
+| Part | Severity | Confidence | Needs |
+|---|---|---|---|
+| A contraction | warning | 0.98 | Nothing |
+| An omitted article | info | 0.50 | The analyzer |
+
+The two parts have one identifier. `ste schema` gives `warning` as the
+default severity of the rule, and the `parts` field of the rule gives the
+two parts. Read the severity of a finding from the finding. A `rules` entry
+in the config changes the severity of the two parts.
 
 Rule 4.2 also tells you not to omit a word to make a sentence shorter. With
 the analyzer, the rule also reports a singular noun with no article, as the

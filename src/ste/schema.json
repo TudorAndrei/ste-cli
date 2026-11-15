@@ -399,7 +399,20 @@
         0.98,
         0.5
       ],
-      "note": "0.98 is a contraction, with the warning severity. 0.5 is a singular noun with no article, as a subject or an object, with the info severity. That part needs the analyzer, and only strict mode or a lower min_confidence shows it."
+      "note": "The severity of a finding depends on its part. default_severity is the severity of a contraction. Read the severity of each finding from the finding, and not from default_severity. A contraction has the warning severity and the confidence 0.98. A singular noun with no article, as a subject or an object, has the info severity and the confidence 0.5. That part needs the analyzer, and only strict mode or a lower min_confidence shows it. A rules entry in the config changes the severity of the two parts.",
+      "parts": [
+        {
+          "part": "contraction",
+          "severity": "warning",
+          "confidence": 0.98
+        },
+        {
+          "part": "omitted article",
+          "severity": "info",
+          "confidence": 0.5,
+          "needs": "analyzer"
+        }
+      ]
     },
     {
       "id": "STE-5.1",
