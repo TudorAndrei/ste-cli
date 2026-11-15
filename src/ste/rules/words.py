@@ -2,7 +2,7 @@
 """Word and phrase checks."""
 
 from ste.models import Diagnostic, Document, Options, Sentence
-from ste.rules.common import span, tokens_match
+from ste.rules.common import phrase_matcher, span
 from ste.rules.data import (
     BANNED_PHRASES,
     BANNED_WORDS,
@@ -12,6 +12,17 @@ from ste.rules.data import (
     NOMINALIZATIONS,
     PHRASE_STOPPERS,
 )
+
+_BANNED_PHRASES = phrase_matcher(tuple(tuple(words) for words, _ in BANNED_PHRASES))
+_NOMINALIZATIONS = phrase_matcher(tuple(tuple(words) for words, _ in NOMINALIZATIONS))
+
+
+def _starts(matches: list[tuple[int, int]]) -> dict[int, list[int]]:
+    """Group phrase indices by the index of their first token."""
+    out: dict[int, list[int]] = {}
+    for i, phrase in matches:
+        out.setdefault(i, []).append(phrase)
+    return out
 
 
 def preceded_by_determiner(s: Sentence, i: int) -> bool:
@@ -58,12 +69,12 @@ def terms(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report words and phrases that have simpler alternatives."""
     out = []
     for s in doc.sentences:
+        starts = _starts(_BANNED_PHRASES.matches(s))
         i = 0
         while i < len(s.tokens):
             matched = False
-            for words, replacement in BANNED_PHRASES:
-                if not tokens_match(s, i, words):
-                    continue
+            for phrase_index in starts.get(i, ()):
+                words, replacement = BANNED_PHRASES[phrase_index]
                 last = i + len(words) - 1
                 phrase = span(s, i, last)
                 if opts.allowed(phrase):
@@ -132,11 +143,11 @@ def nominalizations(doc: Document, _opts: Options) -> list[Diagnostic]:
     """Report a noun phrase that describes an action."""
     out = []
     for s in doc.sentences:
+        starts = _starts(_NOMINALIZATIONS.matches(s))
         i = 0
         while i < len(s.tokens):
-            for words, replacement in NOMINALIZATIONS:
-                if not tokens_match(s, i, words):
-                    continue
+            for phrase_index in starts.get(i, ()):
+                words, replacement = NOMINALIZATIONS[phrase_index]
                 last = i + len(words) - 1
                 out.append(
                     Diagnostic(
@@ -180,26 +191,28 @@ def latin_abbreviations(doc: Document, opts: Options) -> list[Diagnostic]:
 
 def one_name(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report an alternative name for an item with a preferred name."""
+    names = [
+        (preferred, old.lower().split()) for preferred in opts.prefer for old in preferred.instead
+    ]
+    matcher = phrase_matcher(tuple(tuple(words) for _, words in names))
     out = []
     for s in doc.sentences:
-        for preferred in opts.prefer:
-            for old in preferred.instead:
-                words = old.lower().split()
-                if not words:
-                    continue
-                for i in range(len(s.tokens) - len(words) + 1):
-                    if tokens_match(s, i, words):
-                        last = i + len(words) - 1
-                        out.append(
-                            Diagnostic(
-                                "STE-1.11",
-                                f'The text uses "{span(s, i, last)}" and '
-                                f'"{preferred.name}" for the same item.',
-                                "warning",
-                                0.95,
-                                s.tokens[i].start,
-                                s.tokens[last].end,
-                                f'Write "{preferred.name}".',
-                            )
-                        )
+        positions: list[list[int]] = [[] for _ in names]
+        for i, name in matcher.matches(s):
+            positions[name].append(i)
+        for (preferred, words), found in zip(names, positions, strict=True):
+            for i in found:
+                last = i + len(words) - 1
+                out.append(
+                    Diagnostic(
+                        "STE-1.11",
+                        f'The text uses "{span(s, i, last)}" and '
+                        f'"{preferred.name}" for the same item.',
+                        "warning",
+                        0.95,
+                        s.tokens[i].start,
+                        s.tokens[last].end,
+                        f'Write "{preferred.name}".',
+                    )
+                )
     return out
