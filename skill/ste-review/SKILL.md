@@ -5,8 +5,8 @@ description: Review documentation against the ASD-STE100 rules that a determinis
 
 # ste-review
 
-ASD-STE100 has 53 writing rules. The `ste` command can check about 31 of
-them, because they have a mechanical answer. This skill covers the rules that
+ASD-STE100 has 53 writing rules. The `ste` command checks 30 of them, in
+full or in part, because they have a mechanical answer. This skill covers the rules that
 have no mechanical answer: they need a reader who understands the text.
 
 **Read this before you start: your findings are advice, and not defects.** A
@@ -48,6 +48,9 @@ Then read the text yourself for the rules below.
   names a part in one sentence, and an action in the next one, is an example.
   Give the rule number. The writer can then compare the word with their own
   copy of the dictionary.
+- **1.9 A short technical noun.** Is a technical noun easy to understand?
+  `STE-1.9` measures only the length of a noun that the config gives. A long
+  name for a part, when one word is enough, is an example.
 - **1.10 No slang, and no jargon.** A technical noun must be a term of the
   field, and not the language of one team. "The job got stuck" is not a
   technical statement.

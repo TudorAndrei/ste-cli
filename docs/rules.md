@@ -1,13 +1,13 @@
 ---
 title: Rules
-description: The 20 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
+description: The 21 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
 ---
 
 # Rules
 
 [Back to the start page](index.md)
 
-This tool has 20 checks. 2 of them need the analyzer of the grammar, and
+This tool has 21 checks. 2 of them need the analyzer of the grammar, and
 they give no finding without it. ASD-STE100 Issue 9 has 53 rules and a
 dictionary of approved words. The tool does not ship the dictionary. `ste dict import`
 makes an index from your own copy of the specification, and `--use-dict`
@@ -40,6 +40,7 @@ severity, and strict mode does not make it an error.
 | `STE-7.3` | A safety instruction with no explanation | 0.70 | warning |
 | `STE-5.4` | A condition after the command | 0.70 | info |
 | `STE-1.11` | Two names for the same item | 0.95 | warning |
+| `STE-1.9` | A technical noun that is too long | 0.95 | warning |
 | `STE-2.1` | A noun of more than three words | 0.80 | warning |
 | `STE-5.3` | An instruction that is not a command | 0.75 | warning |
 
@@ -198,8 +199,12 @@ needs pressure" is one sentence.
 noun, and a multi-word alphanumeric identifier one word. The tool cannot
 find these without a dictionary, and it counts each of their words. The
 count can therefore be too high for a sentence that has a long title or a
-long name. Rule 8.5 also makes the text in parentheses a separate sentence
-with its own limit. The tool does not check that sentence.
+long name.
+
+**Text in parentheses (rule 8.5).** The text in parentheses counts as one
+word of its sentence. It is also a sentence of its own, with the same limit.
+The tool reports text in parentheses that is longer than the limit, and the
+finding starts at the open parenthesis.
 
 ## STE-8.1 Semicolon
 
@@ -353,6 +358,40 @@ have more than one word, and the letter case does not matter.
 no `prefer` key gets no finding from this rule. The rule cannot see that two
 names mean the same item in a text that the config does not describe.
 
+## STE-1.9 A technical noun that is too long
+
+Reports a technical noun of the project that has more words than the limit.
+Rule 1.9 tells you to select a technical noun that is short and easy to
+understand. The explanation of the rule gives a limit of three words.
+
+The rule reports nothing until the config gives the limit:
+
+```yaml
+max_noun_words: 3
+allow:
+  nouns: ["fuel pump control unit"]   # 4 words: a finding
+prefer:
+  "config file": ["settings file"]    # 2 words: no finding
+```
+
+**What the rule reads.** The tool has no part-of-speech tagger, and it
+cannot find a noun in free text. Thus the rule reads only the nouns that
+the project gives as technical nouns: each item of `allow.nouns`, and each
+name to use in `prefer`. A hyphenated word counts as one word (rule 8.7).
+The rule reports the first use of each noun in a file, and not each use.
+
+**Why the limit has no default.** Rule 1.9 applies when you must select a
+new technical noun. Rule 1.8 tells you to use the technical noun of your
+company or industry, also when it is long. The tool cannot know which of the
+two rules applies to a noun. When you set the limit, you say that the nouns
+of the config are your own selection.
+
+**Limits.**
+
+- The rule cannot see if a noun is easy to understand. A reader must decide.
+- A long noun that the config does not give gets no finding. With the
+  analyzer, rule `STE-2.1` reports a noun of more than three words.
+
 ## STE-5.4 A condition after the command
 
 Reports an instruction that gives its condition after the command. Rule 5.4
@@ -398,9 +437,17 @@ risk of damage. The words of a risk are "injury", "death", "damage", "hazard",
 
 The rule reports each block one time, at the first word of the risk.
 
+**A caution with a risk to a person.** A caution tells of a risk of damage.
+When there is a risk of injury or death, use the label "warning". Thus
+the rule also reports a caution block that has the word "injury", "death", or
+a different form of them. The rule does not read "fatal" or "kill", because
+software text uses them for an error and for a process.
+
 **Limits.** The rule reads a word list, and not the meaning. "This does not
 damage the file" gives a finding. A block with no label is not a safety
-instruction for the rule, and the rule does not read it.
+instruction for the rule, and the rule does not read it. The rule does not
+report a warning that tells of damage only. A risk analysis decides the
+level, and software text often uses "warning" for a loss of data.
 
 ## STE-7.3 A safety instruction with no explanation
 
@@ -468,23 +515,30 @@ The [start page](index.md) gives the full config and the other directives.
 
 ## Rules that this tool does not check
 
-An audit of Issue 9 found no mechanical check for these rules without a
-part-of-speech tagger, a parser, or the dictionary. The tool does not try
-to check them, because a guess gives wrong findings.
+The tool checks 30 of the 53 rules, 9 in full and 21 in part. It does not
+check the other 23. A guess gives wrong findings, thus the tool does not try.
 
 | Rule | Subject | Why not |
 |---|---|---|
-| 1.2, 1.3 | Approved part of speech and meaning | Needs the dictionary |
-| 1.5, 1.6, 1.8, 1.12 | Technical noun and verb categories | A judgment about the subject field |
-| 1.9, 1.10 | Short, clear, no slang | A human judgment |
-| 2.2 | The full form of a long technical noun | A human judgment |
-| 3.1 | The verb forms of the dictionary | Needs the dictionary |
-| 4.2 (part) | Omitted words | Needs a parser |
+| 1.2 | The approved part of speech | Needs a part-of-speech tagger |
+| 1.3 | The approved meaning | A judgment of a reader |
+| 1.4, 3.1 | The forms of the dictionary | Needs a tagger and the forms of the dictionary |
+| 1.5, 1.12 | The category of a technical noun or verb | A judgment about the subject field |
+| 1.7, 1.13 | A technical noun as a verb, and a technical verb as a noun | Needs a part-of-speech tagger |
+| 1.10 | Slang and jargon | A judgment of a reader |
+| 2.2 | The full form of a long technical noun | A judgment of a reader |
+| 3.3 | A past participle as an adjective | Needs a parser to find the position of the participle |
+| 4.4 | Connecting words | Needs semantics |
 | 4.5 | Articles and demonstrative adjectives | The exceptions of the standard make a check too noisy |
-| 5.2 | One instruction for each sentence | Cannot separate simultaneous actions |
-| 6.1, 6.2, 6.5 | Key words, one topic for each paragraph | Needs semantics |
+| 5.2 | One instruction for each sentence | Cannot separate simultaneous actions without a parser |
+| 6.1, 6.2, 6.4, 6.5 | The order, the key words, and the topic of a paragraph | Needs semantics |
 | 7.2 | The order of a safety instruction | Needs a parser to find the command or the condition |
-| 9.1, 9.2, 9.4 | Consistent style | Needs semantics |
+| 8.2 | A hyphen between related words | Needs a parser to find the related words |
+| 8.3 | The permitted uses of parentheses | Needs semantics |
+| 9.1, 9.2 | A different construction, and each word in its correct place | Needs semantics |
+
+[coverage.md](coverage.md) gives each of the 53 rules, and the part of each
+rule that the tool checks.
 
 ## Limits of the tool
 

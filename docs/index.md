@@ -14,7 +14,7 @@ each finding. A person or a machine can then make the correction.
 
 The rule numbers agree with ASD-STE100 Issue 9.
 
-**It is an aid for a writer. It is not an ASD-certified checker.** It has 20
+**It is an aid for a writer. It is not an ASD-certified checker.** It has 21
 checks. The specification has 53 rules and a dictionary of approved words,
 and this tool does not contain that dictionary. Read
 [the limits](#limits) before you use it.
@@ -327,6 +327,7 @@ prefer:                 # rule STE-1.11: one name for each item
 
 min_confidence: 0.6     # remove each finding below this value
 max_words: 25           # replace the sentence limits of the standard
+max_noun_words: 3       # rule STE-1.9: the word limit of a technical noun
 baseline: .ste-baseline.json
 fail_over: 2.5          # without this key, the tool never blocks
 warnings_as_errors: false
@@ -343,6 +344,7 @@ warnings_as_errors: false
 | `prefer` | One name for each item, and its other names (rule STE-1.11) |
 | `min_confidence` | Remove each finding below this value |
 | `max_words` | Replace the sentence limits of the standard |
+| `max_noun_words` | The word limit of a technical noun of the config (rule STE-1.9). No default. |
 | `baseline` | The path of the file of accepted findings |
 | `fail_over` | The score that makes the command exit with code 1 |
 | `warnings_as_errors` | Make each warning an error, and exit with code 1 |
@@ -620,9 +622,9 @@ number on a self-written corpus is weak.
 
 ## What the tool does not check
 
-ASD-STE100 has 53 rules. This tool checks 21 of them today, and about 31 can
-have a mechanical answer. The other rules need a reader: "Make sure that each
-paragraph has only one topic" is an example.
+ASD-STE100 has 53 rules. This tool checks 30 of them today, 9 in full and
+21 in part. 9 more need a part-of-speech tagger. The other rules need a
+reader: "Make sure that each paragraph has only one topic" is an example.
 
 [coverage.md](coverage.md) gives each rule and its group. The
 [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill)
@@ -645,7 +647,7 @@ not reproducible, and it never changes the exit code of `ste lint`. Refer to
   of the specification, and `--use-dict` then gives rule 1.1 the full list.
   [upstream-audit.md](upstream-audit.md) gives the reason that the tool
   cannot ship it.
-- Recall on new text is low, because the tool has 20 checks and the
+- Recall on new text is low, because the tool has 21 checks and the
   standard has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

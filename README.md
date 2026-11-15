@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is a Python command with optional NLP analysis. It has 20 checks. The standard has
+It is a Python command with optional NLP analysis. It has 21 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -328,6 +328,7 @@ prefer:                 # rule STE-1.11: one name for each item
 
 min_confidence: 0.6     # remove each finding below this value
 max_words: 25           # replace the sentence limits of the standard
+max_noun_words: 3       # rule STE-1.9: the word limit of a technical noun
 baseline: .ste-baseline.json
 fail_over: 2.5          # without this key, the tool never blocks
 warnings_as_errors: false
@@ -524,9 +525,9 @@ mise run dist       # writes dist/
 
 ## What the tool does not check
 
-ASD-STE100 has 53 rules. This tool checks 21 of them today, and about 31 can
-have a mechanical answer. The other rules need a reader: "Make sure that each
-paragraph has only one topic" is an example.
+ASD-STE100 has 53 rules. This tool checks 30 of them today, 9 in full and
+21 in part. 9 more need a part-of-speech tagger. The other rules need a
+reader: "Make sure that each paragraph has only one topic" is an example.
 
 [docs/coverage.md](docs/coverage.md) gives each rule and its group. The
 [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill)
@@ -544,7 +545,7 @@ not as a defect.
   See [docs/upstream-audit.md](docs/upstream-audit.md) for the reason that
   the tool cannot ship it.
 - Precision and recall are in [docs/evaluation.md](docs/evaluation.md).
-  Recall on new text is low, because the tool has 20 checks and the standard
+  Recall on new text is low, because the tool has 21 checks and the standard
   has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

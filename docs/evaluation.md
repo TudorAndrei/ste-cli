@@ -32,24 +32,25 @@ give. A file with no expectation file must give no findings.
 | `STE-1.1` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.11` | 3 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.14` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.9` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.4` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.5` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.6` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.7` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-4.2` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-4.3` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-5.1` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.1` | 3 | 0 | 0 | 1.00 | 1.00 |
 | `STE-5.4` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-5.5` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-6.6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-7.1` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-7.1` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-7.3` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-8.1` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-9.3` | 4 | 0 | 0 | 1.00 | 1.00 |
 | `STE-GR-6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| **all** | **30** | **0** | **0** | **1.00** | **1.00** |
+| **all** | **33** | **0** | **0** | **1.00** | **1.00** |
 
-10 fixture files, 4 valid and 6 invalid. Each of the 16 rules that need no
+12 fixture files, 4 valid and 8 invalid. Each of the 17 rules that need no
 analyzer has at least one labeled example. The corpus does not measure the 4
 rules that need the analyzer, because the corpus runs with no Python.
 
@@ -99,7 +100,7 @@ word.
 
 **This measurement gives no recall.** The documents have no labels, and
 nobody knows how many violations the tool did not find. The true recall on
-new text is much less than 1.00. The tool has 20 checks, and the standard
+new text is much less than 1.00. The tool has 21 checks, and the standard
 has 53 rules.
 
 ### The false positives that this measurement found
@@ -207,7 +208,7 @@ each rule, and the directives in the text give a team a way to start.
 
 ## 5. Known limits of the measurement
 
-- The corpus is small. It has 10 files and 30 labeled findings.
+- The corpus is small. It has 12 files and 33 labeled findings.
 - The unlabeled documents are all software documentation in English. Nobody
   measured the tool on aircraft maintenance procedures, which is the first
   purpose of ASD-STE100.

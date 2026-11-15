@@ -1,8 +1,8 @@
 # The ste-review skill
 
-ASD-STE100 has 53 writing rules. The `ste` command can check about 31 of
-them, because they have a mechanical answer: a count, a word list, or a
-sequence of tokens. The other rules need a reader who understands the text.
+ASD-STE100 has 53 writing rules. The `ste` command checks 30 of them, in
+full or in part. These rules have a mechanical answer: a count, a word list,
+or a sequence of tokens. The other rules need a reader who understands the text.
 "Make sure that each paragraph has only one topic" is an example.
 
 This directory holds a skill for an agent. It covers the second group. The
