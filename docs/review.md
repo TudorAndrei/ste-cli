@@ -1,6 +1,6 @@
 ---
 title: Review
-description: An optional command that asks a language model for advice on the 13 rules that need a reader. The advice is not a defect, and it is not reproducible.
+description: An optional command that asks a language model for advice on the 15 rules that need a reader, in full or in part. The advice is not a defect, and it is not reproducible.
 ---
 
 # Review
@@ -117,7 +117,9 @@ The summary also gives `model`, `paragraphs`, `requests`, `cached`, and
 | STE-4.5 | Articles and demonstrative adjectives |
 | STE-6.1 | Give information gradually |
 | STE-6.2 | Key words for a logical structure |
+| STE-6.4 | Paragraphs for related information |
 | STE-6.5 | One topic for each paragraph |
+| STE-8.3 | The permitted uses of parentheses |
 | STE-9.1 | A different sentence construction |
 | STE-9.2 | Each word in its correct place |
 | STE-9.4 | A consistent style |

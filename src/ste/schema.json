@@ -161,7 +161,7 @@
     "eval": "Measure the rules against a labeled corpus.",
     "init": "Write a start config, .ste.yml, in the current directory. It takes --dry-run, --force, and --format.",
     "lint": "Check files, directories, or standard input.",
-    "review": "Get advice from a language model for the 13 rules that need a reader. Each finding is advice with the info severity, and not a defect. It needs the llm extra and ANTHROPIC_API_KEY. It never changes the lint exit code or the baseline.",
+    "review": "Get advice from a language model for the 15 rules that need a reader, in full or in part. Each finding is advice with the info severity, and not a defect. It needs the llm extra and ANTHROPIC_API_KEY. It never changes the lint exit code or the baseline.",
     "schema": "Print this document.",
     "version": "Print the version."
   },
@@ -441,9 +441,19 @@
         "standard_rule": "6.2"
       },
       {
+        "id": "STE-6.4",
+        "name": "Paragraphs for related information",
+        "standard_rule": "6.4"
+      },
+      {
         "id": "STE-6.5",
         "name": "One topic for each paragraph",
         "standard_rule": "6.5"
+      },
+      {
+        "id": "STE-8.3",
+        "name": "The permitted uses of parentheses",
+        "standard_rule": "8.3"
       },
       {
         "id": "STE-9.1",

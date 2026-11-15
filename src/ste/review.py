@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from anthropic import Anthropic
 
 # Change this value when the rule text or the prompt changes. It is part of each cache key.
-RULES_VERSION = "1"
+RULES_VERSION = "2"
 DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_JOBS = 4
 DEFAULT_TIMEOUT = 120.0
@@ -132,11 +132,29 @@ RULES: tuple[tuple[str, str, str], ...] = (
         ),
     ),
     (
+        "STE-6.4",
+        "Paragraphs for related information",
+        (
+            "A paragraph must hold the facts that belong together, and only those facts. "
+            "Report a paragraph that holds a fact that belongs to a different paragraph, or a "
+            "paragraph that holds only a part of one idea."
+        ),
+    ),
+    (
         "STE-6.5",
         "One topic for each paragraph",
         (
             "Report a paragraph that changes its subject in the middle. Propose the place to "
             "divide it."
+        ),
+    ),
+    (
+        "STE-8.3",
+        "The permitted uses of parentheses",
+        (
+            "Parentheses are only for a reference, such as a figure or a step, and for text "
+            "that the reader sees on a display or on a label. Report parentheses that hold an "
+            "explanation or a second idea. Propose a separate sentence for it."
         ),
     ),
     (
