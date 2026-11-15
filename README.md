@@ -11,7 +11,7 @@ Documentation: <https://tudorandrei.github.io/ste-cli/>
 
 ## Installation
 
-Python 3.11 or later is necessary. Install from the repository with uv:
+Python 3.14 or later is necessary. Install from the repository with uv:
 
 ```bash
 uv tool install git+https://github.com/TudorAndrei/ste-cli
@@ -432,7 +432,8 @@ and its limits. The numbers are the rule numbers of Issue 9.
 - The platformdirs library gives the data directory of the user.
 - The spaCy library supplies optional grammar analysis.
 
-Ruff checks and formats the source. ty checks types. pytest runs the tests.
+Ruff checks and formats the source. ty checks types. Vulture finds unused code.
+pytest runs the tests.
 uv manages the environment, dependencies, and builds.
 
 ## More exact rules with an analyzer
@@ -503,6 +504,7 @@ uv sync --locked
 uv run ruff format --check .
 uv run ruff check .
 uv run ty check
+uv run vulture
 uv run pytest
 uv run ste eval --fail-under 1.0 testdata
 ```

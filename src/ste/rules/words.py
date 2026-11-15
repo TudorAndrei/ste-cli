@@ -13,8 +13,6 @@ from ste.rules.data import (
     PHRASE_STOPPERS,
 )
 
-TERM_DATA_VERSION = "1.0.0"
-
 
 def preceded_by_determiner(s: Sentence, i: int) -> bool:
     """Check for a determiner in the same noun phrase."""

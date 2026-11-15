@@ -1,7 +1,10 @@
 # Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Shared rule operations."""
 
-from ste.models import Sentence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ste.models import Sentence
 
 
 def span(sentence: Sentence, first: int, last: int) -> str:

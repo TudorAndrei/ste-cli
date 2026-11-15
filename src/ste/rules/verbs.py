@@ -14,7 +14,6 @@ from ste.rules.data import (
     VERB_FORMS,
 )
 
-VERB_DATA_VERSION = "1.1.0"
 MIN_PARTICIPLE_LENGTH = 3
 MIN_ING_LENGTH = 4
 MIN_ADVERB_LENGTH = 3

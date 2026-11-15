@@ -98,7 +98,7 @@ class Analyzer:
         try:
             tokens = self.analyze(sentence)
             return tokens, bool(tokens)
-        except (ValueError, OSError, RuntimeError):
+        except ValueError, OSError, RuntimeError:
             return [], False
 
     def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
@@ -169,7 +169,7 @@ class ExternalAnalyzer(Analyzer):
         self._reader.start()
         try:
             self.model = self._ready_model()
-        except (ValueError, OSError):
+        except ValueError, OSError:
             self.close()
             raise
 
@@ -238,7 +238,7 @@ class ExternalAnalyzer(Analyzer):
                 if process.poll() is None:
                     process.stdin.write('{"stop": true}\n')
                     process.stdin.flush()
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 pass
             finally:
                 with suppress(OSError, ValueError):
@@ -284,14 +284,14 @@ def check() -> AnalyzerStatus:
                 check=False,
             )
             code = result.returncode
-        except (OSError, subprocess.TimeoutExpired):
+        except OSError, subprocess.TimeoutExpired:
             code = _INVALID_INTERPRETER
     else:
         try:
             code = 0 if importlib.util.find_spec("spacy") else 1
             if code == 0 and not importlib.util.find_spec(MODEL):
                 code = _MISSING_MODEL
-        except (ImportError, ValueError):
+        except ImportError, ValueError:
             code = 1
     if code == _MISSING_MODEL:
         problem = f"the model {MODEL} is not installed"

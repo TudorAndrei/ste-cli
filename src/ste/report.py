@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, TextIO
 if TYPE_CHECKING:
     from ste.models import Diagnostic
 
-FORMATS = ("text", "json", "ndjson", "sarif", "github")
 FIELDS = (
     "rule_id",
     "message",

@@ -1,5 +1,5 @@
 [tools]
-python = "3.13"
+python = "3.14"
 uv = "0.13.8"
 
 [tasks.sync]
@@ -22,6 +22,10 @@ run = "uv run ruff check ."
 description = "Check Python types"
 run = "uv run ty check"
 
+[tasks.dead-code]
+description = "Find unused Python code"
+run = "uv run vulture"
+
 [tasks.fmt-check]
 description = "Fail if a file needs formatting"
 run = "uv run ruff format --check ."
@@ -36,11 +40,11 @@ run = "uv run ste lint README.md AGENTS.md docs/ skill/"
 
 [tasks.check]
 description = "Check the format, source, types, and tests"
-depends = ["fmt-check", "lint", "typecheck", "test"]
+depends = ["fmt-check", "lint", "typecheck", "dead-code", "test"]
 
 [tasks.ci]
 description = "Run all checks without a change to a source file"
-depends = ["fmt-check", "lint", "typecheck", "test", "eval", "lint-docs"]
+depends = ["fmt-check", "lint", "typecheck", "dead-code", "test", "eval", "lint-docs"]
 
 [tasks.build]
 description = "Build the Python wheel and source archive"

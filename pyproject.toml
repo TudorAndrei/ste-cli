@@ -7,7 +7,7 @@ name = "ste-cli"
 version = "0.11.0"
 description = "ASD-STE100 checks for Markdown and plain text"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = "MIT"
 authors = [{name = "TudorAndrei"}]
 dependencies = [
@@ -28,13 +28,18 @@ Homepage = "https://tudorandrei.github.io/ste-cli/"
 Repository = "https://github.com/TudorAndrei/ste-cli"
 
 [dependency-groups]
-dev = ["pytest>=8.3", "ruff>=0.14", "ty>=0.0.1"]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.14",
+    "ty>=0.0.1",
+    "vulture>=2.16",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ste"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]
@@ -50,4 +55,15 @@ ignore = ["D203", "D213", "COM812"]
 testpaths = ["tests"]
 
 [tool.ty.environment]
-python-version = "3.11"
+python-version = "3.14"
+
+[tool.vulture]
+paths = ["src", "tests"]
+min_confidence = 60
+# Typer calls these functions through its command registry.
+ignore_decorators = ["@app.command", "@app.callback", "@dict_app.command", "@dict_app.callback"]
+# Enum values and TypedDict fields use value conversion or string-key access.
+ignore_names = [
+    "ndjson", "sarif", "github",
+    "true_positives", "false_positives", "false_negatives", "precision", "recall", "expect",
+]

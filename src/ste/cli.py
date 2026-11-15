@@ -325,7 +325,7 @@ def git_visible(directory: str) -> set[str] | None:
             capture_output=True,
             check=True,
         )
-    except (OSError, subprocess.CalledProcessError):
+    except OSError, subprocess.CalledProcessError:
         return None
     return {
         str(_absolute(Path(directory) / p)) for p in os.fsdecode(process.stdout).split("\0") if p
