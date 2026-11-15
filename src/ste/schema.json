@@ -193,6 +193,10 @@
     "fail_over": {
       "type": "number"
     },
+    "max_noun_words": {
+      "type": "integer",
+      "note": "no default. Rule STE-1.9 reports nothing until this key gives a limit. The explanation of rule 1.9 gives 3 words."
+    },
     "max_words": {
       "type": "integer"
     },
@@ -535,7 +539,7 @@
       "confidence": [
         0.9
       ],
-      "note": "20 words for a numbered step, and 25 for other text."
+      "note": "20 words for a numbered step, and 25 for other text. The text in parentheses is also a sentence with the same limit (rule 8.5)."
     },
     {
       "id": "STE-8.1",
@@ -612,7 +616,7 @@
       "confidence": [
         0.7
       ],
-      "note": "The rule reads a note, a tip, an info, an attention, and an important block. It reports one that tells of an injury, of damage, or of a loss of data."
+      "note": "The rule reads a note, a tip, an info, an attention, and an important block. It reports one that tells of an injury, of damage, or of a loss of data. It also reports a caution block that tells of an injury or of death, because that risk needs a warning."
     },
     {
       "id": "STE-5.4",
@@ -633,6 +637,16 @@
         0.95
       ],
       "note": "The rule reports nothing until the prefer key of the config gives the names. No tool can know that two nouns mean the same item."
+    },
+    {
+      "id": "STE-1.9",
+      "name": "A technical noun that is too long",
+      "standard_rule": "1.9",
+      "default_severity": "warning",
+      "confidence": [
+        0.95
+      ],
+      "note": "The rule reads only the technical nouns of the config: allow.nouns and the names of prefer. It reports nothing until max_noun_words gives a limit. It reports the first use of each noun in a file."
     },
     {
       "id": "STE-5.3",

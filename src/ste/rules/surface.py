@@ -3,16 +3,49 @@
 
 import re
 
-from ste.models import Diagnostic, Document, Options
+from ste.document import count_words
+from ste.models import Diagnostic, Document, Options, Sentence
 from ste.rules.data import CONTRACTION_EXPANSIONS, S_CONTRACTIONS
 
 
+def parenthesized(masked: str, s: Sentence) -> list[tuple[int, int]]:
+    """Return the outer parenthesis groups of a sentence, with their marks."""
+    groups = []
+    depth = 0
+    start = 0
+    for i in range(s.start, s.end):
+        if masked[i] == "(":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif masked[i] == ")" and depth:
+            depth -= 1
+            if depth == 0:
+                groups.append((start, i + 1))
+    return groups
+
+
 def sentence_length(doc: Document, opts: Options) -> list[Diagnostic]:
-    """Report sentences that exceed their word limit."""
+    """Report sentences, and text in parentheses, that exceed their word limit."""
     out = []
     for s in doc.sentences:
         limit = opts.max_words if opts.max_words > 0 else s.limit()
         kind = "instruction" if s.procedural and not s.note else "sentence"
+        # Rule 8.5: the text in parentheses is also a sentence of its own.
+        for start, end in parenthesized(doc.masked, s):
+            words = count_words(doc.masked, start + 1, end - 1)
+            if words > limit:
+                out.append(
+                    Diagnostic(
+                        "STE-5.1",
+                        f"The text in parentheses has {words} words. The limit is {limit} words.",
+                        "warning",
+                        0.9,
+                        start,
+                        end,
+                        "Write the text in parentheses as a different sentence.",
+                    )
+                )
         if s.words > limit:
             out.append(
                 Diagnostic(

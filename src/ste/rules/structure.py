@@ -6,6 +6,7 @@ from ste.rules.data import (
     CLAUSE_MARKERS,
     CLAUSE_VERBS,
     CONDITION_WORDS,
+    INJURY_WORDS,
     INSTRUCTION_WORDS,
     RISK_WORDS,
     SAFETY_WORDS,
@@ -100,11 +101,33 @@ def safety_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
     return out
 
 
+def _injury_in_caution(s: Sentence) -> Diagnostic | None:
+    """Make a finding for a caution that tells of a risk to a person."""
+    t = next((t for t in s.tokens if t.lower in INJURY_WORDS), None)
+    if t is None:
+        return None
+    return Diagnostic(
+        "STE-7.1",
+        f'The caution tells of a risk to a person ("{t.text}"). '
+        "A caution gives a risk of damage only.",
+        "warning",
+        0.7,
+        t.start,
+        t.end,
+        'Use "warning" for a risk of injury or death.',
+    )
+
+
 def safety_word(doc: Document, _opts: Options) -> list[Diagnostic]:
-    """Report a risk under a label that gives no risk level."""
+    """Report a risk under a label that gives no risk level, or a lower level."""
     out = []
     reported = set()
     for s in doc.sentences:
+        if s.admonition == "caution" and s.block not in reported:
+            if (finding := _injury_in_caution(s)) is not None:
+                reported.add(s.block)
+                out.append(finding)
+            continue
         if not s.admonition or s.admonition in SAFETY_WORDS or s.block in reported:
             continue
         for i, t in enumerate(s.tokens):

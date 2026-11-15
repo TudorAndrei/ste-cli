@@ -10,6 +10,7 @@ import pytest
 from ste import config
 
 OVERRIDE_WORD_LIMIT = 18
+NOUN_WORD_LIMIT = 3
 
 
 @pytest.mark.parametrize(
@@ -29,6 +30,10 @@ OVERRIDE_WORD_LIMIT = 18
         "dictionary: yesplease",
         "allow: {nouns: parser}",
         "rules: {1: off}",
+        "max_noun_words: 0",
+        "max_noun_words: three",
+        "max_noun_words: true",
+        "max_noun_words:",
     ],
 )
 def test_bad_config_is_an_error(text: str) -> None:
@@ -88,6 +93,8 @@ def test_find_and_load(tmp_path: Path) -> None:
     assert config.load(path).allow_nouns == ["parser", "webhook"]
     assert config.load(None).fail_over == -1
     assert config.parse("# a comment").max_words == 0
+    assert config.parse("# a comment").options().max_noun_words == 0
+    assert config.parse("max_noun_words: 3").options().max_noun_words == NOUN_WORD_LIMIT
     assert config.load(Path(__file__).parents[1] / "docs/glossary.yml").mode
 
 

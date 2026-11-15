@@ -1,0 +1,11 @@
+{
+  "mode": "flavored",
+  "max_noun_words": 3,
+  "allow_nouns": ["fuel pump control unit", "fuel pump"],
+  "prefer": {
+    "config file": ["settings file"]
+  },
+  "expect": [
+    { "rule_id": "STE-1.9", "text": "fuel pump control unit" }
+  ]
+}

@@ -15,7 +15,14 @@ from ste.rules.structure import (
 from ste.rules.surface import contractions, semicolons, sentence_length
 from ste.rules.syntax import gerund, imperative, noun_cluster
 from ste.rules.verbs import verbs
-from ste.rules.words import latin_abbreviations, nominalizations, one_name, spelling, terms
+from ste.rules.words import (
+    latin_abbreviations,
+    nominalizations,
+    one_name,
+    short_noun,
+    spelling,
+    terms,
+)
 
 Rule = Callable[[Document, Options], list[Diagnostic]]
 
@@ -38,6 +45,7 @@ def all_rules() -> list[Rule]:
         vertical_list,
         condition_order,
         one_name,
+        short_noun,
         imperative,
         noun_cluster,
         gerund,

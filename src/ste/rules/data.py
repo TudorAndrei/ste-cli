@@ -404,6 +404,19 @@ RISK_WORDS = {
     "injury",
 }
 
+# The words of a risk to a person. "fatal" and "kill" are not here, because
+# software text uses them for an error and for a process.
+INJURY_WORDS = {
+    "death",
+    "deaths",
+    "injure",
+    "injured",
+    "injures",
+    "injuries",
+    "injury",
+    "lethal",
+}
+
 BRITISH_SPELLINGS = {
     "aluminium": "aluminum",
     "analyse": "analyze",

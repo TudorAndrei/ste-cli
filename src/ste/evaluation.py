@@ -99,8 +99,12 @@ def _expected(path: Path) -> tuple[Options, list[dict[str, str]]]:
     mode = raw.get("mode")
     if mode is not None and not isinstance(mode, str):
         raise _invalid(path, "mode must be a string")
+    limit = raw.get("max_noun_words")
+    if limit is not None and (type(limit) is not int or limit <= 0):
+        raise _invalid(path, "max_noun_words must be a positive number")
     opts = Options(
         mode=mode or "flavored",
+        max_noun_words=limit or 0,
         allow_nouns=_string_list(path, raw.get("allow_nouns"), "allow_nouns"),
         prefer=_preferences(path, raw.get("prefer")),
     )

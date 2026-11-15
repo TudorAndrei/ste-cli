@@ -124,6 +124,7 @@ class Options:
 
     mode: str = "flavored"
     max_words: int = 0
+    max_noun_words: int = 0
     allow_nouns: list[str] = field(default_factory=list)
     allow_verbs: list[str] = field(default_factory=list)
     prefer: list[Preferred] = field(default_factory=list)

@@ -239,6 +239,7 @@ class Config:
 
     mode: str = "flavored"
     max_words: int = 0
+    max_noun_words: int = 0
     allow_nouns: list[str] = field(default_factory=list)
     allow_verbs: list[str] = field(default_factory=list)
     disable_rules: list[str] = field(default_factory=list)
@@ -258,6 +259,7 @@ class Config:
         return Options(
             mode=self.mode,
             max_words=self.max_words,
+            max_noun_words=self.max_noun_words,
             allow_nouns=self.allow_nouns.copy(),
             allow_verbs=self.allow_verbs.copy(),
             prefer=self.prefer.copy(),
@@ -288,6 +290,7 @@ def _strings(value: object, key: str) -> list[str]:
 _CONFIG_KEYS = {
     "mode",
     "max_words",
+    "max_noun_words",
     "allow",
     "prefer",
     "disable_rules",
@@ -332,7 +335,7 @@ def _raw_config(text: str) -> dict[str, Any]:
 
 
 def _limits(cfg: Config, raw: dict[str, Any]) -> None:
-    for name in ("mode", "max_words"):
+    for name in ("mode", "max_words", "max_noun_words"):
         if name in raw and raw[name] is None:
             msg = f'the key "{name}" has no value'
             raise _InvalidConfigError(msg)
@@ -341,11 +344,12 @@ def _limits(cfg: Config, raw: dict[str, Any]) -> None:
             msg = f'the mode "{raw["mode"]}" is not "flavored" or "strict"'
             raise _InvalidConfigError(msg)
         cfg.mode = raw["mode"]
-    if "max_words" in raw:
-        if type(raw["max_words"]) is not int or raw["max_words"] <= 0:
-            msg = "max_words must be a positive number"
-            raise _InvalidConfigError(msg)
-        cfg.max_words = raw["max_words"]
+    for name in ("max_words", "max_noun_words"):
+        if name in raw:
+            if type(raw[name]) is not int or raw[name] <= 0:
+                msg = f"{name} must be a positive number"
+                raise _InvalidConfigError(msg)
+            setattr(cfg, name, raw[name])
 
 
 def _glossary(cfg: Config, raw: dict[str, Any]) -> None:

@@ -318,3 +318,71 @@ def test_noun_cluster_allowance_and_character_spans() -> None:
     # A project can name a technical noun explicitly.
     opts.allow_nouns = ["Élan engine fuel pump control unit"]
     assert not [d for d in lint(text, opts) if d.rule_id == "STE-2.1"]
+
+
+@pytest.mark.parametrize(
+    ("text", "nouns", "prefer", "limit", "want"),
+    [
+        ("Open the fuel pump control unit.", ["fuel pump control unit"], [], 0, []),
+        (
+            "Open the fuel pump control unit.",
+            ["fuel pump control unit"],
+            [],
+            3,
+            ["fuel pump control unit"],
+        ),
+        ("Open the fuel pump control unit.", ["fuel pump control unit"], [], 4, []),
+        (
+            "Open the Fuel Pump Control Unit.",
+            ["fuel pump control unit"],
+            [],
+            3,
+            ["Fuel Pump Control Unit"],
+        ),
+        ("Open the fuel pump.", ["fuel pump"], [], 1, ["fuel pump"]),
+        ("Open the air-conditioning system.", ["air-conditioning system"], [], 2, []),
+        ("Open the parser.", ["fuel pump control unit"], [], 3, []),
+        (
+            "Open the config file. Then close the config file.",
+            [],
+            [Preferred("config file", ["settings file"])],
+            1,
+            ["config file"],
+        ),
+    ],
+)
+def test_short_technical_noun(
+    text: str, nouns: list[str], prefer: list[Preferred], limit: int, want: list[str]
+) -> None:
+    """Check that a configured technical noun obeys the configured word limit."""
+    opts = Options(allow_nouns=nouns, prefer=prefer, max_noun_words=limit)
+    got = [d for d in lint(text, opts) if d.rule_id == "STE-1.9"]
+    assert [text[d.start : d.end] for d in got] == want
+
+
+@pytest.mark.parametrize(
+    ("text", "want"),
+    [
+        ("> [!CAUTION]\n> Do not touch the blade. The blade can cause injury.\n", ["injury"]),
+        ("> [!CAUTION]\n> Do not drop the unit. A fall can cause damage.\n", []),
+        ("> [!WARNING]\n> Do not touch the blade. The blade can cause injury.\n", []),
+        ("> [!CAUTION]\n> Keep away. Death or injuries can occur.\n", ["Death"]),
+    ],
+)
+def test_caution_that_tells_of_injury(text: str, want: list[str]) -> None:
+    """Check that a caution with a risk of injury or death needs a warning label."""
+    got = [d for d in lint(text) if d.rule_id == "STE-7.1"]
+    assert [text[d.start : d.end] for d in got] == want
+
+
+def test_text_in_parentheses_is_a_sentence_with_its_own_limit() -> None:
+    """Check that the text in parentheses has the limit of its sentence."""
+    inner = " ".join(["word"] * 26)
+    text = f"Open the valve ({inner}).\n"
+    got = [d for d in lint(text) if d.rule_id == "STE-5.1"]
+    assert [text[d.start : d.end] for d in got] == [f"({inner})"]
+    assert "parentheses" in got[0].message
+    short = " ".join(["word"] * 25)
+    assert not [d for d in lint(f"Open the valve ({short}).\n") if d.rule_id == "STE-5.1"]
+    step = " ".join(["word"] * 21)
+    assert [d.rule_id for d in lint(f"1. Open the valve ({step}).\n")] == ["STE-5.1"]

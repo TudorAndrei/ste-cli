@@ -216,3 +216,38 @@ def one_name(doc: Document, opts: Options) -> list[Diagnostic]:
                     )
                 )
     return out
+
+
+def short_noun(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report the first use of a configured technical noun that is too long."""
+    if opts.max_noun_words <= 0:
+        return []
+    names = sorted(
+        {
+            tuple(name.lower().split())
+            for name in [*opts.allow_nouns, *(preferred.name for preferred in opts.prefer)]
+        }
+    )
+    names = [words for words in names if len(words) > opts.max_noun_words]
+    matcher = phrase_matcher(tuple(names))
+    out = []
+    reported: set[int] = set()
+    for s in doc.sentences:
+        for i, name in matcher.matches(s):
+            if name in reported:
+                continue
+            reported.add(name)
+            last = i + len(names[name]) - 1
+            out.append(
+                Diagnostic(
+                    "STE-1.9",
+                    f'The technical noun "{span(s, i, last)}" has {len(names[name])} words. '
+                    f"The limit is {opts.max_noun_words} words.",
+                    "warning",
+                    0.95,
+                    s.tokens[i].start,
+                    s.tokens[last].end,
+                    "Select a shorter technical noun, and give it in the config.",
+                )
+            )
+    return out

@@ -11,9 +11,10 @@ import pytest
 
 from ste import evaluation
 
-CORPUS_FILE_COUNT = 10
-CORPUS_FINDING_COUNT = 30
+CORPUS_FILE_COUNT = 12
+CORPUS_FINDING_COUNT = 33
 PARTIAL_ACCURACY = 0.5
+LABELED_FINDINGS = 2
 
 
 def test_corpus_matches_existing_labels() -> None:
@@ -48,16 +49,21 @@ def test_counts_each_outcome_and_wildcard_label(tmp_path: Path) -> None:
 
 def test_label_options(tmp_path: Path) -> None:
     """Check label options."""
-    (tmp_path / "sample.md").write_text("Use the settings file.")
+    (tmp_path / "sample.md").write_text("Use the settings file. Open the fuel pump control unit.")
     (tmp_path / "sample.expected.json").write_text(
         json.dumps(
             {
                 "prefer": {"config file": ["settings file"]},
-                "expect": [{"rule_id": "STE-1.11", "text": "settings file"}],
+                "allow_nouns": ["fuel pump control unit"],
+                "max_noun_words": 3,
+                "expect": [
+                    {"rule_id": "STE-1.11", "text": "settings file"},
+                    {"rule_id": "STE-1.9", "text": "fuel pump control unit"},
+                ],
             }
         )
     )
-    assert evaluation.run(tmp_path)["totals"]["true_positives"] == 1
+    assert evaluation.run(tmp_path)["totals"]["true_positives"] == LABELED_FINDINGS
 
 
 def test_empty_and_invalid_corpus(tmp_path: Path) -> None:
@@ -71,7 +77,16 @@ def test_empty_and_invalid_corpus(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "expected", [[], {"prefer": []}, {"allow_nouns": 5}, {"expect": 5}, {"expect": [{"text": 5}]}]
+    "expected",
+    [
+        [],
+        {"prefer": []},
+        {"allow_nouns": 5},
+        {"expect": 5},
+        {"expect": [{"text": 5}]},
+        {"max_noun_words": 0},
+        {"max_noun_words": "3"},
+    ],
 )
 def test_invalid_label_shapes_are_errors(tmp_path: Path, expected: object) -> None:
     """Check invalid label shapes are errors."""
