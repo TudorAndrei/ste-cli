@@ -3,11 +3,18 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from markdown_it import MarkdownIt
+
 if TYPE_CHECKING:
     from ste.models import Diagnostic
+
+_MARKDOWN = MarkdownIt("commonmark").enable("table")
+_COMMENT = re.compile(r"<!--.*?-->")
+_LINE_END = re.compile(r"\r\n|\r|\n")
 
 
 @dataclass
@@ -28,7 +35,8 @@ class Suppression:
 def _parse_directive(line: str) -> tuple[str, list[str]]:
     if "<!--" not in line:
         return "", []
-    body = line.split("<!--", 1)[1].split("-->", 1)[0].split()
+    rest = line.split("<!--", 1)[1]
+    body = rest.split("-->", 1)[0].split()
     if body and body[0] in {
         "ste-disable-next-line",
         "ste-disable-line",
@@ -75,27 +83,61 @@ class _SuppressionState:
         )
 
 
+def _line_spans(source: str) -> list[tuple[int, int, int]]:
+    """Give the start, the end, and the next start of each line, as CommonMark counts lines."""
+    spans = []
+    start = 0
+    for match in _LINE_END.finditer(source):
+        spans.append((start, match.start(), match.end()))
+        start = match.end()
+    spans.append((start, len(source), len(source)))
+    return spans
+
+
+def _directive_text(source: str, spans: list[tuple[int, int, int]]) -> dict[int, str]:
+    """Map each 0-based line to the HTML comment that CommonMark reads as raw HTML.
+
+    A line that is inside a code block or a code span is not in the map.
+    """
+    lines = [source[start:end] for start, end, _ in spans]
+    found: dict[int, str] = {}
+    for token in _MARKDOWN.parse(source):
+        if token.map is None:
+            continue
+        first, last = token.map[0], min(token.map[1], len(lines))
+        if token.type == "html_block":
+            for index in range(first, last):
+                found[index] = lines[index]
+        elif token.type == "inline":
+            comments = {
+                child.content for child in token.children or () if child.type == "html_inline"
+            }
+            for index in range(first, last):
+                for match in _COMMENT.finditer(lines[index]):
+                    if match.group(0) in comments:
+                        found[index] = match.group(0)
+                        break
+    return found
+
+
 def suppressions(source: str) -> list[Suppression]:
-    """Read all rule suppression regions from HTML comments."""
+    """Read all rule suppression regions from HTML comments outside code."""
     if "ste-disable" not in source:
         return []
+    spans = _line_spans(source)
+    directives = _directive_text(source, spans)
     state = _SuppressionState()
-    line_start = 0
-    for line in source.split("\n"):
-        line_end = line_start + len(line)
-        next_start = line_end + 1
-        directive, ids = _parse_directive(line)
+    for index, (line_start, line_end, next_start) in enumerate(spans):
+        directive, ids = _parse_directive(directives.get(index, ""))
         if directive == "ste-disable-next-line":
-            next_end = source.find("\n", next_start)
-            state.regions.append(
-                Suppression(next_start, next_end + 1 if next_end >= 0 else len(source), ids)
-            )
+            # A directive on the last line has no next line.
+            following = spans[index + 1][2] if index + 1 < len(spans) else len(source)
+            state.regions.append(Suppression(next_start, following, ids))
         elif directive == "ste-disable-line":
             state.regions.append(Suppression(line_start, line_end, ids))
         elif directive == "ste-disable":
             state.disable(ids, line_start)
         elif directive == "ste-enable":
             state.enable(ids, line_end)
-        line_start = next_start
     state.finish(len(source))
     return state.regions
