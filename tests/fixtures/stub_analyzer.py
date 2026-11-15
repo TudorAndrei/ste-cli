@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import json
 import sys
+import time
+
+# A sentence that starts with "Slow" gets its answer after this delay.
+SLOW_DELAY = 0.3
 
 
 def main() -> int:
@@ -23,6 +27,8 @@ def main() -> int:
         if request.get("stop"):
             return 0
         text = request.get("text", "")
+        if text.startswith("Slow"):
+            time.sleep(SLOW_DELAY)
         tokens = []
         offset = 0
         for index, word in enumerate(text.split(" ")):

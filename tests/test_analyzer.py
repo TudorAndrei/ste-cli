@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from ste import analyzer
 from ste.analyzer import ExternalAnalyzer, SpacyAnalyzer
 from ste.checker import lint
 from ste.cli import run
@@ -109,6 +110,24 @@ def test_analyzer_exit_does_not_break_close(tmp_path: Path) -> None:
     try:
         assert client.grammar("First sentence.") == ([], False)
         assert client.grammar("Next sentence.") == ([], False)
+    finally:
+        client.close()
+
+
+def test_late_answer_does_not_break_the_next_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check that a late answer to a timed-out request is discarded."""
+    monkeypatch.setattr(analyzer, "RESPONSE_TIMEOUT", 0.1)
+    client = ExternalAnalyzer([sys.executable, str(STUB)])
+    try:
+        # The stub answers "Slow" sentences after SLOW_DELAY, which is later than the timeout.
+        with pytest.raises(ValueError, match="did not answer before the timeout"):
+            client.analyze("Slow sentence.")
+        # The stub writes the late answer first, and then the answer to this request.
+        monkeypatch.setattr(analyzer, "RESPONSE_TIMEOUT", 30.0)
+        tokens = client.analyze("The report was signed by the team.")
+        assert tokens[3].text == "signed"
+        sentence = "The report was signed by the team."
+        assert client.passive_at(sentence, SIGNED_CHARACTER_START) == (True, True)
     finally:
         client.close()
 
