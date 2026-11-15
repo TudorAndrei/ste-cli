@@ -11,12 +11,14 @@ from ste.rules.grammar_words import (
     separated_phrasal,
     technical_words,
 )
+from ste.rules.omissions import omitted_article
 from ste.rules.procedures import (
     condition_clause_order,
     note_command,
     safety_command,
     step_instructions,
 )
+from ste.rules.punctuation import compound_hyphen
 from ste.rules.structure import (
     condition_order,
     note_instruction,
@@ -75,4 +77,6 @@ def all_rules() -> list[Rule]:
         note_command,
         part_of_speech,
         word_forms,
+        omitted_article,
+        compound_hyphen,
     ]
