@@ -52,6 +52,10 @@
       ]
     },
     "eval": {
+      "--analyze": {
+        "note": "exit 2 when a fixture needs the analyzer and it cannot start. Without the flag, the run skips such a fixture and names it in skipped.",
+        "type": "boolean"
+      },
       "--fail-under": {
         "note": "exit 1 when the precision or the recall is less",
         "type": "number"

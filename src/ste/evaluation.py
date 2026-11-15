@@ -28,6 +28,7 @@ class EvaluationReport(TypedDict):
     """Results of a run against the labeled corpus."""
 
     files: int
+    skipped: list[str]
     rules: list[RuleScore]
     totals: RuleScore
 
@@ -129,8 +130,12 @@ def _dictionary(path: Path, value: object) -> dictionary.Index | None:
     return index
 
 
-def run(directory: str | Path) -> EvaluationReport:
-    """Measure all fixtures in a labeled corpus."""
+def run(directory: str | Path, *, require_analyzer: bool = False) -> EvaluationReport:
+    """Measure all fixtures in a labeled corpus.
+
+    Without the analyzer, the run skips a fixture that needs it. With
+    ``require_analyzer``, the run stops with an error instead.
+    """
     root = Path(directory)
     if not root.is_dir():
         msg = f"{root}: the corpus directory does not exist"
@@ -142,39 +147,64 @@ def run(directory: str | Path) -> EvaluationReport:
         msg = f"{root}: the corpus has no fixture files"
         raise ValueError(msg)
     counts: defaultdict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
-    client: analyzer.Analyzer | None = None
+    grammar = _Grammar(required=require_analyzer)
+    skipped: list[str] = []
     try:
-        for path in files:
-            client = _measure(path, counts, client)
+        skipped.extend(
+            path.relative_to(root).as_posix()
+            for path in files
+            if not _measure(path, counts, grammar)
+        )
     finally:
-        if client is not None:
-            client.close()
+        grammar.close()
     totals = [sum(v[n] for v in counts.values()) for n in range(3)]
     return {
         "files": len(files),
+        "skipped": skipped,
         "rules": [_score(k, counts[k]) for k in sorted(counts)],
         "totals": _score("all", totals),
     }
 
 
-def _measure(
-    path: Path, counts: defaultdict[str, list[int]], client: analyzer.Analyzer | None
-) -> analyzer.Analyzer | None:
-    """Add the results of one fixture, and return the analyzer for the next fixture.
+class _Grammar:
+    """The analyzer of a run. It starts at the first fixture that needs it."""
 
-    A fixture with ``"analyze": true`` uses the grammar analyzer. The analyzer
-    starts at the first such fixture, and the next fixtures use it again.
+    def __init__(self, *, required: bool) -> None:
+        self.required = required
+        self.checked = False
+        self.client: analyzer.Analyzer | None = None
+
+    def get(self) -> analyzer.Analyzer | None:
+        """Return the analyzer, or None when it cannot start on this computer."""
+        if not self.checked:
+            self.checked = True
+            status = analyzer.check()
+            if status["ready"]:
+                self.client = analyzer.create()
+            elif self.required:
+                msg = f"the corpus needs the analyzer. {status['problem']}"
+                raise ValueError(msg)
+        return self.client
+
+    def close(self) -> None:
+        """Stop the analyzer, if it started."""
+        if self.client is not None:
+            self.client.close()
+
+
+def _measure(path: Path, counts: defaultdict[str, list[int]], grammar: _Grammar) -> bool:
+    """Add the results of one fixture, and return False when the run skips it.
+
+    A fixture with ``"analyze": true`` needs the grammar analyzer. Without
+    spaCy, the run skips that fixture, and the report names it.
     """
     source = path.read_text(encoding="utf-8")
     expected_path = path.with_suffix(".expected.json")
     opts, analyze, want = _expected(expected_path)
     if analyze:
+        client = grammar.get()
         if client is None:
-            status = analyzer.check()
-            if not status["ready"]:
-                msg = f"{path}: the fixture needs the analyzer. {status['problem']}"
-                raise ValueError(msg)
-            client = analyzer.create()
+            return False
         opts.syntax = client
     used: set[int] = set()
     for diag in lint(source, opts):
@@ -197,7 +227,7 @@ def _measure(
     for n, expectation in enumerate(want):
         if n not in used:
             counts[expectation["rule_id"]][2] += 1
-    return client
+    return True
 
 
 def write_text(stream: TextIO, data: EvaluationReport) -> None:
@@ -210,3 +240,9 @@ def write_text(stream: TextIO, data: EvaluationReport) -> None:
         for row in [*rows, data["totals"]]
     )
     stream.write(f"\n{data['files']} fixture files\n")
+    if data["skipped"]:
+        stream.write(
+            f"{len(data['skipped'])} fixture files skipped, because they need the analyzer: "
+            + ", ".join(data["skipped"])
+            + "\n"
+        )

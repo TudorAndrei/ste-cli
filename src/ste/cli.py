@@ -943,10 +943,16 @@ def _run_analyzer(output_format: str, stdout: TextIO, *, clear_cache: bool) -> i
     return 0
 
 
-def _run_eval(
-    directory: str, output_format: str, fail_under: float, stdout: TextIO, stderr: TextIO
+def _run_eval(  # noqa: PLR0913 - one parameter for each option of the command.
+    directory: str,
+    output_format: str,
+    fail_under: float,
+    stdout: TextIO,
+    stderr: TextIO,
+    *,
+    require_analyzer: bool = False,
 ) -> int:
-    data = evaluation.run(directory)
+    data = evaluation.run(directory, require_analyzer=require_analyzer)
     if output_format == "json":
         stdout.write(json.dumps(data, indent=2) + "\n")
     else:
@@ -1130,10 +1136,26 @@ def eval_command(
     fail_under: Annotated[
         float, typer.Option("--fail-under", help="Minimum precision and recall.")
     ] = -1,
+    analyze: Annotated[
+        bool,
+        typer.Option(
+            "--analyze",
+            help="Stop with an error when a fixture needs the analyzer and it cannot start.",
+        ),
+    ] = False,
 ) -> None:
     """Measure rules against a labeled corpus."""
     io = streams(ctx)
-    raise typer.Exit(_run_eval(directory, output_format.value, fail_under, io.stdout, io.stderr))
+    raise typer.Exit(
+        _run_eval(
+            directory,
+            output_format.value,
+            fail_under,
+            io.stdout,
+            io.stderr,
+            require_analyzer=analyze,
+        )
+    )
 
 
 @app.command("review", cls=SteCommand)

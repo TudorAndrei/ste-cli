@@ -18,11 +18,17 @@ LABELED_FINDINGS = 2
 
 
 def test_corpus_matches_existing_labels() -> None:
-    """Check corpus matches existing labels."""
+    """Check corpus matches existing labels.
+
+    Without spaCy, the run skips the fixtures that need the analyzer. The
+    other fixtures must still agree with their labels.
+    """
     data = evaluation.run(Path(__file__).parents[1] / "testdata")
     assert data["files"] == CORPUS_FILE_COUNT
     assert data["totals"]["precision"] == 1
     assert data["totals"]["recall"] == 1
+    if data["skipped"]:
+        pytest.skip("spaCy is not installed, thus the count of findings is not complete")
     assert data["totals"]["true_positives"] == CORPUS_FINDING_COUNT
 
 
@@ -132,8 +138,33 @@ def test_analyze_label_gives_grammar_to_the_fixture(
     assert len(made) == 1
 
 
-def test_analyze_label_needs_the_analyzer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A fixture that needs the analyzer stops the run when it cannot start."""
+def test_analyzer_fixture_is_skipped_without_the_analyzer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without spaCy, the run skips a fixture that needs the analyzer and names it."""
+    from ste import analyzer  # noqa: PLC0415 - the patch needs the module object.
+
+    monkeypatch.setattr(
+        analyzer, "check", lambda: {"ready": False, "problem": "spaCy is not installed"}
+    )
+    (tmp_path / "a.md").write_text("Open the valve.")
+    (tmp_path / "a.expected.json").write_text(
+        json.dumps({"analyze": True, "expect": [{"rule_id": "STE-5.2"}]})
+    )
+    (tmp_path / "b.md").write_text("It isn't open.")
+    (tmp_path / "b.expected.json").write_text(json.dumps({"expect": [{"rule_id": "STE-4.2"}]}))
+    data = evaluation.run(tmp_path)
+    assert data["skipped"] == ["a.md"]
+    assert data["totals"]["recall"] == 1
+    out = io.StringIO()
+    evaluation.write_text(out, data)
+    assert "1 fixture files skipped, because they need the analyzer: a.md" in out.getvalue()
+
+
+def test_require_analyzer_stops_without_the_analyzer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With require_analyzer, a fixture that needs the analyzer stops the run."""
     from ste import analyzer  # noqa: PLC0415 - the patch needs the module object.
 
     monkeypatch.setattr(
@@ -142,4 +173,4 @@ def test_analyze_label_needs_the_analyzer(tmp_path: Path, monkeypatch: pytest.Mo
     (tmp_path / "a.md").write_text("Open the valve.")
     (tmp_path / "a.expected.json").write_text(json.dumps({"analyze": True}))
     with pytest.raises(ValueError, match=r"needs the analyzer\. spaCy is not installed"):
-        evaluation.run(tmp_path)
+        evaluation.run(tmp_path, require_analyzer=True)
