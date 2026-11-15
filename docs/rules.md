@@ -306,7 +306,7 @@ a link target, or in an HTML entity such as `&nbsp;`.
 
 ## STE-9.3 Phrasal verb
 
-Reports 24 phrasal verbs in all their forms: the base form, the third-person
+Reports 51 phrasal verbs in all their forms: the base form, the third-person
 form, the past form, and the "-ing" form. Example: "carry out", "carries
 out", "carried out", "carrying out". Rule 9.3 tells you not to make a
 phrasal verb from two words.
@@ -321,8 +321,12 @@ phrasal verb from two words.
   a confidence of 0.70.
 - "comes on" and "comes off" tell the state of a light or a switch, and the
   rule does not report them.
-- The analyzer can join a particle to the wrong word. Then the rule does not
-  find "look the key up".
+- The analyzer can join a particle to the object, as in "look the key up",
+  or give it the relation of an adverb, as in "throw the logs away". The
+  rule then reports only a phrasal verb of the list. The adverbs "on" and
+  "in" do not count, because "keep the light on" gives a state.
+- "up to" before a number gives a limit, as in "show up to 10 results".
+  The rule does not report it.
 - A technical verb in `allow.verbs` removes its phrasal verbs from the
   rule. A technical noun does not, thus "log" in `allow.nouns` does not
   permit "log in".

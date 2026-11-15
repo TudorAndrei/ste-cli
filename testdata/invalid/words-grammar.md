@@ -15,3 +15,7 @@ The inspection was performed by the team.
 Turn the pump off.
 
 Log in to the server.
+
+Look the API key up in the settings page.
+
+Throw the old logs away.

@@ -442,7 +442,7 @@
         0.85,
         0.7
       ],
-      "note": "0.85 for a phrasal verb of the list. With the analyzer, the rule also finds a particle with words between it and its verb. A phrasal verb that is not in the list gets 0.7."
+      "note": "0.85 for a phrasal verb of the list. With the analyzer, the rule also finds a particle with words between it and its verb. A phrasal verb that is not in the list gets 0.7. A particle that the parser joins to the object, or reads as an adverb, counts only for a verb of the list. \"up to\" before a number is not a particle."
     },
     {
       "id": "STE-GR-6",

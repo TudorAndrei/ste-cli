@@ -10,7 +10,7 @@ from ste.config import SOFTWARE_NOUNS
 from ste.models import Diagnostic, Document, Options, Sentence, Token
 from ste.rules.common import phrase_matcher, span
 from ste.rules.data import NOMINALIZATIONS, PHRASAL_VERBS
-from ste.rules.verbs import match_phrasal
+from ste.rules.verbs import match_phrasal, up_to_amount
 
 TECHNICAL_WORD_CONFIDENCE = 0.7
 ACTION_NOUN_CONFIDENCE = 0.85
@@ -23,6 +23,12 @@ _PHRASAL_SUGGESTIONS = {
 # "OFF" are words for a state, thus "the light comes on" is not a phrasal
 # verb that needs a different verb.
 _STATE_PARTICLES = {("come", "on"), ("come", "off")}
+# A particle that gives a state when an object comes between, as in "keep
+# the light on". Only "keep on" with no words between means "continue".
+_SEPARATED_STATES = {("keep", "on")}
+# Adverbs that can be the particle of a phrasal verb. "on" and "in" are not
+# here: "keep the light on" gives a state.
+_ADVERB_PARTICLES = frozenset({"away", "back", "down", "off", "out", "up"})
 _ACTION_DEPS = {"dobj", "nsubjpass"}
 _LISTED_NOMINALIZATIONS = phrase_matcher(tuple(tuple(words) for words, _ in NOMINALIZATIONS))
 
@@ -341,6 +347,34 @@ def action_nouns(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
+def _particle_verb(s: Sentence, p: int) -> tuple[int, bool]:
+    """Return the verb of a particle, and whether the parser joins them.
+
+    The parser can give the particle the relation "advmod", as in "throw the
+    logs away". It can also join the particle to the object, as in "look the
+    API key up". The second value is false for these two forms, and only a
+    phrasal verb of the list then gives a finding.
+    """
+    t = s.tokens[p]
+    h = t.head
+    if h < 0 or h == p:
+        return -1, False
+    head = s.tokens[h]
+    if t.dep == "prt" and head.pos == "VERB":
+        return h, True
+    if not (
+        (t.tag == "RP" and t.dep in {"prt", "advmod"})
+        or (t.dep == "advmod" and t.pos == "ADV" and t.lower in _ADVERB_PARTICLES)
+    ):
+        return -1, False
+    if head.pos == "VERB" and h < p:
+        return h, False
+    g = head.head
+    if head.pos in {"NOUN", "PROPN"} and 0 <= g < h and s.tokens[g].pos == "VERB":
+        return g, False
+    return -1, False
+
+
 def separated_phrasal(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report a verb and its particle that the word list does not find.
 
@@ -353,21 +387,23 @@ def separated_phrasal(doc: Document, opts: Options) -> list[Diagnostic]:
         if not s.tagged:
             continue
         for p, particle in enumerate(s.tokens):
-            verb = particle.head
-            if particle.dep != "prt" or verb < 0 or verb == p:
+            verb, joined = _particle_verb(s, p)
+            if verb < 0:
                 continue
             v = s.tokens[verb]
             # A technical noun such as "log" does not permit the verb "log in".
-            if v.pos != "VERB" or v.lower in verbs or match_phrasal(s, verb, opts):
+            if v.lower in verbs or match_phrasal(s, verb, opts) or up_to_amount(s, p):
                 continue
             first, last = min(verb, p), max(verb, p)
             phrase = span(s, first, last)
             if opts.allowed(phrase):
                 continue
             key = (_base(v), particle.lower)
-            if key in _STATE_PARTICLES:
+            if key in _STATE_PARTICLES or (key in _SEPARATED_STATES and p > verb + 1):
                 continue
             listed = key in _PHRASAL_SUGGESTIONS
+            if not joined and not listed:
+                continue
             name = f"{key[0]} {key[1]}"
             out.append(
                 Diagnostic(

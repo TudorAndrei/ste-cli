@@ -12,6 +12,8 @@
     { "rule_id": "STE-3.7", "text": "inspection was performed" },
     { "rule_id": "STE-3.6", "text": "was performed" },
     { "rule_id": "STE-9.3", "text": "Turn the pump off" },
-    { "rule_id": "STE-9.3", "text": "Log in" }
+    { "rule_id": "STE-9.3", "text": "Log in" },
+    { "rule_id": "STE-9.3", "text": "Look the API key up" },
+    { "rule_id": "STE-9.3", "text": "Throw the old logs away" }
   ]
 }

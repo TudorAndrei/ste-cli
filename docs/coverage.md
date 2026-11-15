@@ -90,7 +90,7 @@ column "Needs" gives what that part needs:
 | 7.3 | An explanation of the risk | `STE-7.3` reports a short block of one sentence. | Does the text give a risk? | Reader |
 | 8.2 | A hyphen between words that are directly related | `STE-8.2`, with the analyzer and the `info` severity. It reads a list of pairs for an adjective and a noun. | A pair of an adjective and a noun that is not in the list, and a pair of nouns | Tagger |
 | 8.6 | Elements that count as one word | A number, a quantity and its unit, quoted text, and the number of a step. With the analyzer, a name of many words. | A title or an identifier in small letters | Tagger |
-| 9.3 | A phrasal verb | `STE-9.3` reports 24 phrasal verbs. With the analyzer, it also finds a separated particle and a phrasal verb that is not in the list. | The list is not complete, and the parser makes errors. | Tagger |
+| 9.3 | A phrasal verb | `STE-9.3` reports 51 phrasal verbs. With the analyzer, it also finds a separated particle and a phrasal verb that is not in the list. | The list is not complete, and the parser makes errors. | Tagger |
 | 9.4 | A consistent style | `STE-1.11` reads `prefer`. | Wording that the config does not give | Reader |
 
 ## The analyzer

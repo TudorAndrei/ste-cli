@@ -20,6 +20,12 @@ MIN_PARTICIPLE_LENGTH = 3
 MIN_ING_LENGTH = 4
 MIN_ADVERB_LENGTH = 3
 SYNTAX_CONFIDENCE = 0.9
+# "up to" before an amount gives a limit, as in "show up to 10 results".
+# Then "up" is not the particle of a phrasal verb.
+_AMOUNT_WORDS = frozenset(
+    {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"}
+    | {"twenty", "fifty", "hundred", "thousand", "a", "an"}
+)
 PHRASAL_INDEX: dict[str, list[tuple[list[str], str]]] = {}
 for _base, _particles, _suggestion in PHRASAL_VERBS:
     for _form in VERB_FORMS[_base]:
@@ -166,12 +172,24 @@ def match_passive(s: Sentence, i: int, opts: Options) -> tuple[Diagnostic, bool]
     ), agent
 
 
+def up_to_amount(s: Sentence, last: int) -> bool:
+    """Return whether the particle "up" starts "up to" and an amount."""
+    after = [t.lower for t in s.tokens[last : last + 3]]
+    return (
+        len(after) == 3  # noqa: PLR2004
+        and after[:2] == ["up", "to"]
+        and (after[2][:1].isdigit() or after[2] in _AMOUNT_WORDS)
+    )
+
+
 def match_phrasal(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
     """Find a phrasal verb that starts at one token."""
     for particles, suggestion in PHRASAL_INDEX.get(s.tokens[i].lower, []):
         if [t.lower for t in s.tokens[i + 1 : i + 1 + len(particles)]] != particles:
             continue
         last = i + len(particles)
+        if up_to_amount(s, last):
+            continue
         phrase = span(s, i, last)
         if opts.allowed(phrase) or opts.allowed(s.tokens[i].lower):
             continue

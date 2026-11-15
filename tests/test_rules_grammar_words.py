@@ -96,6 +96,82 @@ def test_a_preposition_is_not_a_particle() -> None:
     assert found(text, spec, "STE-9.3") == []
 
 
+def test_a_particle_that_the_parser_joins_to_the_object() -> None:
+    """Check a listed verb when the parser gives its particle to the object."""
+    text = "Look the API key up in the settings page."
+    spec = [
+        "Look/VERB/VB/ROOT//look",
+        "the/DET/DT/det/2/the",
+        "API/NOUN/NN/nsubj/3/api",
+        "key/NOUN/NN/ccomp/0/key",
+        "up/ADP/RP/prt/3/up",
+        "in/ADP/IN/prep/3/in",
+        "the/DET/DT/det/7/the",
+        "settings/NOUN/NNS/pobj/5/setting",
+        "page/NOUN/NN/advmod/0/page",
+        "./PUNCT/./punct/0/.",
+    ]
+    findings = found(text, spec, "STE-9.3")
+    assert texts(text, findings) == ["Look the API key up"]
+    assert findings[0].suggestion == 'Write "find".'
+
+
+def test_an_adverb_particle_of_a_listed_verb() -> None:
+    """Check that "away" after the object of "throw" is a particle."""
+    text = "Throw the old logs away."
+    spec = [
+        "Throw/VERB/VB/ROOT//throw",
+        "the/DET/DT/det/3/the",
+        "old/ADJ/JJ/amod/3/old",
+        "logs/NOUN/NNS/dobj/0/log",
+        "away/ADV/RB/advmod/0/away",
+        "./PUNCT/./punct/0/.",
+    ]
+    assert texts(text, found(text, spec, "STE-9.3")) == ["Throw the old logs away"]
+
+
+def test_an_adverb_for_a_state_is_not_a_particle() -> None:
+    """Check that "on" for a state, and a verb outside the list, give no finding."""
+    keep = "Keep the light on."
+    keep_spec = [
+        "Keep/VERB/VB/ROOT//keep",
+        "the/DET/DT/det/2/the",
+        "light/NOUN/NN/dobj/0/light",
+        "on/ADV/RB/advmod/0/on",
+        "./PUNCT/./punct/0/.",
+    ]
+    move = "Move the API key up in the list."
+    move_spec = [
+        "Move/VERB/VB/ROOT//move",
+        "the/DET/DT/det/2/the",
+        "API/NOUN/NN/compound/3/api",
+        "key/NOUN/NN/dobj/0/key",
+        "up/ADP/RP/prt/3/up",
+        "in/ADP/IN/prep/3/in",
+        "the/DET/DT/det/7/the",
+        "list/NOUN/NN/pobj/5/list",
+        "./PUNCT/./punct/0/.",
+    ]
+    keep_prt = [item.replace("on/ADV/RB/advmod", "on/ADP/RP/prt") for item in keep_spec]
+    assert found(keep, keep_spec, "STE-9.3") == []
+    assert found(keep, keep_prt, "STE-9.3") == []
+    assert found(move, move_spec, "STE-9.3") == []
+
+
+def test_up_to_an_amount_is_not_a_particle() -> None:
+    """Check that "up to five" gives a limit, also when the parser reads a particle."""
+    text = "Give up to five seconds."
+    spec = [
+        "Give/VERB/VB/ROOT//give",
+        "up/ADP/RP/prt/0/up",
+        "to/PART/TO/quantmod/3/to",
+        "five/NUM/CD/nummod/4/five",
+        "seconds/NOUN/NNS/dobj/0/second",
+        "./PUNCT/./punct/0/.",
+    ]
+    assert found(text, spec, "STE-9.3") == []
+
+
 def test_a_separated_phrasal_verb_needs_the_grammar() -> None:
     """Check that the word list alone does not report a separated form."""
     assert [d for d in lint(TURN_OFF, Options()) if d.rule_id == "STE-9.3"] == []

@@ -619,5 +619,27 @@ VERB_CASES: list[VerbCase] = [
         "name": "phrasal/shut-down",
         "text": "Shut down the computer.",
     },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "Look up"}],
+        "name": "phrasal/look-up",
+        "text": "Look up the key in the table.",
+    },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "goes down"}],
+        "name": "phrasal/go-down",
+        "text": "The service goes down when the disk is full.",
+    },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "came back"}],
+        "name": "phrasal/come-back",
+        "text": "The server came back after the restart.",
+    },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "Throw away"}],
+        "name": "phrasal/throw-away",
+        "text": "Throw away the old logs.",
+    },
+    {"expect": [], "name": "phrasal/up-to-a-number", "text": "Show up to 10 results."},
+    {"expect": [], "name": "phrasal/up-to-a-number-word", "text": "Give up to five seconds."},
     {"expect": [], "name": "clean/imperative", "text": "Start the pump. Then open the valve."},
 ]
