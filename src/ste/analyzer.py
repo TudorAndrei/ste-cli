@@ -24,6 +24,8 @@ from ste.analyzer_worker import (
     DEFAULT_PARTS,
     MODEL,
     excluded,
+    in_lexicon,
+    lexicon,
     model_identity,
     model_version,
 )
@@ -70,6 +72,14 @@ def _label(token: dict[str, object], key: str) -> str:
     return value
 
 
+def _flag(token: dict[str, object], key: str) -> bool:
+    value = token.get(key, True)
+    if not isinstance(value, bool):
+        msg = "the analyzer token flags must be true or false"
+        raise _ProtocolError(msg)
+    return value
+
+
 def _parse_tokens(raw: object) -> list[SyntaxToken]:
     if not isinstance(raw, list):
         msg = "the analyzer tokens must be a list"
@@ -89,6 +99,7 @@ def _parse_tokens(raw: object) -> list[SyntaxToken]:
                 head=_integer(token, "head"),
                 start=_integer(token, "start"),
                 lemma=_label(token, "lemma"),
+                in_lexicon=_flag(token, "in_lexicon"),
             )
         )
     return tokens
@@ -181,11 +192,13 @@ class SpacyAnalyzer(Analyzer):
         """Find the local model and name it, without loading it."""
         super().__init__()
         self._nlp: NLPModel | None = None
+        self._words: frozenset[str] = frozenset()
         try:
             version = model_version()
         except metadata.PackageNotFoundError:
             # The load gives the message and the command that installs the part.
             self._nlp = _load_model(parts)
+            self._words = lexicon(self._nlp)
             version = model_version()
         self._parts = parts
         self.model = MODEL
@@ -196,6 +209,7 @@ class SpacyAnalyzer(Analyzer):
         """Return the model, and load it at the first use."""
         if self._nlp is None:
             self._nlp = _load_model(self._parts)
+            self._words = lexicon(self._nlp)
         return self._nlp
 
     def analyze(self, text: str) -> list[SyntaxToken]:
@@ -204,12 +218,23 @@ class SpacyAnalyzer(Analyzer):
 
     def analyze_batch(self, texts: list[str]) -> list[list[SyntaxToken]]:
         """Analyze many sentences with one call of ``nlp.pipe``."""
+        nlp = self.nlp
         return [
             [
-                SyntaxToken(t.i, t.text, t.pos_, t.tag_, t.dep_, t.head.i, t.idx, t.lemma_)
+                SyntaxToken(
+                    t.i,
+                    t.text,
+                    t.pos_,
+                    t.tag_,
+                    t.dep_,
+                    t.head.i,
+                    t.idx,
+                    t.lemma_,
+                    in_lexicon(t.text, t.pos_, self._words),
+                )
                 for t in doc
             ]
-            for doc in self.nlp.pipe(texts, batch_size=BATCH_SIZE)
+            for doc in nlp.pipe(texts, batch_size=BATCH_SIZE)
         ]
 
 

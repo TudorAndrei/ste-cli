@@ -42,6 +42,10 @@ class SyntaxToken:
     head: int
     start: int
     lemma: str = ""
+    # False when the analyzer has a word list and the word is not in it, as
+    # for the name of a tool such as "oxfmt". The tagger can give such a
+    # word any part of speech.
+    in_lexicon: bool = True
 
 
 @dataclass

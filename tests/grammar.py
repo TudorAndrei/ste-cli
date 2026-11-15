@@ -5,7 +5,9 @@ A test gives the grammar of each sentence as a list of tokens. A token is a
 string ``"text/POS/TAG/dep/head"`` or ``"text/POS/TAG/dep/head/lemma"``, or a
 tuple with the same fields. ``head`` is the index of the head token in the
 same list, and an empty head makes the token its own head (the root). The
-helper finds the offset of each token in the sentence, in order.
+helper finds the offset of each token in the sentence, in order. A seventh
+field ``unknown`` marks a word that the lexicon of the model does not have,
+as in ``"oxfmt/VERB/VB/conj/0/oxfmt/unknown"``.
 
 Two forms give the same grammar to the rules:
 
@@ -56,7 +58,10 @@ def syntax_tokens(sentence: str, spec: Sequence[Spec]) -> list[SyntaxToken]:
         lemma = fields[_FIELDS] if len(fields) > _FIELDS else ""
         start = sentence.index(text, offset)
         offset = start + len(text)
-        out.append(SyntaxToken(i, text, pos, tag, dep, int(head) if head else i, start, lemma))
+        known = fields[_FIELDS + 1 :] != ["unknown"]
+        out.append(
+            SyntaxToken(i, text, pos, tag, dep, int(head) if head else i, start, lemma, known)
+        )
     return out
 
 

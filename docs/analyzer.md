@@ -184,6 +184,12 @@ The program gives `{"ready": true}` first. `{"stop": true}` ends it. A
 different program can replace spaCy. It must give only a part of speech and
 a relation for each token. The `lemma` field is optional.
 
+The field `"in_lexicon": false` is also optional. It marks a word that is
+not in the word list of the model, such as the name of a tool. The list has
+only nouns, verbs, adjectives, and adverbs. The lemmatizer of spaCy gives
+it. A token without the field is in the word list. Rule `STE-5.2` ignores a
+second verb with this mark.
+
 `tests/fixtures/stub_analyzer.py` is an example that needs no library.
 `--analyzer "<command>"` gives your own program to the tool.
 

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 # Increment this number when the stored token format changes.
-FORMAT = 1
+FORMAT = 2
 # The cache keeps the newest entries up to this number. One entry is about
 # 600 bytes, thus the file stays below about 60 MB.
 MAX_ENTRIES = 100_000
@@ -66,7 +66,10 @@ def clear(path: Path | None = None) -> bool:
 
 def _encode(tokens: list[SyntaxToken]) -> str:
     return json.dumps(
-        [[t.index, t.text, t.pos, t.tag, t.dep, t.head, t.start, t.lemma] for t in tokens],
+        [
+            [t.index, t.text, t.pos, t.tag, t.dep, t.head, t.start, t.lemma, t.in_lexicon]
+            for t in tokens
+        ],
         ensure_ascii=False,
         separators=(",", ":"),
     )

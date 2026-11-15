@@ -14,6 +14,7 @@ import pytest
 
 from ste import analyzer
 from ste.analyzer import ExternalAnalyzer, SpacyAnalyzer
+from ste.analyzer_worker import in_lexicon
 from ste.checker import lint
 from ste.cli import run
 from ste.document import parse
@@ -161,3 +162,58 @@ def test_cli_external_analyzer_with_space_in_path(tmp_path: Path) -> None:
     findings = json.loads(stdout.getvalue())["findings"]
     assert [f["rule_id"] for f in findings] == ["STE-3.6"]
     assert findings[0]["text"] == "was signed"
+
+
+LEXICON = frozenset({"use", "return", "connect", "token", "install", "format", "base"})
+
+
+@pytest.mark.parametrize(
+    ("word", "want"),
+    [
+        ("return", True),
+        ("Returns", True),
+        ("returned", True),
+        ("reconnect", True),
+        ("uninstall", True),
+        ("tokenize", True),
+        ("rebase", True),
+        ("oxfmt", False),
+        ("oxlint", False),
+        ("window_count", True),
+        ("3D", True),
+    ],
+)
+def test_a_word_outside_the_lexicon(word: str, *, want: bool) -> None:
+    """Check that only a word that the lexicon cannot give is not English."""
+    assert in_lexicon(word, "VERB", LEXICON) is want
+
+
+def test_an_empty_lexicon_knows_each_word() -> None:
+    """Check that a model without a lexicon marks no word."""
+    assert in_lexicon("oxfmt", "VERB", frozenset())
+
+
+def test_the_protocol_marks_a_word_outside_the_lexicon(tmp_path: Path) -> None:
+    """Check that "in_lexicon": false reaches the grammar token."""
+    script = tmp_path / "lexicon.py"
+    token = {"i": 0, "text": "oxfmt", "pos": "VERB", "head": 0, "in_lexicon": False}
+    script.write_text(
+        "import json, sys\nprint('{\"ready\": true}', flush=True)\n"
+        'for line in sys.stdin:\n r=json.loads(line)\n if r.get("stop"): break\n'
+        f' print(json.dumps({{"id":r["id"],"tokens":[{token!r}]}}), flush=True)\n'
+    )
+    client = ExternalAnalyzer([sys.executable, str(script)])
+    try:
+        assert not client.analyze("oxfmt")[0].in_lexicon
+    finally:
+        client.close()
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("en_core_web_sm") is None,
+    reason="optional spaCy model is not installed",
+)
+def test_local_spacy_marks_a_tool_name() -> None:
+    """Check that the local model marks a tool name, and not an English verb."""
+    tokens = SpacyAnalyzer().analyze("Use oxlint for linting and oxfmt for formatting.")
+    assert {t.text for t in tokens if not t.in_lexicon} == {"oxlint", "oxfmt"}

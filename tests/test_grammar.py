@@ -225,7 +225,10 @@ def test_disk_cache_serves_a_second_run() -> None:
 
 def test_disk_cache_separates_analyzers(cache_file: Path) -> None:
     """Check that a different model identity does not read an entry."""
-    tokens = [SyntaxToken(0, "Go", "VERB", "VB", "ROOT", 0, 0, "go")]
+    tokens = [
+        SyntaxToken(0, "Go", "VERB", "VB", "ROOT", 0, 0, "go"),
+        SyntaxToken(1, "oxfmt", "VERB", "VB", "conj", 0, 3, "oxfmt", in_lexicon=False),
+    ]
     cache = GrammarCache("a", cache_file)
     cache.put_many({"Go.": tokens})
     assert cache.get_many(["Go."]) == {"Go.": tokens}
