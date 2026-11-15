@@ -1,0 +1,11 @@
+{
+  "analyze": true,
+  "dictionary": "../dictionaries/invented.json",
+  "expect": [
+    { "rule_id": "STE-1.2", "text": "plonks" },
+    { "rule_id": "STE-1.2", "text": "glorp" },
+    { "rule_id": "STE-3.1", "text": "twizzled" },
+    { "rule_id": "STE-1.4", "text": "grottiest" },
+    { "rule_id": "STE-1.1", "text": "blep" }
+  ]
+}

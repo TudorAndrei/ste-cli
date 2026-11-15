@@ -42,9 +42,16 @@ def lookup_dictionary(opts: Options, s: Sentence, i: int) -> Diagnostic | None:
         return None
     word = s.tokens[i].lower
     result, unapproved = opts.dictionary.unapproved(word)
-    if not unapproved or (result.only_verb and preceded_by_determiner(s, i)):
+    if not unapproved:
         return None
-    confidence = 0.6 if result.only_verb else 0.95
+    confidence = 0.95
+    if result.only_verb:
+        # The dictionary rejects only the verb. The grammar tells a verb from a
+        # noun. Without it, a determiner before the word shows a noun.
+        pos = s.tokens[i].pos if s.tagged else ""
+        if pos in {"NOUN", "ADJ"} or (pos != "VERB" and preceded_by_determiner(s, i)):
+            return None
+        confidence = 0.95 if pos == "VERB" else 0.6
     suggestion = "The dictionary gives no alternative. Write the idea in approved words."
     if result.alternatives:
         suggestion = 'Write "' + '", or "'.join(result.alternatives) + '".'

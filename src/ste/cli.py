@@ -865,6 +865,8 @@ def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int
                 f"{stats['unapproved']}"
                 "\nalternatives: "
                 f"{stats['alternatives']}"
+                "\nforms:        "
+                f"{stats['forms']}"
                 "\n"
             )
         _write_plan(stdout, ns.output_format, plan, text)

@@ -16,3 +16,4 @@
 |blep (v)|BLEP (TN)|MAKE A BLEP OF THE PLATE.|Blep the plate.|
 |frob (v)|GRIBBLE (v) (WITH A FRAMMIS [TN] OR FRAMMISES [TN])|GRIBBLE THE PLATE WITH A FRAMMIS.|Frob the plate.|
 |GRIBBLE (n)|A hole in a plate|EXAMINE THE GRIBBLE.||
+|WIBBLY (adj), WIBBLIER, WIBBLIEST|Not stable|THE PLATE IS WIBBLIER.||

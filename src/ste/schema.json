@@ -483,7 +483,7 @@
         0.95,
         0.6
       ],
-      "note": "0.95 and 0.6 come from the dictionary. 0.6 means that the dictionary has the word only as a verb, and the tool has no part-of-speech tagger."
+      "note": "0.95 and 0.6 come from the dictionary. 0.6 means that the dictionary has the word only as a verb, and the analyzer did not tag the word. With the analyzer, a verb gets 0.95, and a noun or an adjective gives no finding."
     },
     {
       "id": "STE-1.14",
@@ -752,6 +752,36 @@
         0.8
       ],
       "note": "The rule needs the analyzer. It reads the first sentence of a warning, a caution, and a danger block. It reports a sentence with a subject and a verb that is not a command. A phrase with no verb gives no finding."
+    },
+    {
+      "id": "STE-1.2",
+      "name": "A word that is not the approved part of speech",
+      "standard_rule": "1.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs --use-dict and the analyzer. It reports a verb that the dictionary approves only as a noun or an adjective, and a noun that it approves only as a verb. It does not read a heading or a table cell."
+    },
+    {
+      "id": "STE-1.4",
+      "name": "An adjective form that the dictionary does not give",
+      "standard_rule": "1.4",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It reads a comparative or a superlative adjective."
+    },
+    {
+      "id": "STE-3.1",
+      "name": "A verb form that the dictionary does not give",
+      "standard_rule": "3.1",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It also applies rule 1.4 to a verb. STE-3.5 reports an -ing form."
     }
   ],
   "schema_version": 1,

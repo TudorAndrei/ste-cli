@@ -7,7 +7,10 @@ Report writers convert offsets and columns to UTF-8 bytes for CLI compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @dataclass
@@ -133,11 +136,48 @@ class DictionaryResult:
     technical_noun: bool = False
 
 
+class WordEntry(Protocol):
+    """One entry of an imported dictionary: a word, as one part of speech."""
+
+    @property
+    def word(self) -> str:
+        """The headword, in lower case."""
+        ...
+
+    @property
+    def approved(self) -> bool:
+        """Whether the dictionary approves the word as this part of speech."""
+        ...
+
+    @property
+    def pos(self) -> str:
+        """The part of speech of the dictionary, such as "n", "v", or "adj"."""
+        ...
+
+    @property
+    def alternatives(self) -> list[str]:
+        """The approved words to use instead."""
+        ...
+
+    @property
+    def forms(self) -> list[str]:
+        """The other forms that the dictionary gives, in lower case."""
+        ...
+
+
 class Dictionary(Protocol):
     """The word lookup contract for an imported dictionary."""
 
     def unapproved(self, word: str) -> tuple[DictionaryResult, bool]:
         """Look up an unapproved word and its permitted alternatives."""
+        ...
+
+    def lookup(self, word: str, /) -> Sequence[WordEntry]:
+        """Get each entry of a headword."""
+        ...
+
+    def by_form(self, form: str, /) -> Sequence[WordEntry]:
+        """Get each entry that gives this word as one of its other forms."""
         ...
 
 

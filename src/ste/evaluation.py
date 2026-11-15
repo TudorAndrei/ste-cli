@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import TextIO, TypedDict
 
-from ste import analyzer
+from ste import analyzer, dictionary
 from ste.checker import lint
 from ste.models import Options, Preferred
 
@@ -112,8 +112,21 @@ def _expected(path: Path) -> tuple[Options, bool, list[dict[str, str]]]:
         allow_nouns=_string_list(path, raw.get("allow_nouns"), "allow_nouns"),
         allow_verbs=_string_list(path, raw.get("allow_verbs"), "allow_verbs"),
         prefer=_preferences(path, raw.get("prefer")),
+        dictionary=_dictionary(path, raw.get("dictionary")),
     )
     return opts, analyze, _expectations(path, raw.get("expect"))
+
+
+def _dictionary(path: Path, value: object) -> dictionary.Index | None:
+    """Load the dictionary index that a label names, by a path from the label file."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise _invalid(path, "dictionary must be the path of an index")
+    index = dictionary.load(path.parent / value)
+    if index is None:
+        raise _invalid(path, f"the dictionary {value} does not exist")
+    return index
 
 
 def run(directory: str | Path) -> EvaluationReport:

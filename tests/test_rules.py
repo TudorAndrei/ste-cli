@@ -3,12 +3,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from ste.checker import lint
 from ste.models import DictionaryResult, Options, Preferred
 from tests.grammar import StubSyntax
 from tests.test_rules_cases import STRUCTURE_CASES, SYNTAX_CASES, VERB_CASES, VerbCase
+
+if TYPE_CHECKING:
+    from ste.models import WordEntry
 
 DICTIONARY_CONFIDENCE = 0.95
 ANALYZER_CONFIDENCE = 0.9
@@ -146,6 +151,14 @@ class TestDictionary:
         if word == "utilize":
             return DictionaryResult(alternatives=["use"]), True
         return DictionaryResult(), False
+
+    def lookup(self, _word: str) -> list[WordEntry]:
+        """Give no entry. These tests read only unapproved words."""
+        return []
+
+    def by_form(self, _form: str) -> list[WordEntry]:
+        """Give no entry. These tests read only unapproved words."""
+        return []
 
 
 @pytest.mark.parametrize(

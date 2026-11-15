@@ -49,6 +49,9 @@ severity, and strict mode does not make it an error.
 | `STE-1.13` | A technical verb as a noun | 0.70 | warning |
 | `STE-5.2` | More than one instruction in a step | 0.80 | warning |
 | `STE-7.2` | A safety instruction that does not start with a command | 0.80 | warning |
+| `STE-1.2` | A word that is not the approved part of speech | 0.70 | warning |
+| `STE-1.4` | An adjective form that the dictionary does not give | 0.80 | warning |
+| `STE-3.1` | A verb form that the dictionary does not give | 0.80 | warning |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -70,8 +73,13 @@ the reason that the tool cannot ship the data.
 
 **Limits.** Rule 1.1 also has parts that need more than the word list. They
 are the approved part of speech (rule 1.2) and the approved meaning (rule
-1.3). This tool checks neither. With `--use-dict`, the rule uses a determiner to see
-that a word is a noun, and it does not use a part-of-speech tagger.
+1.3). `STE-1.2` checks the part of speech with the analyzer. The tool does
+not check the meaning.
+
+**With the analyzer.** Some entries reject a word only as a verb. Without the
+analyzer, a determiner before the word shows a noun, and a finding gets a
+confidence of 0.60. With the analyzer, a verb gets 0.95, and a noun or an
+adjective gives no finding.
 
 **Control.** `allow.nouns` and `allow.verbs` in the glossary remove a term
 from this rule. Rule 1.8 tells writers to use the technical nouns of their
@@ -668,6 +676,66 @@ passive voice uses it after "to be".
 - The rule reads the clause as a defect, because the participle has the
   function of a verb in it. A reader can permit a short clause with
   `<!-- ste-disable-next-line STE-3.3 -->`.
+
+## STE-1.2 A word that is not the approved part of speech
+
+Reports a verb when the dictionary approves the word only as a noun or an
+adjective. It also reports a noun when the dictionary approves the word only
+as a verb. Rule 1.2 permits an approved word only as the part of speech that
+the dictionary gives. When the dictionary has the word as an unapproved verb
+with alternatives, the suggestion gives those alternatives.
+
+The rule needs `--use-dict` and the analyzer. Without one of them, it gives
+no finding. It finds the entries by the lemma of the word, thus "plates"
+finds the entry "plate".
+
+**Limits.**
+
+- The tagger can make a mistake. A word that ends with "-s" can be a plural
+  noun or a verb. Thus the confidence is 0.70. Read the sentence before you
+  change it.
+- The rule does not compare a noun and an adjective. The tagger often gives
+  a noun before a noun as an adjective.
+- The rule does not compare an adverb, a preposition, or a conjunction. The
+  tagger often mixes up these classes. It also ignores a word that the
+  dictionary approves as one of these classes.
+- The rule does not read a heading, a table cell, or a sentence of less than
+  3 words. These are usually fragments, and the tagger has no context.
+- A noun as the first word of a sentence does not get a finding. The first
+  word of an instruction is a verb, and the tagger sometimes gives it as a
+  noun.
+- A word with a capital letter after the first word is usually a name. A
+  word with a hyphen or a digit is usually a compound or a name. The rule
+  does not report them.
+- An "-ing" verb does not get a finding. `STE-3.5` reports it.
+- `allow.nouns` and `allow.verbs` remove a word, by its text or its lemma.
+
+## STE-1.4 and STE-3.1 A form that the dictionary does not give
+
+Reports a verb or an adjective in a form that its dictionary entry does not
+give. `STE-3.1` reports a verb, for example a past tense that the entry does
+not give. `STE-1.4` reports a comparative or a superlative adjective, for
+example "-est" when the entry gives only "-er". The suggestion gives the
+forms of the entry. Rules 1.4 and 3.1 permit only the forms that the
+dictionary gives. Thus `STE-3.1` also applies rule 1.4 to a verb.
+
+The rule needs `--use-dict`, the analyzer, and an index with the forms. `ste
+dict import` keeps the forms that your copy gives after a headword, such as
+`WORD (v), WORDS, WORDED`. An index from an earlier version of the tool has
+no forms. Import the dictionary again to get them. `ste dict info` gives the
+number of forms.
+
+**Limits.**
+
+- The rule checks only an entry that gives one or more forms.
+- The analyzer must give the correct lemma. For a word that it does not
+  know, the lemma can be wrong, and then the rule gives no finding.
+- A word that is a headword or a listed form of a different entry does not
+  get a finding.
+- A word with a hyphen or a digit, and a word with a capital letter after
+  the first word, do not get a finding.
+- An "-ing" verb does not get a finding. `STE-3.5` reports it.
+- A noun does not get a finding. The dictionary does not list the plural.
 
 <!-- ste-enable -->
 

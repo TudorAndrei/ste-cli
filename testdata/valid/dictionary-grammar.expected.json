@@ -1,0 +1,5 @@
+{
+  "analyze": true,
+  "dictionary": "../dictionaries/invented.json",
+  "expect": []
+}

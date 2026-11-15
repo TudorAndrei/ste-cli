@@ -16,7 +16,9 @@ from platformdirs import user_data_path
 
 from ste.models import DictionaryResult
 
-VERSION = 1
+# Version 2 adds the forms of each word. An index of version 1 has no forms.
+VERSION = 2
+_VERSIONS = frozenset({1, VERSION})
 MIN_ALTERNATIVE_LENGTH = 2
 MIN_TABLE_CELLS = 2
 _HEADWORD = re.compile(
@@ -25,6 +27,7 @@ _HEADWORD = re.compile(
 _ALTERNATIVE = re.compile(r"\b([A-Z][A-Z'\u2019\-]+(?:\s+[A-Z][A-Z'\u2019\-]*)*)\b", re.ASCII)
 _PART_TWO = re.compile(r"part\s*2\s*[\u2013-]\s*dictionary", re.IGNORECASE)
 _BRACKETED = re.compile(r"\([^)]*\)|\[[^\]]*\]")
+_FORM = re.compile(r"[A-Za-z][A-Za-z'\u2019\-]*")
 
 
 @dataclass
@@ -36,6 +39,9 @@ class Entry:
     pos: str = ""
     alternatives: list[str] = field(default_factory=list)
     technical_noun: bool = False
+    # The other forms that the user's copy gives after the headword, such as
+    # the past tense of a verb or the comparative of an adjective.
+    forms: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -46,6 +52,7 @@ class Index:
     words: list[Entry] = field(default_factory=list)
     version: int = VERSION
     _by_word: dict[str, list[Entry]] = field(default_factory=dict, repr=False)
+    _by_form: dict[str, list[Entry]] = field(default_factory=dict, repr=False)
 
     def lookup(self, word: str) -> list[Entry]:
         """Get all entries for a word without regard to letter case."""
@@ -53,6 +60,14 @@ class Index:
             for entry in self.words:
                 self._by_word.setdefault(entry.word.lower(), []).append(entry)
         return self._by_word.get(word.lower(), [])
+
+    def by_form(self, form: str) -> list[Entry]:
+        """Get the entries that give this word as one of their other forms."""
+        if not self._by_form:
+            for entry in self.words:
+                for item in entry.forms:
+                    self._by_form.setdefault(item, []).append(entry)
+        return self._by_form.get(form.lower(), [])
 
     def unapproved(self, word: str) -> tuple[DictionaryResult, bool]:
         """Get replacement advice when no entry approves the word."""
@@ -73,6 +88,7 @@ class Index:
             "approved": approved,
             "unapproved": len(self.words) - approved,
             "alternatives": sum(len(e.alternatives) for e in self.words),
+            "forms": sum(len(e.forms) for e in self.words),
         }
 
     def save(self, path: str | Path) -> None:
@@ -82,7 +98,7 @@ class Index:
         words = []
         for entry in self.words:
             item = asdict(entry)
-            for key in ("pos", "alternatives", "technical_noun"):
+            for key in ("pos", "alternatives", "technical_noun", "forms"):
                 if not item[key]:
                     del item[key]
             words.append(item)
@@ -128,6 +144,12 @@ def _table_row(raw_line: str) -> tuple[str, str] | None:
     return (cells[0], cells[1]) if len(cells) >= MIN_TABLE_CELLS else None
 
 
+def _forms(text: str, headword: str) -> list[str]:
+    """Read the forms that follow a headword, such as ", GRIBBLES, GRIBBLED"."""
+    forms = (m.group(0).lower() for m in _FORM.finditer(_BRACKETED.sub(" ", text)))
+    return list(dict.fromkeys(f for f in forms if f != headword))
+
+
 def _row_entries(word: str, meaning: str) -> list[tuple[Entry, bool]] | None:
     matches = list(_HEADWORD.finditer(word))
     if not matches:
@@ -138,7 +160,10 @@ def _row_entries(word: str, meaning: str) -> list[tuple[Entry, bool]] | None:
         if not text or text.lower() == "word":
             continue
         approved = bool(re.search("[A-Z]", text)) and not re.search("[a-z]", text)
-        entry = Entry(text.lower(), approved, pos)
+        end = matches[n + 1].start() if n + 1 < len(matches) else len(word)
+        entry = Entry(
+            text.lower(), approved, pos, forms=_forms(word[match.end() : end], text.lower())
+        )
         continues = not approved and n == 0
         if continues:
             entry.alternatives = _alternatives(meaning)
@@ -153,6 +178,7 @@ def _merge_entry(index: Index, seen: dict[tuple[str, str], Entry], entry: Entry)
         existing = seen[key]
         existing.alternatives = list(dict.fromkeys(existing.alternatives + entry.alternatives))
         existing.approved |= entry.approved
+        existing.forms = list(dict.fromkeys(existing.forms + entry.forms))
         return existing
     seen[key] = entry
     index.words.append(entry)
@@ -216,10 +242,11 @@ def _entry(item: object) -> Entry:
     ):
         msg = "invalid dictionary entry"
         raise _InvalidIndexError(msg)
-    alternatives = item.get("alternatives", [])
-    if not isinstance(alternatives, list) or not all(isinstance(a, str) for a in alternatives):
-        msg = "invalid dictionary alternatives"
-        raise _InvalidIndexError(msg)
+    for key in ("alternatives", "forms"):
+        values = item.get(key, [])
+        if not isinstance(values, list) or not all(isinstance(a, str) for a in values):
+            msg = f"invalid dictionary {key}"
+            raise _InvalidIndexError(msg)
     return Entry(**item)
 
 
@@ -249,7 +276,7 @@ def load(path: str | Path | None = None) -> Index | None:
     if (
         not isinstance(raw, dict)
         or type(raw.get("version")) is not int
-        or raw.get("version") != VERSION
+        or raw.get("version") not in _VERSIONS
     ):
         msg = f"{target}: the index has an unsupported version. Import the dictionary again"
         raise ValueError(msg)

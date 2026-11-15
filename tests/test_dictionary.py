@@ -19,7 +19,13 @@ FIXTURE = Path(__file__).parent / "fixtures" / "dictionary.md"
 def test_dictionary_import_and_persistence(tmp_path: Path) -> None:
     """Check dictionary import and persistence."""
     index = parse(FIXTURE.read_text(), "fixture")
-    assert index.stats() == {"words": 8, "approved": 3, "unapproved": 5, "alternatives": 4}
+    assert index.stats() == {
+        "words": 9,
+        "approved": 4,
+        "unapproved": 5,
+        "alternatives": 4,
+        "forms": 4,
+    }
     path = tmp_path / "sub" / "dictionary.json"
     index.save(path)
     restored = load(path)
@@ -32,6 +38,9 @@ def test_dictionary_import_and_persistence(tmp_path: Path) -> None:
     assert found
     assert result.alternatives == ["gribble", "frammis"]
     assert not result.only_verb
+    verb = next(e for e in restored.lookup("gribble") if e.pos == "v")
+    assert verb.forms == ["gribbles", "gribbled"]
+    assert [e.word for e in restored.by_form("wibbliest")] == ["wibbly"]
 
 
 @pytest.mark.parametrize(
@@ -75,9 +84,41 @@ def test_dictionary_rejects_invalid_input(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="no dictionary entry"):
         parse("# Part 2 - Dictionary\nNo entries")
     path = tmp_path / "index.json"
-    path.write_text(json.dumps({"version": 2}))
+    path.write_text(json.dumps({"version": 3}))
     with pytest.raises(ValueError, match="version"):
         load(path)
     path.write_text(json.dumps({"version": 1, "words": [{"word": 1, "approved": False}]}))
     with pytest.raises(ValueError, match="entry"):
+        load(path)
+
+
+def test_forms_follow_their_headword() -> None:
+    """Check that each form belongs to the headword before it in the cell."""
+    text = (
+        "## Part 2 - Dictionary\n"
+        "|Word|Meaning|\n"
+        "|---|---|\n"
+        "|GLORP (v), GLORPS, GLORPED, GLORPED|To join|\n"
+        "|SNOOT (n)|A tube|\n"
+    )
+    index = parse(text)
+    assert [(e.word, e.pos, e.forms) for e in index.words] == [
+        ("glorp", "v", ["glorps", "glorped"]),
+        ("snoot", "n", []),
+    ]
+
+
+def test_an_index_of_version_one_still_loads(tmp_path: Path) -> None:
+    """Check that an index from an earlier import loads without forms."""
+    path = tmp_path / "index.json"
+    path.write_text(
+        json.dumps({"version": 1, "source": "old", "words": [{"word": "glorp", "approved": True}]})
+    )
+    index = load(path)
+    assert index is not None
+    assert index.lookup("glorp")[0].forms == []
+    path.write_text(
+        json.dumps({"version": 2, "words": [{"word": "glorp", "approved": True, "forms": [1]}]})
+    )
+    with pytest.raises(ValueError, match="forms"):
         load(path)

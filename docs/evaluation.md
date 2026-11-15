@@ -36,6 +36,7 @@ The expectation file can also give settings for its fixture:
 | `prefer` | The preferred names, as in the config |
 | `max_noun_words` | The limit of rule 1.9 |
 | `analyze` | `true` runs the fixture with the grammar analyzer. The run stops with an error when the analyzer cannot start. |
+| `dictionary` | The path of a dictionary index, from the directory of the label file. The fixture then runs with the dictionary. The corpus uses an index of invented words only. |
 
 | Rule | TP | FP | FN | Precision | Recall |
 |---|---|---|---|---|---|

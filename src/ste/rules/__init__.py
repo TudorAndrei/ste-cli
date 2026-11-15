@@ -4,6 +4,7 @@
 from collections.abc import Callable
 
 from ste.models import Diagnostic, Document, Options
+from ste.rules.forms import part_of_speech, word_forms
 from ste.rules.grammar_words import (
     action_nouns,
     pos_spelling,
@@ -72,4 +73,6 @@ def all_rules() -> list[Rule]:
         safety_command,
         condition_clause_order,
         note_command,
+        part_of_speech,
+        word_forms,
     ]
