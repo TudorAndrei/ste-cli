@@ -220,6 +220,13 @@ def test_a_participle_that_is_not_an_adjective(
     assert found(text, "STE-3.3", {text: spec}) == want
 
 
+def test_a_participle_clause_is_information() -> None:
+    """Check that rule 3.3 gives the info severity, because the standard can permit the clause."""
+    text = GRAMMAR_CASES[0][1]
+    opts = Options(syntax=StubSyntax({text: GRAMMAR_CASES[0][2]}))
+    assert [d.severity for d in lint(text, opts) if d.rule_id == "STE-3.3"] == ["info"]
+
+
 def test_no_participle_finding_without_the_analyzer() -> None:
     """Check that rule 3.3 needs the analyzer."""
     assert found("The file created by the tool is large.", "STE-3.3") == []

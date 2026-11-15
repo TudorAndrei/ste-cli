@@ -198,6 +198,11 @@ def test_part_of_speech(text: str, want: list[tuple[str, str]]) -> None:
     assert _texts(text, _found(text, ("STE-1.2",))) == want
 
 
+def test_part_of_speech_is_information() -> None:
+    """Check that rule 1.2 gives the info severity, because the tagger can be wrong."""
+    assert [d.severity for d in _found("The man plonks the frammis.", ("STE-1.2",))] == ["info"]
+
+
 def test_part_of_speech_gives_the_alternatives() -> None:
     """Check that the suggestion uses the unapproved entry of the same part of speech."""
     (finding,) = _found("The man frammises the plonk.", ("STE-1.2",))

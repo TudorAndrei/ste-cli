@@ -44,12 +44,12 @@ severity, and strict mode does not make it an error.
 | `STE-2.1` | A noun of more than three words | 0.80 | warning |
 | `STE-5.3` | An instruction that is not a command | 0.75 | warning |
 | `STE-3.2` | A verb form that is not an approved tense | 0.90, or 0.80 | warning |
-| `STE-3.3` | A past participle that is not an adjective | 0.80, or 0.70 | warning |
+| `STE-3.3` | A past participle that is not an adjective | 0.80, or 0.70 | info |
 | `STE-1.7` | A technical noun as a verb | 0.70 | warning |
 | `STE-1.13` | A technical verb as a noun | 0.70 | warning |
 | `STE-5.2` | More than one instruction in a step | 0.80 | warning |
 | `STE-7.2` | A safety instruction that does not start with a command | 0.80 | warning |
-| `STE-1.2` | A word that is not the approved part of speech | 0.70 | warning |
+| `STE-1.2` | A word that is not the approved part of speech | 0.70 | info |
 | `STE-1.4` | An adjective form that the dictionary does not give | 0.80 | warning |
 | `STE-3.1` | A verb form that the dictionary does not give | 0.80 | warning |
 | `STE-8.2` | A compound modifier with no hyphen | 0.70 | info |
@@ -698,9 +698,11 @@ passive voice uses it after "to be".
 - A participle with "to be" or "have" goes to `STE-3.6` or `STE-3.4`.
 - The word must have the form of a past participle. Thus a word that the
   analyzer tags in error, such as "page", gives no finding.
-- The rule reads the clause as a defect, because the participle has the
-  function of a verb in it. A reader can permit a short clause with
-  `<!-- ste-disable-next-line STE-3.3 -->`.
+- The severity is `info`. Rule 3.3 permits a past participle as an
+  adjective. It is not certain that the rule also forbids a short clause,
+  such as "the file created by the tool". Thus a finding is a question for
+  the writer, and not a defect. Read the sentence, and change it when a
+  clause with a subject and a verb is clearer.
 
 ## STE-1.2 A word that is not the approved part of speech
 
@@ -719,6 +721,8 @@ finds the entry "plate".
 - The tagger can make a mistake. A word that ends with "-s" can be a plural
   noun or a verb. Thus the confidence is 0.70. Read the sentence before you
   change it.
+- The severity is `info`. We measured the precision of the rule only with
+  an invented dictionary, and not with the real dictionary.
 - The rule does not compare a noun and an adjective. The tagger often gives
   a noun before a noun as an adjective.
 - The rule does not compare an adverb, a preposition, or a conjunction. The

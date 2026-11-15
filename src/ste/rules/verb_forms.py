@@ -114,7 +114,9 @@ def participle_use(doc: Document, opts: Options) -> list[Diagnostic]:
                     f'"{t.text}" is a past participle that is used as a verb. '
                     "ASD-STE100 permits a past participle as an adjective, "
                     'or after "to be".',
-                    "warning",
+                    # It is not certain that the standard forbids a reduced
+                    # clause, thus the finding is information.
+                    "info",
                     AGENT_CONFIDENCE if agent else CLAUSE_CONFIDENCE,
                     t.start,
                     t.end,

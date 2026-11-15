@@ -558,12 +558,12 @@
       "id": "STE-3.3",
       "name": "A past participle that is not an adjective",
       "standard_rule": "3.3",
-      "default_severity": "warning",
+      "default_severity": "info",
       "confidence": [
         0.8,
         0.7
       ],
-      "note": "The rule needs the analyzer. It reports a participle that is the verb of a reduced clause. 0.8 with a by-agent, 0.7 without one."
+      "note": "The rule needs the analyzer. It reports a participle that is the verb of a reduced clause. 0.8 with a by-agent, 0.7 without one. The severity is info, because it is not certain that rule 3.3 forbids a reduced clause, such as 'the file created by the tool'."
     },
     {
       "id": "STE-1.7",
@@ -609,11 +609,11 @@
       "id": "STE-1.2",
       "name": "A word that is not the approved part of speech",
       "standard_rule": "1.2",
-      "default_severity": "warning",
+      "default_severity": "info",
       "confidence": [
         0.7
       ],
-      "note": "The rule needs --use-dict and the analyzer. It reports a verb that the dictionary approves only as a noun or an adjective, and a noun that it approves only as a verb. It does not read a heading or a table cell."
+      "note": "The rule needs --use-dict and the analyzer. It reports a verb that the dictionary approves only as a noun or an adjective, and a noun that it approves only as a verb. It does not read a heading or a table cell. The severity is info, because the precision was measured only with an invented dictionary."
     },
     {
       "id": "STE-1.4",

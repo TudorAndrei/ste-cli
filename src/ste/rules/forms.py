@@ -99,7 +99,8 @@ def part_of_speech(doc: Document, opts: Options) -> list[Diagnostic]:
                 Diagnostic(
                     "STE-1.2",
                     f'"{t.text}" is approved only as {approved}. Here it is {_POS_NAMES[given]}.',
-                    "warning",
+                    # The precision was measured only with an invented dictionary.
+                    "info",
                     POS_CONFIDENCE,
                     t.start,
                     t.end,
