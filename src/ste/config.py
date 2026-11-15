@@ -242,6 +242,7 @@ class Config:
     max_noun_words: int = 0
     allow_nouns: list[str] = field(default_factory=list)
     allow_verbs: list[str] = field(default_factory=list)
+    preset_nouns: list[str] = field(default_factory=list)
     disable_rules: list[str] = field(default_factory=list)
     rules: dict[str, str] = field(default_factory=dict)
     exclude: list[str] = field(default_factory=list)
@@ -262,6 +263,7 @@ class Config:
             max_noun_words=self.max_noun_words,
             allow_nouns=self.allow_nouns.copy(),
             allow_verbs=self.allow_verbs.copy(),
+            preset_nouns=self.preset_nouns.copy(),
             prefer=self.prefer.copy(),
             disable_rules=self.disable_rules.copy(),
             rule_severity=self.rules.copy(),
@@ -362,7 +364,7 @@ def _glossary(cfg: Config, raw: dict[str, Any]) -> None:
     for name in ("exclude", "disable_rules", "presets"):
         setattr(cfg, name, _strings(raw.get(name), name))
     for name in cfg.presets:
-        cfg.allow_nouns.extend(preset(name))
+        cfg.preset_nouns.extend(preset(name))
 
 
 def _gates(cfg: Config, raw: dict[str, Any]) -> None:

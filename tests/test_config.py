@@ -79,7 +79,9 @@ warnings_as_errors: true
     assert options.mode == "strict"
     assert options.max_words == OVERRIDE_WORD_LIMIT
     assert options.allow_verbs == ["parser", "web#hook"]
-    assert {"file", "hook", "build", "web#hook"} <= set(options.allow_nouns)
+    assert options.allow_nouns == ["parser", "web#hook"]
+    assert {"file", "hook", "build"} <= set(options.preset_nouns)
+    assert options.allowed("build")
     assert options.prefer[0].name == "config"
     assert options.rule_severity == {"STE-4.2": "info"}
     assert options.warnings_as_errors

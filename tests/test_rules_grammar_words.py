@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from ste.checker import lint, lint_document
 from ste.models import Diagnostic, Options
 from ste.rules.grammar_words import PHRASAL_LIST_CONFIDENCE, PHRASAL_OTHER_CONFIDENCE
@@ -260,7 +262,7 @@ def test_an_action_noun_needs_the_grammar() -> None:
 
 
 def test_a_technical_noun_as_a_verb() -> None:
-    """Check that a glossary noun with a verb tag gives rule 1.7."""
+    """Check that a glossary noun with a verb tag gives rule 1.7, as information."""
     text = "Shim the bracket."
     spec = [
         "Shim/VERB/VB/ROOT//shim",
@@ -269,13 +271,15 @@ def test_a_technical_noun_as_a_verb() -> None:
         "./PUNCT/./punct/0/.",
     ]
     opts = Options(allow_nouns=["shim"])
-    assert texts(text, found(text, spec, "STE-1.7", opts)) == ["Shim"]
+    findings = found(text, spec, "STE-1.7", opts)
+    assert texts(text, findings) == ["Shim"]
+    assert findings[0].severity == "info"
     assert found(text, spec, "STE-1.7", Options(allow_nouns=["shim"], allow_verbs=["shim"])) == []
     assert found(text, spec, "STE-1.7") == []
 
 
 def test_a_software_preset_noun_is_also_a_verb() -> None:
-    """Check that a noun of the software preset, such as "cache", is not rule 1.7."""
+    """Check that only a noun that the user lists, and not a preset noun, is rule 1.7."""
     text = "Cache the result."
     spec = [
         "Cache/VERB/VB/ROOT//cache",
@@ -283,7 +287,59 @@ def test_a_software_preset_noun_is_also_a_verb() -> None:
         "result/NOUN/NN/dobj/0/result",
         "./PUNCT/./punct/0/.",
     ]
-    assert found(text, spec, "STE-1.7", Options(allow_nouns=["cache"])) == []
+    preset = Options(preset_nouns=["cache"])
+    listed = Options(allow_nouns=["cache"], preset_nouns=["cache"])
+    assert found(text, spec, "STE-1.7", preset) == []
+    assert texts(text, found(text, spec, "STE-1.7", listed)) == ["Cache"]
+
+
+@pytest.mark.parametrize(
+    ("text", "spec"),
+    [
+        (
+            "Use the built-in parser.",
+            [
+                "Use/VERB/VB/ROOT//use",
+                "the/DET/DT/det/5/the",
+                "built/VERB/VBN/amod/5/build",
+                "-/PUNCT/HYPH/punct/2/-",
+                "in/ADP/RP/prt/2/in",
+                "parser/NOUN/NN/dobj/0/parser",
+                "./PUNCT/./punct/0/.",
+            ],
+        ),
+        ("Build:", ["Build/VERB/VB/ROOT//build", ":/PUNCT/:/punct/0/:"]),
+        (
+            "Keep the build output.",
+            [
+                "Keep/VERB/VB/ROOT//keep",
+                "the/DET/DT/det/3/the",
+                "build/VERB/VB/amod/3/build",
+                "output/NOUN/NN/dobj/0/output",
+                "./PUNCT/./punct/0/.",
+            ],
+        ),
+        (
+            "Record the owner, the time, and the build.",
+            [
+                "Record/VERB/VB/ROOT//record",
+                "the/DET/DT/det/2/the",
+                "owner/NOUN/NN/dobj/0/owner",
+                ",/PUNCT/,/punct/2/,",
+                "the/DET/DT/det/5/the",
+                "time/NOUN/NN/conj/2/time",
+                ",/PUNCT/,/punct/5/,",
+                "and/CCONJ/CC/cc/5/and",
+                "the/DET/DT/det/9/the",
+                "build/VERB/VB/conj/5/build",
+                "./PUNCT/./punct/0/.",
+            ],
+        ),
+    ],
+)
+def test_a_compound_word_or_a_label_is_not_a_verb(text: str, spec: list[Spec]) -> None:
+    """Check that a compound, a label, a modifier, and a noun list give no finding."""
+    assert found(text, spec, "STE-1.7", Options(allow_nouns=["build"])) == []
 
 
 def test_a_technical_noun_as_a_noun() -> None:

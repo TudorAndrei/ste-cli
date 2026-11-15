@@ -468,7 +468,7 @@ def _lint_options(ns: LintOptions, cfg: config.Config) -> Options:
     if ns.warnings_as_errors:
         opts.warnings_as_errors = True
     if ns.preset:
-        opts.allow_nouns.extend(config.preset(ns.preset))
+        opts.preset_nouns.extend(config.preset(ns.preset))
     if ns.use_dict or ns.dict or cfg.dictionary:
         opts.dictionary = dictionary.load(ns.dict or None)
         if opts.dictionary is None:

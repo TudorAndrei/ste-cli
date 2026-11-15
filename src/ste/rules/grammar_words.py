@@ -6,7 +6,6 @@ no finding here, and the word-list checks of ``words`` and ``verbs`` keep
 their behavior.
 """
 
-from ste.config import SOFTWARE_NOUNS
 from ste.models import Diagnostic, Document, Options, Sentence, Token
 from ste.rules.common import phrase_matcher, span
 from ste.rules.data import NOMINALIZATIONS, PHRASAL_VERBS
@@ -157,7 +156,9 @@ LIGHT_VERBS: dict[str, frozenset[str] | None] = {
         }
     ),
 }
-_PRESET_NOUNS = frozenset(SOFTWARE_NOUNS)
+_MIN_SENTENCE_WORDS = 2
+_MODIFIER_DEPS = frozenset({"amod", "compound"})
+_NOUNS = frozenset({"NOUN", "PROPN"})
 _QUOTES = "\"'\u201c\u201d\u2018\u2019`"
 _POS_NAMES = {"NOUN": "noun", "VERB": "verb", "ADJ": "adjective"}
 _VERB_TAGS = {"VB", "VBD", "VBG", "VBN", "VBP", "VBZ"}
@@ -190,15 +191,36 @@ def _used_as_verb(s: Sentence, i: int) -> bool:
     )
 
 
+def _noun_as_verb(s: Sentence, i: int) -> bool:
+    """Return whether a word is a verb, and not a label, a modifier, or a list item.
+
+    The tagger can read a technical noun as a verb. These relations then
+    show the noun:
+
+    - A sentence of one word is often a label or a title, as in "Commit:".
+    - A compound word such as "built-in" is not the technical noun.
+    - A modifier of a noun, as in "the build output", is a noun.
+    - A word that joins a noun, as in "the owner, the time, and the build",
+      is a noun of the list.
+    """
+    t = s.tokens[i]
+    if len(s.tokens) < _MIN_SENTENCE_WORDS or "-" in t.text or t.dep in _MODIFIER_DEPS:
+        return False
+    if t.dep == "conj" and 0 <= t.head < len(s.tokens) and s.tokens[t.head].pos in _NOUNS:
+        return False
+    return _used_as_verb(s, i)
+
+
 def technical_words(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report a technical noun as a verb, and a technical verb as a noun.
 
     The glossary gives the technical nouns (``allow.nouns``) and the technical
     verbs (``allow.verbs``). A word in both lists has both parts of speech.
-    The nouns of the software preset are not technical nouns here. Software
-    text uses most of them as verbs too, such as "build" and "commit".
+    The nouns of a preset are not technical nouns here. Software text uses
+    most of them as verbs too, such as "build" and "commit". A noun that the
+    user writes in ``allow.nouns`` counts, also when the preset has it.
     """
-    nouns = _single_words(opts.allow_nouns) - _PRESET_NOUNS
+    nouns = _single_words(opts.allow_nouns)
     verbs = _single_words(opts.allow_verbs)
     only_nouns, only_verbs = nouns - verbs, verbs - nouns
     if not only_nouns and not only_verbs:
@@ -209,12 +231,13 @@ def technical_words(doc: Document, opts: Options) -> list[Diagnostic]:
             continue
         for i, t in enumerate(s.tokens):
             base = _base(t)
-            if _used_as_verb(s, i) and (t.lower in only_nouns or base in only_nouns):
+            if _noun_as_verb(s, i) and (t.lower in only_nouns or base in only_nouns):
                 out.append(
                     Diagnostic(
                         "STE-1.7",
                         f'"{t.text}" is a technical noun, but this sentence uses it as a verb.',
-                        "warning",
+                        # The tagger often reads a software noun as a verb.
+                        "info",
                         TECHNICAL_WORD_CONFIDENCE,
                         t.start,
                         t.end,

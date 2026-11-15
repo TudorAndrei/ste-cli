@@ -232,7 +232,11 @@ def short_noun(doc: Document, opts: Options) -> list[Diagnostic]:
     names = sorted(
         {
             tuple(name.lower().split())
-            for name in [*opts.allow_nouns, *(preferred.name for preferred in opts.prefer)]
+            for name in [
+                *opts.allow_nouns,
+                *opts.preset_nouns,
+                *(preferred.name for preferred in opts.prefer),
+            ]
         }
     )
     names = [words for words in names if len(words) > opts.max_noun_words]

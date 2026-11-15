@@ -209,6 +209,9 @@ class Options:
     max_noun_words: int = 0
     allow_nouns: list[str] = field(default_factory=list)
     allow_verbs: list[str] = field(default_factory=list)
+    # The nouns of a preset, such as "software". They permit a word as the
+    # nouns of the user do, but rule STE-1.7 reads only the nouns of the user.
+    preset_nouns: list[str] = field(default_factory=list)
     prefer: list[Preferred] = field(default_factory=list)
     disable_rules: list[str] = field(default_factory=list)
     rule_severity: dict[str, str] = field(default_factory=dict)
@@ -216,7 +219,7 @@ class Options:
     warnings_as_errors: bool = False
     dictionary: Dictionary | None = None
     syntax: Syntax | None = None
-    _allowed_key: tuple[tuple[str, ...], tuple[str, ...]] | None = field(
+    _allowed_key: tuple[tuple[str, ...], ...] | None = field(
         default=None, init=False, repr=False, compare=False
     )
     _allowed_words: frozenset[str] = field(
@@ -242,8 +245,8 @@ class Options:
 
     def allowed(self, word: str) -> bool:
         """Return whether the glossary permits this word."""
-        key = (tuple(self.allow_nouns), tuple(self.allow_verbs))
+        key = (tuple(self.allow_nouns), tuple(self.allow_verbs), tuple(self.preset_nouns))
         if key != self._allowed_key:
-            self._allowed_words = frozenset(w.lower() for w in key[0] + key[1])
+            self._allowed_words = frozenset(w.lower() for words in key for w in words)
             self._allowed_key = key
         return word.lower() in self._allowed_words

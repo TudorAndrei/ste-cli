@@ -45,7 +45,7 @@ severity, and strict mode does not make it an error.
 | `STE-5.3` | An instruction that is not a command | 0.75 | warning |
 | `STE-3.2` | A verb form that is not an approved tense | 0.90, or 0.80 | warning |
 | `STE-3.3` | A past participle that is not an adjective | 0.80, or 0.70 | info |
-| `STE-1.7` | A technical noun as a verb | 0.70 | warning |
+| `STE-1.7` | A technical noun as a verb | 0.70 | info |
 | `STE-1.13` | A technical verb as a noun | 0.70 | warning |
 | `STE-5.2` | More than one instruction in a step | 0.80 | warning |
 | `STE-7.2` | A safety instruction that does not start with a command | 0.80 | warning |
@@ -402,11 +402,17 @@ Rule 1.7 tells you to use a technical noun only as a noun. An example is
 - A word that is in `allow.nouns` and in `allow.verbs` has the two parts of
   speech, and the rule does not report it.
 - The nouns of the `software` preset do not count. Software text uses most
-  of them as verbs too, such as "build", "commit", and "run".
+  of them as verbs too, such as "build", "commit", and "run". A noun that
+  you write in `allow.nouns` counts, also when the preset has it.
+- A label of one word, such as "Commit:", gives no finding. A compound
+  such as "built-in", a modifier of a noun, as in "the build output", and a
+  noun of a list also give no finding.
 - The rule reads only a technical noun of one word.
 - The tagger can tag a capitalized first word as a name. The rule then
   accepts it as a verb only when it has a direct object.
-- The confidence is 0.70, because the tagger can confuse a noun and a verb.
+- The confidence is 0.70 and the severity is `info`, because the tagger
+  can confuse a noun and a verb. A noun of software, such as "commit",
+  often causes this error.
 
 ## STE-1.13 A technical verb as a noun
 

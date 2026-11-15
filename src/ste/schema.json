@@ -582,11 +582,11 @@
       "id": "STE-1.7",
       "name": "A technical noun as a verb",
       "standard_rule": "1.7",
-      "default_severity": "warning",
+      "default_severity": "info",
       "confidence": [
         0.7
       ],
-      "note": "The rule needs the analyzer. It reads the one-word nouns of allow.nouns that are not also in allow.verbs. The nouns of the software preset are not technical nouns for this rule."
+      "note": "The rule needs the analyzer. It reads the one-word nouns of allow.nouns that are not also in allow.verbs. The nouns of a preset count only when allow.nouns also gives them. A label of one word, a compound such as \"built-in\", a modifier of a noun, and a noun of a list give no finding. The severity is info, because the tagger often reads a software noun as a verb."
     },
     {
       "id": "STE-1.13",
