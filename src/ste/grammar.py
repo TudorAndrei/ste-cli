@@ -17,6 +17,8 @@ A rule reads the grammar of a sentence in one of two forms:
 
 from __future__ import annotations
 
+import re
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -107,14 +109,43 @@ def _head_word(
     return -1
 
 
+_QUOTE_MARKS = re.compile(r"(?<=\n)[ \t]*>[ \t>]*")
+
+
+def analyzer_text(sentence: Sentence) -> tuple[int, str]:
+    """Return the offset and the text that the analyzer reads for a sentence.
+
+    A label such as "**NOTE:**" or "[!WARNING]" is not a part of the sentence,
+    and the analyzer reads it as the subject or the root. The text starts after
+    the label. Spaces replace the quote marks of each line of a block quote, and
+    thus each offset stays the same.
+    """
+    text = sentence.text
+    offset = 0
+    if sentence.first and sentence.admonition:
+        label = re.match(
+            rf"[\s*_>:!\-\[]*{re.escape(sentence.admonition)}(?![a-z])[\s*_\]:!>]*",
+            text,
+            re.IGNORECASE,
+        )
+        if label is not None and label.end() < len(text):
+            offset = label.end()
+    body = _QUOTE_MARKS.sub(lambda m: " " * len(m[0]), text[offset:])
+    return offset, body
+
+
 def annotate(doc: Document, syntax: Syntax) -> None:
     """Fill the grammar of each sentence with one batch request."""
     doc.analyzed = True
     if not doc.sentences:
         return
-    results = syntax.grammar_many([s.text for s in doc.sentences])
-    for sentence, tokens in zip(doc.sentences, results, strict=True):
-        align(sentence, tokens)
+    texts = [analyzer_text(s) for s in doc.sentences]
+    results = syntax.grammar_many([text for _, text in texts])
+    for sentence, (offset, _), tokens in zip(doc.sentences, texts, results, strict=True):
+        shifted = tokens
+        if offset:
+            shifted = [replace(t, start=t.start + offset) if t.start >= 0 else t for t in tokens]
+        align(sentence, shifted)
 
 
 _PASSIVE_DEPS = frozenset({"auxpass", "nsubjpass", "csubjpass"})
