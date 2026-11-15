@@ -1,0 +1,17 @@
+{
+  "mode": "flavored",
+  "analyze": true,
+  "allow_nouns": ["shim", "bracket"],
+  "allow_verbs": ["install"],
+  "expect": [
+    { "rule_id": "STE-1.7", "text": "Shim" },
+    { "rule_id": "STE-1.13", "text": "install" },
+    { "rule_id": "STE-1.14", "text": "licence" },
+    { "rule_id": "STE-1.14", "text": "Practise" },
+    { "rule_id": "STE-3.7", "text": "Do an installation" },
+    { "rule_id": "STE-3.7", "text": "inspection was performed" },
+    { "rule_id": "STE-3.6", "text": "was performed" },
+    { "rule_id": "STE-9.3", "text": "Turn the pump off" },
+    { "rule_id": "STE-9.3", "text": "Log in" }
+  ]
+}

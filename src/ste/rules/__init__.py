@@ -4,6 +4,12 @@
 from collections.abc import Callable
 
 from ste.models import Diagnostic, Document, Options
+from ste.rules.grammar_words import (
+    action_nouns,
+    pos_spelling,
+    separated_phrasal,
+    technical_words,
+)
 from ste.rules.structure import (
     condition_order,
     note_instruction,
@@ -52,4 +58,8 @@ def all_rules() -> list[Rule]:
         gerund,
         verb_tense,
         participle_use,
+        technical_words,
+        pos_spelling,
+        action_nouns,
+        separated_phrasal,
     ]

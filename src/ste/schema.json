@@ -45,7 +45,7 @@
         "type": "path"
       },
       "subcommands": [
-        "import \u003cfile\u003e",
+        "import <file>",
         "info",
         "path",
         "remove"
@@ -493,7 +493,7 @@
       "confidence": [
         0.9
       ],
-      "note": "A capitalized word that does not start a sentence is a name, thus the rule does not report it."
+      "note": "A capitalized word that does not start a sentence is a name, thus the rule does not report it. With the analyzer, the rule also reports a pair that changes with the part of speech, such as \"licence\" and \"practise\". A word in quotation marks is a mention, and the analyzer part does not report it."
     },
     {
       "id": "STE-3.4",
@@ -534,8 +534,10 @@
       "standard_rule": "3.7",
       "default_severity": "warning",
       "confidence": [
-        0.9
-      ]
+        0.9,
+        0.85
+      ],
+      "note": "0.9 for a word group of the list. 0.85 with the analyzer: a verb with little meaning, such as \"perform\" or \"make\", and its object, a noun that names an action."
     },
     {
       "id": "STE-4.2",
@@ -572,8 +574,10 @@
       "standard_rule": "9.3",
       "default_severity": "warning",
       "confidence": [
-        0.85
-      ]
+        0.85,
+        0.7
+      ],
+      "note": "0.85 for a phrasal verb of the list. With the analyzer, the rule also finds a particle with words between it and its verb. A phrasal verb that is not in the list gets 0.7."
     },
     {
       "id": "STE-GR-6",
@@ -705,6 +709,26 @@
         0.7
       ],
       "note": "The rule needs the analyzer. It reports a participle that is the verb of a reduced clause. 0.8 with a by-agent, 0.7 without one."
+    },
+    {
+      "id": "STE-1.7",
+      "name": "A technical noun as a verb",
+      "standard_rule": "1.7",
+      "default_severity": "warning",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reads the one-word nouns of allow.nouns that are not also in allow.verbs. The nouns of the software preset are not technical nouns for this rule."
+    },
+    {
+      "id": "STE-1.13",
+      "name": "A technical verb as a noun",
+      "standard_rule": "1.13",
+      "default_severity": "warning",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reads the one-word verbs of allow.verbs that are not also in allow.nouns. The rule does not report a verb before a noun, as in \"the lint command\"."
     }
   ],
   "schema_version": 1,
@@ -718,11 +742,11 @@
   "suppression": {
     "note": "A directive with no rule identifier applies to every rule.",
     "syntax": [
-      "\u003c!-- ste-disable --\u003e",
-      "\u003c!-- ste-disable STE-3.6 --\u003e",
-      "\u003c!-- ste-enable STE-3.6 --\u003e",
-      "\u003c!-- ste-disable-next-line --\u003e",
-      "\u003c!-- ste-disable-line --\u003e"
+      "<!-- ste-disable -->",
+      "<!-- ste-disable STE-3.6 -->",
+      "<!-- ste-enable STE-3.6 -->",
+      "<!-- ste-disable-next-line -->",
+      "<!-- ste-disable-line -->"
     ]
   },
   "tool": "ste",
