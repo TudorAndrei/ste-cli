@@ -158,6 +158,13 @@ start of each line of a block quote. The offsets of `Sentence.syntax` still
 start at the start of `Sentence.text`. A test with `StubSyntax` gives the
 sentence without its label as the key.
 
+The analyzer also does not read the text of inline code. A word of "X"
+letters of the same length replaces each code span, and the analyzer reads
+it as a name. The token of that word in `Sentence.syntax` has the source
+text, the part of speech `X`, and the tag `XX`. It keeps its dependency,
+and thus a command keeps its object. A test with `StubSyntax` gives the
+text of `ste.grammar.analyzer_text` as the key.
+
 Each rule must also work when `Sentence.tagged` is false. A test can make
 a tagged document without spaCy. The `tagged` function and the
 `StubSyntax` class in `tests/grammar.py` take the grammar of each word

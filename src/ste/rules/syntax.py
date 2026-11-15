@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Checks that use syntax from an NLP analyzer."""
 
+from ste.grammar import analyzer_text
 from ste.models import Diagnostic, Document, Options, Sentence, SyntaxToken
 from ste.rules.common import quoted
 from ste.rules.data import ADJECTIVAL_ING, BE_FORMS, CONDITION_WORDS, GERUND_DEPS
@@ -47,7 +48,7 @@ def reads_as_command_with_please(s: Sentence, opts: Options, index: int) -> bool
     """Use explicit command context to resolve an ambiguous first word."""
     if opts.syntax is None:
         return False
-    text = s.text
+    _, text = analyzer_text(s)
     if text and "A" <= text[0] <= "Z":
         text = text[0].lower() + text[1:]
     grammar, ok = opts.syntax.grammar("please " + text)

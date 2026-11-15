@@ -93,6 +93,9 @@ class Sentence:
     # All analyzer tokens of the sentence, punctuation included, with offsets
     # from the start of ``text``. It is empty when the grammar is not known.
     syntax: list[SyntaxToken] = field(default_factory=list)
+    # The inline code spans of the sentence, with offsets from the start of
+    # ``text``. The analyzer does not read their text.
+    code: list[tuple[int, int]] = field(default_factory=list)
 
     @property
     def tagged(self) -> bool:

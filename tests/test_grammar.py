@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import re
 import sys
 from typing import TYPE_CHECKING
 
@@ -16,7 +17,7 @@ from ste.analyzer import Analyzer, ExternalAnalyzer, SpacyAnalyzer
 from ste.checker import lint, lint_document
 from ste.cli import run
 from ste.document import parse
-from ste.grammar import align, annotate
+from ste.grammar import align, analyzer_text, annotate
 from ste.grammar_cache import GrammarCache
 from ste.models import Options, SyntaxToken
 from tests.grammar import StubSyntax, syntax_tokens, tagged
@@ -91,18 +92,65 @@ def test_one_analyzer_token_gives_its_grammar_to_each_word() -> None:
 def test_a_masked_word_and_an_unknown_sentence_stay_untagged() -> None:
     """Check that code and an unknown sentence get no grammar."""
     text = "Run `ls` now. Stop."
+    _, read = analyzer_text(parse(text).sentences[0])
+    code = read.split()[1]
     doc = tagged(
         text,
-        {"Run `ls` now.": ["Run/VERB/VB/ROOT/0", "ls/NOUN/NN/dobj/0", "now/ADV/RB/advmod/0"]},
+        {read: ["Run/VERB/VB/ROOT/0", f"{code}/NOUN/NN/dobj/0", "now/ADV/RB/advmod/0"]},
     )
     first, second = doc.sentences
     assert first.tagged
+    assert [(t.pos, t.dep) for t in first.syntax] == [
+        ("VERB", "ROOT"),
+        ("X", "dobj"),
+        ("ADV", "advmod"),
+    ]
     assert [(t.text, t.dep, t.head) for t in first.tokens] == [
         ("Run", "ROOT", 0),
         ("now", "advmod", 0),
     ]
     assert not second.tagged
     assert (second.tokens[0].pos, second.tokens[0].head) == ("", -1)
+
+
+class NounTagger(Analyzer):
+    """An analyzer that gives the noun tag to each part of a text between spaces."""
+
+    def __init__(self) -> None:
+        """Start with no text."""
+        super().__init__()
+        self.seen: list[str] = []
+
+    def analyze(self, text: str) -> list[SyntaxToken]:
+        """Give a noun token for each part of the text between spaces."""
+        self.seen.append(text)
+        return [
+            SyntaxToken(i, m[0], "NOUN", "NN", "dep", 0, m.start())
+            for i, m in enumerate(re.finditer(r"\S+", text))
+        ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Run `ste lint --format json` now.\n",
+        "1. Run `ste lint --format json` now.\n",
+        "- Run `ste lint --format json` now.\n",
+        "> Run `ste lint --format json` now.\n",
+        "# Run `ste lint --format json` now\n",
+        "| Step |\n|---|\n| Run `ste lint --format json` now. |\n",
+    ],
+)
+def test_the_analyzer_never_reads_inline_code(text: str) -> None:
+    """Check that the text of inline code does not reach the analyzer or a rule."""
+    analyzer = NounTagger()
+    findings = lint(text, Options(syntax=analyzer))
+    assert analyzer.seen
+    assert not any("lint" in seen or "json" in seen for seen in analyzer.seen)
+    assert [d for d in findings if d.rule_id == "STE-2.1"] == []
+    sentence = next(s for s in parse(text).sentences if "Run" in s.text)
+    offset, read = analyzer_text(sentence)
+    assert len(read) == len(sentence.text) - offset
 
 
 def test_a_token_without_an_offset_tags_no_word() -> None:

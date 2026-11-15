@@ -109,6 +109,7 @@ def _head_word(
     return -1
 
 
+_CODE_MARK = "X"
 _QUOTE_MARKS = re.compile(r"(?<=\n)[ \t]*>[ \t>]*")
 
 
@@ -117,10 +118,14 @@ def analyzer_text(sentence: Sentence) -> tuple[int, str]:
 
     A label such as "**NOTE:**" or "[!WARNING]" is not a part of the sentence,
     and the analyzer reads it as the subject or the root. The text starts after
-    the label. Spaces replace the quote marks of each line of a block quote, and
-    thus each offset stays the same.
+    the label. Spaces replace the quote marks of each line of a block quote.
+    A word of "X" letters replaces each inline code span, because code is not
+    prose: the analyzer reads the span as a name, and not as words. Each
+    offset stays the same.
     """
     text = sentence.text
+    for start, end in sentence.code:
+        text = text[:start] + _CODE_MARK * (end - start) + text[end:]
     offset = 0
     if sentence.first and sentence.admonition:
         label = re.match(
@@ -145,7 +150,21 @@ def annotate(doc: Document, syntax: Syntax) -> None:
         shifted = tokens
         if offset:
             shifted = [replace(t, start=t.start + offset) if t.start >= 0 else t for t in tokens]
+        if sentence.code:
+            shifted = [_hide_code(sentence, t) for t in shifted]
         align(sentence, shifted)
+
+
+def _hide_code(sentence: Sentence, token: SyntaxToken) -> SyntaxToken:
+    """Give the "other" part of speech to an analyzer token in inline code.
+
+    The token keeps its dependency, and thus a command keeps its object. No
+    rule reads the token as a noun, a verb, or a word of a noun cluster.
+    """
+    end = token.start + len(token.text)
+    if token.start < 0 or not any(a < end and b > token.start for a, b in sentence.code):
+        return token
+    return replace(token, text=sentence.text[token.start : end], pos="X", tag="XX", lemma="")
 
 
 _PASSIVE_DEPS = frozenset({"auxpass", "nsubjpass", "csubjpass"})

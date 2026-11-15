@@ -348,6 +348,9 @@ gives that limit, because a long noun cluster has more than one meaning.
 - A name of many words is one unit by rule 8.6, and the rule does not report
   it. Each word must be a name for that test.
 - `allow.nouns` removes a cluster from the rule.
+- The analyzer does not read the text of inline code. It reads one name in
+  its position, and a name from code is not a word of a cluster. Thus
+  "Run `ste lint --format json`" gives no finding.
 - Software documentation has many long noun clusters. On a repository of 180
   files, the rule gave 141 findings.
 
