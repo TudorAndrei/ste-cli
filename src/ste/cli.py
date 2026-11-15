@@ -255,6 +255,12 @@ def find_project(config_path: str = "", *, no_config: bool = False) -> Project:
     cwd = Path.cwd()
     if config_path and not no_config:
         path = Path(_absolute(config_path))
+        # The directory where discovery from here would find this file, if any.
+        for directory in (cwd, *cwd.parents):
+            if any(path == directory / name for name in config.DEFAULT_NAMES):
+                return Project(directory, path)
+            if (directory / ".git").exists():
+                break
         return Project(_config_directory(path), path)
     for directory in (cwd, *cwd.parents):
         if not no_config and (found := config.find(directory)):
@@ -483,7 +489,8 @@ def _read_lint(
                     results.append(_lint_one(STDIN_NAME, stdin.read(), opts))
             else:
                 for file in text_files(path, proj.directory, cfg.exclude, all_files=ns.read_all):
-                    key = _absolute(file)
+                    # Follow symbolic links before ".." is removed, as the system does.
+                    key = Path(os.path.realpath(file))
                     if key in seen:
                         continue
                     seen.add(key)
@@ -1127,10 +1134,13 @@ def _silence_stdout() -> None:
 def main() -> int:
     """Run the command with the process arguments and standard streams."""
     # A stream is None when the caller closed its file descriptor.
-    with open(os.devnull, "w", encoding="utf-8") as null:  # noqa: PTH123 - os.devnull is a name.
+    with (
+        open(os.devnull, encoding="utf-8") as empty,  # noqa: PTH123 - os.devnull is a name.
+        open(os.devnull, "w", encoding="utf-8") as null,  # noqa: PTH123 - os.devnull is a name.
+    ):
         stdout = sys.stdout or null
         try:
-            code = run(sys.argv[1:], sys.stdin or null, stdout, sys.stderr or null)
+            code = run(sys.argv[1:], sys.stdin or empty, stdout, sys.stderr or null)
             # Flush here so that a closed pipe is caught, and not at interpreter exit.
             stdout.flush()
         except BrokenPipeError:

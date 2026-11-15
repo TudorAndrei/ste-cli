@@ -16,7 +16,7 @@ import pytest
 from rich.text import Text
 from typer.testing import CliRunner
 
-from ste.cli import app, find_project, match_pattern, matches_any, run
+from ste.cli import app, find_project, main, match_pattern, matches_any, run
 
 SAMPLE_FINDING_COUNT = 3
 EXIT_ERROR = 2
@@ -496,6 +496,48 @@ def test_config_in_docs_directory_sets_project_root(
     assert discovered.directory == tmp_path
     assert explicit.directory == tmp_path
     assert explicit.config_path == config_file
+
+
+def test_explicit_config_from_subdirectory_matches_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that an explicit config gives the project directory that discovery gives."""
+    (tmp_path / ".git").mkdir()
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "glossary.yml").write_text('exclude: ["/draft.md"]\n')
+    (docs / "draft.md").write_text("It isn't ready.")
+    (docs / "guide.md").write_text("It isn't ready.")
+    monkeypatch.chdir(docs)
+    assert find_project().directory == docs
+    assert find_project("glossary.yml").directory == docs
+    assert report(".")["summary"]["files"] == 1
+    assert report("--config", "glossary.yml", ".")["summary"]["files"] == 1
+
+
+def test_symlink_parent_is_a_different_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that link/../draft.md is read when the link goes to another directory."""
+    project, other = tmp_path / "project", tmp_path / "other"
+    (other / "subdir").mkdir(parents=True)
+    project.mkdir()
+    (project / "draft.md").write_text("It isn't ready.")
+    (other / "draft.md").write_text("It isn't ready; it isn't open.")
+    (project / "link").symlink_to(other / "subdir", target_is_directory=True)
+    monkeypatch.chdir(project)
+    data = report("--no-config", "draft.md", "link/../draft.md")
+    assert data["summary"]["files"] == MIXED_FILE_COUNT
+
+
+def test_closed_stdin_reads_as_empty(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Check that a closed standard input gives empty text and not an error."""
+    monkeypatch.setattr(sys, "stdin", None)
+    monkeypatch.setattr(sys, "argv", ["ste", "lint", "--no-config", "--format", "json", "-"])
+    assert main() == 0
+    assert json.loads(capsys.readouterr().out)["summary"]["findings"] == 0
 
 
 def test_dict_path_turns_dictionary_on(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
