@@ -27,11 +27,11 @@ severity, and strict mode does not make it an error.
 | `STE-3.4` | Complex verb construction | 0.90, 0.85, or 0.55 | warning |
 | `STE-3.5` | Progressive "-ing" form | 0.90 | warning |
 | `STE-3.6` | Passive voice | 0.95, 0.85, or 0.70 | warning |
-| `STE-3.7` | A noun for an action | 0.90 | warning |
+| `STE-3.7` | A noun for an action | 0.90, or 0.85 | warning |
 | `STE-4.2` | Contraction | 0.98 | warning |
 | `STE-5.1` | Sentence too long | 0.90 | warning |
 | `STE-8.1` | Semicolon | 1.00 | warning |
-| `STE-9.3` | Phrasal verb | 0.85 | warning |
+| `STE-9.3` | Phrasal verb | 0.85, or 0.70 | warning |
 | `STE-GR-6` | Latin abbreviation | 0.90 | info |
 | `STE-4.3` | A list with two constructions | 0.80 | info |
 | `STE-5.5` | An instruction in a note | 0.80 | warning |
@@ -45,6 +45,8 @@ severity, and strict mode does not make it an error.
 | `STE-5.3` | An instruction that is not a command | 0.75 | warning |
 | `STE-3.2` | A verb form that is not an approved tense | 0.90, or 0.80 | warning |
 | `STE-3.3` | A past participle that is not an adjective | 0.80, or 0.70 | warning |
+| `STE-1.7` | A technical noun as a verb | 0.70 | warning |
+| `STE-1.13` | A technical verb as a noun | 0.70 | warning |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -80,8 +82,13 @@ Reports 54 British spellings that have one American form, for example
 
 **Limits.**
 
-- The list keeps out each pair that needs a part of speech. Three examples
-  are "licence", "practise", and "programme".
+- The list does not include a pair that needs a part of speech, such as
+  "licence" and "practise". British English writes the noun "licence" and
+  the verb "license". American English writes "license" for the two.
+  **With the analyzer**, the rule reads the part of speech and reports
+  "licence", "practise", and "dependant", with their other forms. The
+  message names the part of speech. A word in quotation marks is a mention
+  of the word, and this part of the rule does not report it.
 - The tool does not report a capitalized word that does not start its
   sentence, because that word is usually a name. An example is "Defence" in
   the name of an organization. Thus the tool does not find a British
@@ -165,8 +172,22 @@ writing, and only when the agent is unknown.
 Reports 17 word groups that use a noun for an action, for example "do a
 check of". Rule 3.7 tells you to use an approved verb.
 
-**Limits.** The tool cannot find a noun for an action that is not in the
-list, because it cannot make a verb from a noun without a dictionary.
+**With the analyzer**, the rule also reports a verb with little meaning and
+its direct object. The object is a noun that names an action. An
+example is "do an installation of the software", which is "install the
+software". The verbs are "perform", "do", "conduct", "carry out",
+"undertake", "effect", and "accomplish". "make", "give", "provide", and
+"take" count only with some nouns, because "make a preparation" can make an
+item. The rule also reads a passive form, such as "the inspection was
+performed". The confidence is 0.85.
+
+**Limits.**
+
+- Without the analyzer, the tool cannot find a noun for an action that is
+  not in the list.
+- The analyzer part has a list of 57 nouns, each with one verb. A noun
+  that is also the name of an item, such as "application", is not in the
+  list.
 
 ## STE-4.2 Contraction
 
@@ -242,10 +263,19 @@ phrasal verb from two words.
 
 **Limits.**
 
-- The verb and its particle must touch. The tool does not find a separated
-  form, such as "turn the pump on".
-- The list is short on purpose. The dictionary gives single words, not
-  combinations. A hand-written list is the only method.
+- Without the analyzer, the verb and its particle must touch, and the tool
+  does not find a separated form, such as "turn the pump on".
+- **With the analyzer**, the rule reads the particle of each verb. It finds
+  "turn the pump on", with a confidence of 0.85 for a verb of the list. It
+  also finds a phrasal verb that is not in the list, such as "log in", with
+  a confidence of 0.70.
+- "comes on" and "comes off" tell the state of a light or a switch, and the
+  rule does not report them.
+- The analyzer can join a particle to the wrong word. Then the rule does not
+  find "look the key up".
+- A technical verb in `allow.verbs` removes its phrasal verbs from the
+  rule. A technical noun does not, thus "log" in `allow.nouns` does not
+  permit "log in".
 
 ## STE-GR-6 Latin abbreviation
 
@@ -301,6 +331,41 @@ description gives a finding, and a list of requirements gives none.
   on one repository, and each of those 68 was wrong.
 - A step of two words, such as "Complete preflight", stays ambiguous. The
   rule can report it.
+
+## STE-1.7 A technical noun as a verb
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Reports a technical noun of `allow.nouns` that the sentence uses as a verb.
+Rule 1.7 tells you to use a technical noun only as a noun. An example is
+"Shim the bracket" when the glossary gives "shim" as a noun.
+
+**Limits.**
+
+- A word that is in `allow.nouns` and in `allow.verbs` has the two parts of
+  speech, and the rule does not report it.
+- The nouns of the `software` preset do not count. Software text uses most
+  of them as verbs too, such as "build", "commit", and "run".
+- The rule reads only a technical noun of one word.
+- The tagger can tag a capitalized first word as a name. The rule then
+  accepts it as a verb only when it has a direct object.
+- The confidence is 0.70, because the tagger can confuse a noun and a verb.
+
+## STE-1.13 A technical verb as a noun
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Reports a technical verb of `allow.verbs` that the sentence uses as a noun.
+Rule 1.13 tells you to use a technical verb only as a verb. An example is
+"Do the install again" when the glossary gives "install" as a verb.
+
+**Limits.**
+
+- A word that is in `allow.nouns` and in `allow.verbs` has the two parts of
+  speech, and the rule does not report it.
+- The rule does not report a verb before a noun, as in "the lint command".
+- An "-ing" form is for rule 3.5, and this rule does not report it.
+- The confidence is 0.70, because the tagger can confuse a noun and a verb.
 
 ## STE-4.3 A list with two constructions
 
@@ -597,7 +662,6 @@ check the other 23. A guess gives wrong findings, thus the tool does not try.
 | 1.3 | The approved meaning | A judgment of a reader |
 | 1.4, 3.1 | The forms of the dictionary | Needs a tagger and the forms of the dictionary |
 | 1.5, 1.12 | The category of a technical noun or verb | A judgment about the subject field |
-| 1.7, 1.13 | A technical noun as a verb, and a technical verb as a noun | Needs a part-of-speech tagger |
 | 1.10 | Slang and jargon | A judgment of a reader |
 | 2.2 | The full form of a long technical noun | A judgment of a reader |
 | 4.4 | Connecting words | Needs semantics |
