@@ -21,7 +21,7 @@ from markdown_it.rules_inline import (
 from ste.models import Document, Sentence, Token
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from markdown_it.rules_inline.state_inline import StateInline
     from markdown_it.token import Token as MarkdownToken
@@ -137,7 +137,7 @@ _SPACE = " \t\n\r"
 _CLOSING = "*_) ]\"'`".replace(" ", "")
 _JOIN = "'\u2019\u02bc-._"
 # "[^\W_]" is a letter or a number. It also matches a number that is not a
-# digit, such as "½", that _is_word does not accept. _word_span finds and
+# digit, such as "½", that _is_word does not accept. _word_spans finds and
 # corrects this case.
 _LETTER = r"[^\W_]"
 _JOINED = rf"(?:{_LETTER}|[{re.escape(_JOIN)}](?={_LETTER}))*"
@@ -414,10 +414,7 @@ def _all_words(run: str) -> bool:
     return run.isascii() or all(_is_word(char) for char in run if char not in _JOIN)
 
 
-def _end_of_word(text: str, pos: int, end: int) -> int:
-    stop = _match_end(_JOINED_RUN, text, pos, end)
-    if _all_words(text[pos:stop]):
-        return stop
+def _scan_word(text: str, pos: int, end: int) -> int:
     while pos < end:
         if _is_word(text[pos]) or (
             text[pos] in _JOIN and pos + 1 < end and _is_word(text[pos + 1])
@@ -428,14 +425,36 @@ def _end_of_word(text: str, pos: int, end: int) -> int:
     return pos
 
 
-def _word_span(text: str, match: re.Match[str], end: int) -> tuple[int, int]:
-    """Return the word of a _WORD match, or an empty span at a character that is not a word."""
+def _end_of_word(text: str, pos: int, end: int) -> int:
+    stop = _match_end(_JOINED_RUN, text, pos, end)
+    if _all_words(text[pos:stop]):
+        return stop
+    return _scan_word(text, pos, end)
+
+
+def _word_spans(text: str, match: re.Match[str], end: int) -> Iterator[tuple[int, int]]:
+    """Return the words of a _WORD match.
+
+    A match can contain a number that is not a digit, such as "½". Such a
+    character is not part of a word. Each character of the match is examined
+    one time, so a long run of these characters does not make the search slow.
+    """
     start, stop = match.span()
     if _all_words(text[start:stop]):
-        return start, stop
-    if not _is_word(text[start]):
-        return start, start
-    return start, _end_of_word(text, start, end)
+        yield start, stop
+        return
+    last_bad = max(i for i in range(start, stop) if text[i] not in _JOIN and not _is_word(text[i]))
+    pos = start
+    while pos < stop:
+        if not _is_word(text[pos]):
+            pos += 1
+        elif pos > last_bad:
+            yield pos, stop
+            return
+        else:
+            word_end = _scan_word(text, pos, end)
+            yield pos, word_end
+            pos = word_end
 
 
 def tokenize(masked: str, start: int = 0, end: int | None = None) -> list[Token]:
@@ -444,15 +463,17 @@ def tokenize(masked: str, start: int = 0, end: int | None = None) -> list[Token]
     out: list[Token] = []
     pos = start
     while match := _WORD.search(masked, pos, end):
-        pos, stop = _word_span(masked, match, end)
-        if stop == pos:
-            pos += 1
-            continue
-        word = masked[pos:stop]
-        out.append(
-            Token(word, word.replace("\u2019", "'").replace("\u02bc", "'").lower(), pos, stop)
-        )
-        pos = stop
+        for word_start, word_end in _word_spans(masked, match, end):
+            word = masked[word_start:word_end]
+            out.append(
+                Token(
+                    word,
+                    word.replace("\u2019", "'").replace("\u02bc", "'").lower(),
+                    word_start,
+                    word_end,
+                )
+            )
+        pos = match.end()
     return out
 
 
@@ -502,12 +523,10 @@ def count_words(masked: str, start: int = 0, end: int | None = None) -> int:
             else:
                 pos += 1
             continue
-        pos, stop = _word_span(masked, match, end)
-        if stop == pos:
-            pos += 1
-            continue
-        pos = _quantity_end(masked, pos, stop, end)
-        count += 1
+        pos = match.end()
+        for word_start, word_end in _word_spans(masked, match, end):
+            pos = max(pos, _quantity_end(masked, word_start, word_end, end))
+            count += 1
     return count
 
 
