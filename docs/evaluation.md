@@ -27,6 +27,16 @@ The corpus is in `testdata/`. Each fixture file can have a
 `<name>.expected.json` file that lists the findings that the checker must
 give. A file with no expectation file must give no findings.
 
+The expectation file can also give settings for its fixture:
+
+| Key | Use |
+|---|---|
+| `mode` | `flavored` or `strict` |
+| `allow_nouns`, `allow_verbs` | The technical words of the fixture |
+| `prefer` | The preferred names, as in the config |
+| `max_noun_words` | The limit of rule 1.9 |
+| `analyze` | `true` runs the fixture with the grammar analyzer. The run stops with an error when the analyzer cannot start. |
+
 | Rule | TP | FP | FN | Precision | Recall |
 |---|---|---|---|---|---|
 | `STE-1.1` | 2 | 0 | 0 | 1.00 | 1.00 |
@@ -51,8 +61,9 @@ give. A file with no expectation file must give no findings.
 | **all** | **33** | **0** | **0** | **1.00** | **1.00** |
 
 12 fixture files, 4 valid and 8 invalid. Each of the 17 rules that need no
-analyzer has at least one labeled example. The corpus does not measure the 4
-rules that need the analyzer, because the corpus runs with no Python.
+analyzer has at least one labeled example. A fixture with `"analyze": true`
+measures a rule that needs the analyzer. CI installs spaCy for this
+reason.
 
 The 4 valid files test for wrong findings. Each of them must give 0
 findings. They hold the constructions that gave a wrong finding

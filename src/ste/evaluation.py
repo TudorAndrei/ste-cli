@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import TextIO, TypedDict
 
+from ste import analyzer
 from ste.checker import lint
 from ste.models import Options, Preferred
 
@@ -85,7 +86,7 @@ def _expectations(path: Path, value: object) -> list[dict[str, str]]:
     return expectations
 
 
-def _expected(path: Path) -> tuple[Options, list[dict[str, str]]]:
+def _expected(path: Path) -> tuple[Options, bool, list[dict[str, str]]]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -99,6 +100,9 @@ def _expected(path: Path) -> tuple[Options, list[dict[str, str]]]:
     mode = raw.get("mode")
     if mode is not None and not isinstance(mode, str):
         raise _invalid(path, "mode must be a string")
+    analyze = raw.get("analyze", False)
+    if not isinstance(analyze, bool):
+        raise _invalid(path, "analyze must be true or false")
     limit = raw.get("max_noun_words")
     if limit is not None and (type(limit) is not int or limit <= 0):
         raise _invalid(path, "max_noun_words must be a positive number")
@@ -106,9 +110,10 @@ def _expected(path: Path) -> tuple[Options, list[dict[str, str]]]:
         mode=mode or "flavored",
         max_noun_words=limit or 0,
         allow_nouns=_string_list(path, raw.get("allow_nouns"), "allow_nouns"),
+        allow_verbs=_string_list(path, raw.get("allow_verbs"), "allow_verbs"),
         prefer=_preferences(path, raw.get("prefer")),
     )
-    return opts, _expectations(path, raw.get("expect"))
+    return opts, analyze, _expectations(path, raw.get("expect"))
 
 
 def run(directory: str | Path) -> EvaluationReport:
@@ -124,37 +129,62 @@ def run(directory: str | Path) -> EvaluationReport:
         msg = f"{root}: the corpus has no fixture files"
         raise ValueError(msg)
     counts: defaultdict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
-    for path in files:
-        source = path.read_text(encoding="utf-8")
-        expected_path = path.with_suffix(".expected.json")
-        opts, want = _expected(expected_path)
-        used: set[int] = set()
-        for diag in lint(source, opts):
-            text = " ".join(source[diag.start : diag.end].split())
-            match = next(
-                (
-                    n
-                    for n, w in enumerate(want)
-                    if n not in used
-                    and w["rule_id"] == diag.rule_id
-                    and (not w.get("text") or w["text"] == text)
-                ),
-                None,
-            )
-            if match is None:
-                counts[diag.rule_id][1] += 1
-            else:
-                used.add(match)
-                counts[diag.rule_id][0] += 1
-        for n, expectation in enumerate(want):
-            if n not in used:
-                counts[expectation["rule_id"]][2] += 1
+    client: analyzer.Analyzer | None = None
+    try:
+        for path in files:
+            client = _measure(path, counts, client)
+    finally:
+        if client is not None:
+            client.close()
     totals = [sum(v[n] for v in counts.values()) for n in range(3)]
     return {
         "files": len(files),
         "rules": [_score(k, counts[k]) for k in sorted(counts)],
         "totals": _score("all", totals),
     }
+
+
+def _measure(
+    path: Path, counts: defaultdict[str, list[int]], client: analyzer.Analyzer | None
+) -> analyzer.Analyzer | None:
+    """Add the results of one fixture, and return the analyzer for the next fixture.
+
+    A fixture with ``"analyze": true`` uses the grammar analyzer. The analyzer
+    starts at the first such fixture, and the next fixtures use it again.
+    """
+    source = path.read_text(encoding="utf-8")
+    expected_path = path.with_suffix(".expected.json")
+    opts, analyze, want = _expected(expected_path)
+    if analyze:
+        if client is None:
+            status = analyzer.check()
+            if not status["ready"]:
+                msg = f"{path}: the fixture needs the analyzer. {status['problem']}"
+                raise ValueError(msg)
+            client = analyzer.create()
+        opts.syntax = client
+    used: set[int] = set()
+    for diag in lint(source, opts):
+        text = " ".join(source[diag.start : diag.end].split())
+        match = next(
+            (
+                n
+                for n, w in enumerate(want)
+                if n not in used
+                and w["rule_id"] == diag.rule_id
+                and (not w.get("text") or w["text"] == text)
+            ),
+            None,
+        )
+        if match is None:
+            counts[diag.rule_id][1] += 1
+        else:
+            used.add(match)
+            counts[diag.rule_id][0] += 1
+    for n, expectation in enumerate(want):
+        if n not in used:
+            counts[expectation["rule_id"]][2] += 1
+    return client
 
 
 def write_text(stream: TextIO, data: EvaluationReport) -> None:

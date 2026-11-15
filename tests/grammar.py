@@ -67,6 +67,9 @@ class StubSyntax:
         """Keep the grammar of each sentence, by its text."""
         self.spec = grammar
 
+    def close(self) -> None:
+        """Release nothing. A real analyzer stops its process here."""
+
     def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]:
         """Return the specified grammar for one sentence."""
         if sentence.strip() not in self.spec:

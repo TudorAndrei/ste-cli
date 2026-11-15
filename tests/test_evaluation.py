@@ -106,3 +106,40 @@ def test_null_labels_and_missing_fields_follow_json_contract(tmp_path: Path) -> 
     result = evaluation.run(tmp_path)
     assert result["rules"][0]["rule_id"] == ""
     assert result["totals"]["false_negatives"] == 1
+
+
+def test_analyze_label_gives_grammar_to_the_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fixture with "analyze": true runs with one shared analyzer."""
+    from ste import analyzer  # noqa: PLC0415 - the patch needs the module object.
+    from tests.grammar import StubSyntax  # noqa: PLC0415
+
+    sentence = "Open the valve."
+    grammar: dict[str, list[str]] = {}
+    made: list[StubSyntax] = []
+
+    def create() -> StubSyntax:
+        made.append(StubSyntax(grammar))
+        return made[-1]
+
+    monkeypatch.setattr(analyzer, "check", lambda: {"ready": True, "problem": ""})
+    monkeypatch.setattr(analyzer, "create", create)
+    for name in ("a", "b"):
+        (tmp_path / f"{name}.md").write_text(sentence)
+        (tmp_path / f"{name}.expected.json").write_text(json.dumps({"analyze": True}))
+    evaluation.run(tmp_path)
+    assert len(made) == 1
+
+
+def test_analyze_label_needs_the_analyzer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fixture that needs the analyzer stops the run when it cannot start."""
+    from ste import analyzer  # noqa: PLC0415 - the patch needs the module object.
+
+    monkeypatch.setattr(
+        analyzer, "check", lambda: {"ready": False, "problem": "spaCy is not installed"}
+    )
+    (tmp_path / "a.md").write_text("Open the valve.")
+    (tmp_path / "a.expected.json").write_text(json.dumps({"analyze": True}))
+    with pytest.raises(ValueError, match=r"needs the analyzer\. spaCy is not installed"):
+        evaluation.run(tmp_path)
