@@ -180,7 +180,7 @@ that directory.
 The copyright page of Issue 9 gives three statements that decide what this
 repository can hold:
 
-<!-- ste-disable STE-3.6 -->
+<!-- ste-disable STE-3.2 STE-3.6 -->
 
 1. **The ban.** "no reproduction or publication of it, in whole or in part,
    shall be made without the written authority of an officer" of ASD.

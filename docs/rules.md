@@ -24,7 +24,7 @@ severity, and strict mode does not make it an error.
 |---|---|---|---|
 | `STE-1.1` | Unapproved word or word group | 0.90 | warning |
 | `STE-1.14` | British spelling | 0.90 | warning |
-| `STE-3.4` | Complex verb construction (perfect tense) | 0.90, or 0.55 | warning |
+| `STE-3.4` | Complex verb construction | 0.90, 0.85, or 0.55 | warning |
 | `STE-3.5` | Progressive "-ing" form | 0.90 | warning |
 | `STE-3.6` | Passive voice | 0.95, 0.85, or 0.70 | warning |
 | `STE-3.7` | A noun for an action | 0.90 | warning |
@@ -43,6 +43,8 @@ severity, and strict mode does not make it an error.
 | `STE-1.9` | A technical noun that is too long | 0.95 | warning |
 | `STE-2.1` | A noun of more than three words | 0.80 | warning |
 | `STE-5.3` | An instruction that is not a command | 0.75 | warning |
+| `STE-3.2` | A verb form that is not an approved tense | 0.90, or 0.80 | warning |
+| `STE-3.3` | A past participle that is not an adjective | 0.80, or 0.70 | warning |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -93,9 +95,20 @@ Reports "has", "have", or "had", and then a past participle. An adverb or
 "not" can come between the two words. Example: "has been sent", "had gone".
 Rule 3.4 does not permit an auxiliary verb that makes a complex construction.
 
+The rule also reports "is to be" and then a past participle, as in "is to be
+installed". This construction has three auxiliary words. The confidence is
+0.85. With the analyzer, the confidence is 0.90, and the rule gives no
+finding when the analyzer does not read the last word as a participle. When
+the same words give an `STE-3.6` finding, and no "by" agent follows, the
+tool removes the passive finding.
+
 **Limits.**
 
-- "have to" is an obligation. The tool does not report it.
+- "have to" is an obligation. The tool does not report it. The problem is
+  the meaning of "have", and not the construction. Rule 1.3 gives the
+  approved meaning of a word, and a reader must examine it.
+- "is to" and then a verb, as in "The aim is to start the pump", is
+  usually not an obligation. The tool does not report it.
 - "has been" and then a word that is not a participle gets a confidence of
   0.55. Only `strict` mode shows it.
 
@@ -110,11 +123,16 @@ position, such as "Before starting the pump" and "by using the network". The
 analyzer separates a verb from a noun and from a modifier, which rule 3.5
 permits. On a repository of 180 files, this part gave 354 more findings.
 
-**Limits.** The tool has a list of "-ing" words that are adjectives or
-nouns, such as "missing" and "existing". It does not report them. It does
-not report "is being", because that is the passive voice and rule 3.6
-reports it. Without the analyzer, the tool finds only the form after "to
-be".
+**Limits.**
+
+- A word directly after a quotation mark, or directly before one, is a
+  mention and not a verb. An example is `must be "warning"`. The tool does
+  not report it, with or without the analyzer.
+- The tool has a list of "-ing" words that are adjectives or nouns, such as
+  "missing" and "existing". It does not report them.
+- The tool does not report "is being", because that is the passive voice,
+  and rule 3.6 reports it.
+- Without the analyzer, the tool finds only the form after "to be".
 
 ## STE-3.6 Passive voice
 
@@ -461,6 +479,61 @@ to see if it gives a risk, and a long instruction with no reason
 gives no finding. A note and a tip are not safety instructions, and the rule
 ignores them.
 
+## STE-3.2 A verb form that is not an approved tense
+
+Reports "would", "should", "shall", "may", or "might" and then a verb.
+Example: "would see", "should not restart", "may fail".
+
+Rule 3.2 approves only six forms of a verb. They are the infinitive, the
+imperative, the simple present, the simple past, the simple future, and the
+past participle. A modal of this list makes a different form, such as a
+conditional.
+
+| Condition | Confidence |
+|---|---|
+| The analyzer gives the modal and the verb that it goes with | 0.90 |
+| The words alone: a modal and then a word that is not a determiner or a pronoun | 0.80 |
+
+With the analyzer, the rule also finds a modal that is not next to its
+verb, as in "Should the pump fail". The analyzer also stops a finding when
+"may" is not a modal.
+
+**Limits.**
+
+- The standard approves "can", "could", "must", and "will". The rule does
+  not report them.
+- A perfect after the modal, as in "would have sent", goes to `STE-3.4`.
+  Thus one problem gives one message.
+- A capital "May" that does not start its sentence is usually a month. The
+  rule does not report it.
+- Without the analyzer, the rule does not find an inversion, as in "Should
+  the pump fail".
+
+## STE-3.3 A past participle that is not an adjective
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Reports a past participle that is the verb of a short clause, and not an
+adjective. Example: "The file created by the tool", "Once installed, the
+agent starts". Rule 3.3 permits a past participle as an adjective, and the
+passive voice uses it after "to be".
+
+| Condition | Confidence |
+|---|---|
+| A "by" agent follows the participle | 0.80 |
+| No agent | 0.70 |
+
+**Limits.**
+
+- A participle before its noun, as in "the attached cable", is an
+  adjective. The rule does not report it.
+- A participle with "to be" or "have" goes to `STE-3.6` or `STE-3.4`.
+- The word must have the form of a past participle. Thus a word that the
+  analyzer tags in error, such as "page", gives no finding.
+- The rule reads the clause as a defect, because the participle has the
+  function of a verb in it. A reader can permit a short clause with
+  `<!-- ste-disable-next-line STE-3.3 -->`.
+
 <!-- ste-enable -->
 
 ## What the tool does not examine
@@ -527,7 +600,6 @@ check the other 23. A guess gives wrong findings, thus the tool does not try.
 | 1.7, 1.13 | A technical noun as a verb, and a technical verb as a noun | Needs a part-of-speech tagger |
 | 1.10 | Slang and jargon | A judgment of a reader |
 | 2.2 | The full form of a long technical noun | A judgment of a reader |
-| 3.3 | A past participle as an adjective | Needs a parser to find the position of the participle |
 | 4.4 | Connecting words | Needs semantics |
 | 4.5 | Articles and demonstrative adjectives | The exceptions of the standard make a check too noisy |
 | 5.2 | One instruction for each sentence | Cannot separate simultaneous actions without a parser |
