@@ -1,19 +1,21 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Command interface for the ASD-STE100 checker."""
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
-from collections.abc import Mapping
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, TextIO
+from typing import TYPE_CHECKING, Annotated, TextIO
 
 import typer
 from typer._click.core import Context, ParameterSource
@@ -22,7 +24,13 @@ from typer.core import TyperCommand, TyperGroup, TyperOption
 from ste import __version__, analyzer, baseline, config, dictionary, evaluation, report
 from ste.checker import lint_document
 from ste.document import parse
-from ste.models import Options
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
+    from typer._click.core import Parameter
+
+    from ste.models import Options
 
 STDIN_NAME = "(standard input)"
 STARTER_CONFIG = """# The config of ste. Each key is optional. Run "ste schema" for all keys.
@@ -73,7 +81,13 @@ GENERATED_FILES = {
 }
 
 
-def _boolean_args(params, ctx: Context, args: list[str], group: bool = False):
+def _boolean_args(
+    params: Sequence[Parameter],
+    ctx: Context,
+    args: list[str],
+    *,
+    group: bool = False,
+) -> tuple[list[str], dict[str, bool]]:
     """Keep explicit boolean values while Typer reads all other arguments."""
     options = {
         name: param for param in params if isinstance(param, TyperOption) for name in param.opts
@@ -91,7 +105,8 @@ def _boolean_args(params, ctx: Context, args: list[str], group: bool = False):
         if option is not None and option.is_bool_flag and not option.is_eager:
             if option.name is not None:
                 if sep and value.lower() not in {"true", "false", "1", "0", "t", "f"}:
-                    raise typer.BadParameter(f"invalid boolean: {value}", ctx=ctx, param=option)
+                    msg = f"invalid boolean: {value}"
+                    raise typer.BadParameter(msg, ctx=ctx, param=option)
                 values[option.name] = not sep or value.lower() in {"true", "1", "t"}
         else:
             converted.append(arg)
@@ -113,12 +128,14 @@ class SteCommand(TyperCommand):
     """Accept the existing --flag=true and --flag=false forms."""
 
     def parse_args(self, ctx: Context, args: list[str]) -> list[str]:
+        """Read Typer arguments and preserve explicit boolean flag values."""
         converted, values = _boolean_args(self.params, ctx, args)
         rest = super().parse_args(ctx, converted)
         _set_booleans(ctx, values)
         return rest
 
-    def invoke(self, ctx: Context):
+    def invoke(self, ctx: Context) -> object:
+        """Run the command and convert input failures to usage errors."""
         try:
             return super().invoke(ctx)
         except (OSError, ValueError) as err:
@@ -129,6 +146,7 @@ class SteGroup(TyperGroup):
     """Apply the same boolean syntax to options before a subcommand."""
 
     def parse_args(self, ctx: Context, args: list[str]) -> list[str]:
+        """Read Typer arguments and preserve explicit boolean flag values."""
         converted, values = _boolean_args(self.params, ctx, args, group=True)
         rest = super().parse_args(ctx, converted)
         _set_booleans(ctx, values)
@@ -136,6 +154,8 @@ class SteGroup(TyperGroup):
 
 
 class OutputFormat(StrEnum):
+    """List the report formats accepted by the lint commands."""
+
     text = "text"
     json = "json"
     ndjson = "ndjson"
@@ -144,18 +164,23 @@ class OutputFormat(StrEnum):
 
 
 class SimpleFormat(StrEnum):
+    """List formats accepted by status and data commands."""
+
     text = "text"
     json = "json"
 
 
 @dataclass
 class Streams:
+    """Hold the input and output streams for one command."""
+
     stdin: TextIO
     stdout: TextIO
     stderr: TextIO
 
 
 def streams(ctx: typer.Context) -> Streams:
+    """Get the streams bound to the current invocation."""
     if isinstance(ctx.obj, Streams):
         return ctx.obj
     return Streams(sys.stdin, sys.stdout, sys.stderr)
@@ -163,8 +188,10 @@ def streams(ctx: typer.Context) -> Streams:
 
 @dataclass
 class LintOptions:
+    """Hold the parsed lint command options."""
+
     paths: list[str] = field(default_factory=list)
-    format: str = "text"
+    output_format: str = "text"
     mode: str = ""
     fields: str = ""
     config: str = ""
@@ -174,7 +201,7 @@ class LintOptions:
     analyzer: str = ""
     summary: bool = False
     no_config: bool = False
-    all: bool = False
+    read_all: bool = False
     no_baseline: bool = False
     fail_on_new: bool = False
     warnings_as_errors: bool = False
@@ -188,24 +215,34 @@ class LintOptions:
 
 @dataclass
 class DictOptions:
-    format: str = "text"
+    """Hold dictionary options shared with the subcommands."""
+
+    output_format: str = "text"
     out: str = ""
     dry_run: bool = False
 
 
 @dataclass
 class Project:
+    """Resolve configuration paths from the project directory."""
+
     directory: Path
     config_path: Path | None = None
 
     def resolve(self, path: str) -> str:
+        """Resolve a nonempty path from the project directory."""
         return str(self.directory / path) if path else ""
 
 
-def find_project(config_path: str = "", no_config: bool = False) -> Project:
+def _absolute(path: str | Path) -> Path:
+    return Path(os.path.normpath(path)).absolute()
+
+
+def find_project(config_path: str = "", *, no_config: bool = False) -> Project:
+    """Find the project directory and its optional configuration."""
     cwd = Path.cwd()
     if config_path and not no_config:
-        path = Path(os.path.abspath(config_path))
+        path = Path(_absolute(config_path))
         return Project(path.parent, path)
     for directory in (cwd, *cwd.parents):
         if not no_config and (found := config.find(directory)):
@@ -216,27 +253,31 @@ def find_project(config_path: str = "", no_config: bool = False) -> Project:
 
 
 def repo_root(directory: Path) -> Path:
+    """Find the Git root containing the given directory."""
     return next((p for p in (directory, *directory.parents) if (p / ".git").exists()), directory)
 
 
 def relative_to(directory: str | Path, path: str | Path) -> str:
-    return os.path.relpath(os.path.abspath(path), os.path.abspath(directory)).replace("\\", "/")
+    """Get a portable relative path without changing file identity."""
+    return os.path.relpath(_absolute(path), _absolute(directory)).replace("\\", "/")
 
 
 def display_path(path: str) -> str:
-    if not path or not os.path.isabs(path):
+    """Shorten an absolute path when it is inside the current directory."""
+    if not path or not Path(path).is_absolute():
         return path
     relative = relative_to(Path.cwd(), path)
     return path if relative.startswith("..") else relative
 
 
 def match_pattern(pattern: str, path: str) -> bool:
+    """Match a project exclusion pattern against a path."""
     if not pattern:
         return False
     if "**" in pattern:
         position = 0
-        for n, part in enumerate(pattern.split("**")):
-            part = part.strip("/")
+        for n, segment in enumerate(pattern.split("**")):
+            part = segment.strip("/")
             if not part:
                 continue
             match = re.search(
@@ -247,8 +288,6 @@ def match_pattern(pattern: str, path: str) -> bool:
             position += match.end()
         return True
     # A single star cannot cross a directory boundary.
-    import fnmatch
-
     if len(pattern.split("/")) != len(path.split("/")):
         return False
     return all(
@@ -257,6 +296,7 @@ def match_pattern(pattern: str, path: str) -> bool:
 
 
 def matches_any(path: str | Path, root: str | Path, patterns: list[str]) -> bool:
+    """Check a file against all project exclusion patterns."""
     relative = relative_to(root, path)
     return any(
         match_pattern(p.removeprefix("./").replace("\\", "/"), relative)
@@ -266,10 +306,14 @@ def matches_any(path: str | Path, root: str | Path, patterns: list[str]) -> bool
 
 
 def git_visible(directory: str) -> set[str] | None:
+    """Get the files visible to Git, or defer when Git is unavailable."""
+    git = shutil.which("git")
+    if git is None:
+        return None
     try:
-        process = subprocess.run(
+        process = subprocess.run(  # noqa: S603 - Fixed git executable; paths are separate arguments.
             [
-                "git",
+                git,
                 "-C",
                 directory,
                 "ls-files",
@@ -284,13 +328,21 @@ def git_visible(directory: str) -> set[str] | None:
     except (OSError, subprocess.CalledProcessError):
         return None
     return {
-        os.path.abspath(os.path.join(directory, p))
-        for p in os.fsdecode(process.stdout).split("\0")
-        if p
+        str(_absolute(Path(directory) / p)) for p in os.fsdecode(process.stdout).split("\0") if p
     }
 
 
-def text_files(path: str, all_files: bool, project_dir: Path, exclude: list[str]) -> list[str]:
+def _include_file(file: str, visible: set[str] | None, *, all_files: bool) -> bool:
+    path = Path(file)
+    if path.suffix not in (".md", ".markdown", ".txt"):
+        return False
+    if visible is not None and str(_absolute(file)) not in visible:
+        return False
+    return all_files or path.stem.lower() not in GENERATED_FILES
+
+
+def text_files(path: str, project_dir: Path, exclude: list[str], *, all_files: bool) -> list[str]:
+    """Collect permitted Markdown and text files in path order."""
     target = Path(path)
     target.stat()
     if not target.is_dir():
@@ -305,24 +357,21 @@ def text_files(path: str, all_files: bool, project_dir: Path, exclude: list[str]
         if not all_files:
             dirs[:] = [d for d in dirs if not d.startswith(".") and d not in SKIPPED_DIRS]
         for name in names:
-            file = os.path.normpath(os.path.join(directory, name))
-            if Path(name).suffix not in (".md", ".markdown", ".txt"):
-                continue
-            if visible is not None and os.path.abspath(file) not in visible:
-                continue
-            if not all_files and Path(name).stem.lower() in GENERATED_FILES:
-                continue
-            if not matches_any(file, project_dir, exclude):
+            file = os.path.normpath(Path(directory) / name)
+            if _include_file(file, visible, all_files=all_files) and not matches_any(
+                file, project_dir, exclude
+            ):
                 files.append(file)
     if not files:
-        raise ValueError(f"{path}: the directory has no Markdown or text files")
+        msg = f"{path}: the directory has no Markdown or text files"
+        raise ValueError(msg)
     return sorted(files)
 
 
-def _write_plan(stream: TextIO, format: str, data: Mapping[str, object], text: str) -> None:
+def _write_plan(stream: TextIO, output_format: str, data: Mapping[str, object], text: str) -> None:
     stream.write(
-        json.dumps(data, indent=2 if format == "json" else None, ensure_ascii=False) + "\n"
-        if format in ("json", "ndjson")
+        json.dumps(data, indent=2 if output_format == "json" else None, ensure_ascii=False) + "\n"
+        if output_format in ("json", "ndjson")
         else text
     )
 
@@ -340,32 +389,41 @@ def _baseline_key(path: str, file: str) -> str:
     return file if file == STDIN_NAME else relative_to(Path(path).parent, file)
 
 
-def _run_lint(ns: LintOptions, stdin: TextIO, stdout: TextIO, stderr: TextIO, write: bool) -> int:
+def _validate_lint(ns: LintOptions, stdin: TextIO, *, write: bool) -> list[str]:
     fields = [f.strip() for f in ns.fields.split(",")] if ns.fields else []
     if unknown := set(fields) - set(report.FIELDS):
-        raise ValueError(
-            f"no field is named {', '.join(sorted(unknown))}. The fields are: {', '.join(report.FIELDS)}"
+        msg = (
+            "no field is named "
+            f"{', '.join(sorted(unknown))}"
+            ". The fields are: "
+            f"{', '.join(report.FIELDS)}"
         )
+        raise ValueError(msg)
     if ns.limit < 0:
-        raise ValueError("--limit must not be less than 0")
+        msg = "--limit must not be less than 0"
+        raise ValueError(msg)
     if ns.dry_run and not write:
-        raise ValueError(
-            "--dry-run applies only to the baseline command. The lint command writes no file."
-        )
+        msg = "--dry-run applies only to the baseline command. The lint command writes no file."
+        raise ValueError(msg)
     if not ns.paths:
         if stdin.isatty():
-            raise ValueError('give a file or a directory. Give "-" to read standard input.')
+            msg = 'give a file or a directory. Give "-" to read standard input.'
+            raise ValueError(msg)
         ns.paths = ["-"]
-    proj = find_project(ns.config, ns.no_config)
-    cfg = config.load(proj.config_path)
+    return fields
+
+
+def _lint_options(ns: LintOptions, cfg: config.Config) -> Options:
     opts = cfg.options()
     if ns.mode:
         if ns.mode not in ("flavored", "strict"):
-            raise ValueError(f'the mode "{ns.mode}" is not "flavored" or "strict"')
+            msg = f'the mode "{ns.mode}" is not "flavored" or "strict"'
+            raise ValueError(msg)
         opts.mode = ns.mode
     if ns.max_words:
         if ns.max_words < 0:
-            raise ValueError("--max-words must not be less than 0")
+            msg = "--max-words must not be less than 0"
+            raise ValueError(msg)
         opts.max_words = ns.max_words
     if ns.warnings_as_errors:
         opts.warnings_as_errors = True
@@ -374,15 +432,21 @@ def _run_lint(ns: LintOptions, stdin: TextIO, stdout: TextIO, stderr: TextIO, wr
     if ns.use_dict or cfg.dictionary:
         opts.dictionary = dictionary.load(ns.dict or None)
         if opts.dictionary is None:
-            raise ValueError('there is no dictionary index. Run "ste dict import <file>" first.')
+            msg = 'there is no dictionary index. Run "ste dict import <file>" first.'
+            raise ValueError(msg)
+    return opts
+
+
+def _read_lint(
+    ns: LintOptions, proj: Project, cfg: config.Config, opts: Options, stdin: TextIO
+) -> list[report.FileResult]:
     client = None
     if ns.analyze or ns.analyzer or cfg.analyzer:
         try:
             client = analyzer.create(ns.analyzer or None)
         except (ValueError, RuntimeError, OSError) as err:
-            raise ValueError(
-                f'the analyzer did not start.\n{err}\nRun "ste analyzer" to see what it needs.'
-            ) from err
+            msg = f'the analyzer did not start.\n{err}\nRun "ste analyzer" to see what it needs.'
+            raise ValueError(msg) from err
         opts.syntax = client
     try:
         results = []
@@ -390,109 +454,137 @@ def _run_lint(ns: LintOptions, stdin: TextIO, stdout: TextIO, stderr: TextIO, wr
             if path == "-":
                 results.append(_lint_one(STDIN_NAME, stdin.read(), opts))
             else:
-                for file in text_files(path, ns.all, proj.directory, cfg.exclude):
-                    with open(file, encoding="utf-8", newline="") as stream:
+                for file in text_files(path, proj.directory, cfg.exclude, all_files=ns.read_all):
+                    with Path(file).open(encoding="utf-8", newline="") as stream:
                         results.append(_lint_one(file, stream.read(), opts))
     finally:
         if client is not None:
             client.close()
-    base_path = ns.baseline or proj.resolve(cfg.baseline)
-    if not base_path:
-        default = proj.resolve(baseline.DEFAULT_NAME)
-        if Path(default).is_file() or write:
-            base_path = default
+    return results
+
+
+def _write_baseline(
+    ns: LintOptions, base_path: str, results: list[report.FileResult], stdout: TextIO
+) -> int:
     shown = display_path(base_path)
-    if write:
-        entries = [
-            baseline.Result(
-                _baseline_key(base_path, r.path),
-                [(str(f.data["rule_id"]), str(f.data["text"])) for f in r.findings],
-            )
-            for r in results
-        ]
-        merge = baseline.plan(base_path, entries)
-        total = sum(len(r.findings) for r in results)
-        plan: dict[str, object] = {
-            "action": "baseline",
-            "dry_run": ns.dry_run,
-            "path": shown,
-            "findings": total,
-            "files": len(results),
-            "kept": merge.kept,
-            "removed": merge.removed,
-        }
-        extra = (
-            f"It keeps {merge.kept} accepted findings of the files that this run did not read.\n"
-            if merge.kept
-            else ""
-        ) + (
-            f"It removes {merge.removed} accepted findings of the files that do not exist now.\n"
-            if merge.removed
-            else ""
+    entries = [
+        baseline.Result(
+            _baseline_key(base_path, r.path),
+            [(str(f.data["rule_id"]), str(f.data["text"])) for f in r.findings],
         )
-        if ns.dry_run:
-            plan["exists"] = Path(base_path).is_file()
-            text = (
-                f"A real run writes {shown} with {total} findings of {len(results)} files.\n{extra}"
-            )
-        else:
-            baseline.save(
-                base_path,
-                entries,
-                datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
-            )
-            text = f"{shown} holds {total} findings of {len(results)} files.\n{extra}The tool now reports only a new finding. Remove the file to report all.\n"
-        _write_plan(stdout, ns.format, plan, text)
-        return 0
-    accepted = stale = 0
-    if base_path and not ns.no_baseline:
-        accepted_set = baseline.load(base_path)
-        read = set()
-        for result in results:
-            file = _baseline_key(base_path, result.path)
-            read.add(file)
-            kept = []
-            for f in result.findings:
-                if accepted_set.take(file, str(f.data["rule_id"]), str(f.data["text"])):
-                    accepted += 1
-                else:
-                    kept.append(f)
-            result.findings = kept
-        stale = accepted_set.stale(read)
-    schema = _schema()
-    if ns.format in ("sarif", "github"):
-        root = repo_root(proj.directory)
-        for result in results:
-            if result.path == STDIN_NAME:
-                continue
-            relative = relative_to(root, result.path)
-            if relative.startswith("../"):
-                continue
-            result.path = relative
-            for f in result.findings:
-                f.data["file"] = relative
-    rep = report.Report(opts.mode, results, accepted, stale)
+        for r in results
+    ]
+    merge = baseline.plan(base_path, entries)
+    total = sum(len(r.findings) for r in results)
+    plan: dict[str, object] = {
+        "action": "baseline",
+        "dry_run": ns.dry_run,
+        "path": shown,
+        "findings": total,
+        "files": len(results),
+        "kept": merge.kept,
+        "removed": merge.removed,
+    }
+    extra = (
+        f"It keeps {merge.kept} accepted findings of the files that this run did not read.\n"
+        if merge.kept
+        else ""
+    ) + (
+        f"It removes {merge.removed} accepted findings of the files that do not exist now.\n"
+        if merge.removed
+        else ""
+    )
+    if ns.dry_run:
+        plan["exists"] = Path(base_path).is_file()
+        text = f"A real run writes {shown} with {total} findings of {len(results)} files.\n{extra}"
+    else:
+        baseline.save(
+            base_path,
+            entries,
+            datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        )
+        text = (
+            f"{shown}"
+            " holds "
+            f"{total}"
+            " findings of "
+            f"{len(results)}"
+            " files.\n"
+            f"{extra}"
+            "The tool now reports only a new finding. Remove the file to report "
+            "all.\n"
+        )
+    _write_plan(stdout, ns.output_format, plan, text)
+    return 0
+
+
+def _apply_baseline(base_path: str, results: list[report.FileResult]) -> tuple[int, int]:
+    accepted = 0
+    accepted_set = baseline.load(base_path)
+    read = set()
+    for result in results:
+        file = _baseline_key(base_path, result.path)
+        read.add(file)
+        kept = []
+        for f in result.findings:
+            if accepted_set.take(file, str(f.data["rule_id"]), str(f.data["text"])):
+                accepted += 1
+            else:
+                kept.append(f)
+        result.findings = kept
+    stale = accepted_set.stale(read)
+    return accepted, stale
+
+
+def _host_paths(project_dir: Path, results: list[report.FileResult]) -> None:
+    root = repo_root(project_dir)
+    for result in results:
+        if result.path == STDIN_NAME:
+            continue
+        relative = relative_to(root, result.path)
+        if relative.startswith("../"):
+            continue
+        result.path = relative
+        for f in result.findings:
+            f.data["file"] = relative
+
+
+def _lint_report(
+    ns: LintOptions, rep: report.Report, base_path: str, stdout: TextIO, fields: list[str]
+) -> None:
+    shown = display_path(base_path)
+    accepted, stale = rep.accepted, rep.stale
     report.write(
         stdout,
         rep,
         report.Options(
-            format=ns.format,
+            format=ns.output_format,
             limit=ns.limit,
             fields=fields,
             summary_only=ns.summary,
-            rules=schema["rules"],
+            rules=_schema()["rules"],
             tool_version=__version__,
         ),
     )
-    if ns.format == "text":
+    if ns.output_format == "text":
         if accepted:
             stdout.write(
-                f"{accepted} findings are in the baseline {shown}, thus this report does not show them.\n"
+                f"{accepted}"
+                " findings are in the baseline "
+                f"{shown}"
+                ", thus this report does not show them.\n"
             )
         if stale:
             stdout.write(
-                f'{stale} accepted findings are not in the text now. Run "ste baseline" to record the lower number.\n'
+                f"{stale}"
+                ' accepted findings are not in the text now. Run "ste baseline" to '
+                "record the lower number.\n"
             )
+
+
+def _lint_gate(
+    ns: LintOptions, cfg: config.Config, rep: report.Report, opts: Options, stderr: TextIO
+) -> int:
     summary = rep.summary()
     if opts.warnings_as_errors and summary["errors"]:
         stderr.write(f"ste: {summary['errors']} findings have the error severity\n")
@@ -509,30 +601,58 @@ def _run_lint(ns: LintOptions, stdin: TextIO, stdout: TextIO, stderr: TextIO, wr
     return 0
 
 
+def _run_lint(ns: LintOptions, io: Streams, *, write: bool) -> int:
+    fields = _validate_lint(ns, io.stdin, write=write)
+    proj = find_project(ns.config, no_config=ns.no_config)
+    cfg = config.load(proj.config_path)
+    opts = _lint_options(ns, cfg)
+    results = _read_lint(ns, proj, cfg, opts, io.stdin)
+    base_path = ns.baseline or proj.resolve(cfg.baseline)
+    if not base_path:
+        default = proj.resolve(baseline.DEFAULT_NAME)
+        if Path(default).is_file() or write:
+            base_path = default
+    if write:
+        return _write_baseline(ns, base_path, results, io.stdout)
+    accepted, stale = (
+        _apply_baseline(base_path, results) if base_path and not ns.no_baseline else (0, 0)
+    )
+    if ns.output_format in ("sarif", "github"):
+        _host_paths(proj.directory, results)
+    rep = report.Report(opts.mode, results, accepted, stale)
+    _lint_report(ns, rep, base_path, io.stdout, fields)
+    return _lint_gate(ns, cfg, rep, opts, io.stderr)
+
+
 def _schema() -> dict:
     data = json.loads(Path(__file__).with_name("schema.json").read_text(encoding="utf-8"))
     data["version"] = __version__
     return data
 
 
-def _run_init(format: str, dry_run: bool, force: bool, stdout: TextIO) -> int:
+def _run_init(output_format: str, stdout: TextIO, *, dry_run: bool, force: bool) -> int:
     path = Path(config.DEFAULT_NAMES[0])
     if (existing := config.find(".")) and not force:
-        raise ValueError(f"{existing} exists. Give --force to write {path} all the same.")
+        msg = f"{existing} exists. Give --force to write {path} all the same."
+        raise ValueError(msg)
     plan = {"action": "init", "dry_run": dry_run, "path": str(path), "exists": path.is_file()}
     if dry_run:
         text = f"A real run writes {path}.\n"
     else:
         path.write_text(STARTER_CONFIG, encoding="utf-8")
-        text = f'{path} holds the start config. Run "ste lint --summary ." to see the size of the problem.\n'
-    _write_plan(stdout, format, plan, text)
+        text = (
+            f"{path}"
+            ' holds the start config. Run "ste lint --summary ." to see the size '
+            "of the problem.\n"
+        )
+    _write_plan(stdout, output_format, plan, text)
     return 0
 
 
 def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int:
     path = Path(ns.out or dictionary.default_path())
     if command == "path":
-        _write_plan(stdout, ns.format, {"path": str(path)}, f"{path}\n")
+        _write_plan(stdout, ns.output_format, {"path": str(path)}, f"{path}\n")
     elif command == "remove":
         exists = path.is_file()
         plan: dict[str, object] = {
@@ -547,22 +667,46 @@ def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int
             path.unlink(missing_ok=True)
             plan["removed"] = exists
             text = "The index is removed. The term rule now uses only its hand-written list.\n"
-        _write_plan(stdout, ns.format, plan, text)
+        _write_plan(stdout, ns.output_format, plan, text)
     elif command == "info":
         index = dictionary.load(path)
         plan = {"path": str(path), "present": index is not None}
         if index is None:
-            text = f'There is no index at {path}.\nRule STE-1.1 uses its hand-written list of 27 words and 11 word groups.\nRun "ste dict import <file>" to make the index.\n'
+            text = (
+                "There is no index at "
+                f"{path}"
+                ".\nRule STE-1.1 uses its hand-written list of 27 words and 11 word "
+                'groups.\nRun "ste dict import <file>" to make the index.\n'
+            )
         else:
             stats = index.stats()
             plan.update({"source": index.source, **stats})
-            text = f"index:        {path}\nsource:       {index.source}\nwords:        {stats['words']}\napproved:     {stats['approved']}\nnot approved: {stats['unapproved']}\nalternatives: {stats['alternatives']}\n"
-        _write_plan(stdout, ns.format, plan, text)
+            text = (
+                "index:        "
+                f"{path}"
+                "\nsource:       "
+                f"{index.source}"
+                "\nwords:        "
+                f"{stats['words']}"
+                "\napproved:     "
+                f"{stats['approved']}"
+                "\nnot approved: "
+                f"{stats['unapproved']}"
+                "\nalternatives: "
+                f"{stats['alternatives']}"
+                "\n"
+            )
+        _write_plan(stdout, ns.output_format, plan, text)
     else:
         if Path(source).suffix.lower() == ".pdf":
-            raise ValueError(
-                f"{source} is a PDF. This tool reads text, thus make the Markdown first:\n  npx -y @firecrawl/anydoc@0.2.4 {source} -o ste100.md\n  ste dict import ste100.md"
+            msg = (
+                f"{source}"
+                " is a PDF. This tool reads text, thus make the Markdown first:\n  npx"
+                " -y @firecrawl/anydoc@0.2.4 "
+                f"{source}"
+                " -o ste100.md\n  ste dict import ste100.md"
             )
+            raise ValueError(msg)
         index = dictionary.parse(Path(source).read_text(encoding="utf-8"), Path(source).name)
         stats = index.stats()
         plan = {
@@ -577,36 +721,57 @@ def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int
             text = f"A real run writes {path} with {stats['words']} words.\n"
         else:
             index.save(path)
-            text = f'{path} holds {stats["words"]} words: {stats["approved"]} approved and {stats["unapproved"]} not approved, with {stats["alternatives"]} alternatives.\n\nThe index is for you only: do not commit it.\nThe dictionary is off by default. Give --use-dict, or put "dictionary: true"\nin your config, to make rule STE-1.1 use it.\n'
-        _write_plan(stdout, ns.format, plan, text)
+            text = (
+                f"{path}"
+                " holds "
+                f"{stats['words']}"
+                " words: "
+                f"{stats['approved']}"
+                " approved and "
+                f"{stats['unapproved']}"
+                " not approved, with "
+                f"{stats['alternatives']}"
+                " alternatives.\n\nThe index is for you only: do not commit it.\nThe "
+                'dictionary is off by default. Give --use-dict, or put "dictionary: '
+                'true"\nin your config, to make rule STE-1.1 use it.\n'
+            )
+        _write_plan(stdout, ns.output_format, plan, text)
     return 0
 
 
-def _run_analyzer(format: str, stdout: TextIO) -> int:
+def _run_analyzer(output_format: str, stdout: TextIO) -> int:
     status = analyzer.check()
     if status["ready"]:
-        text = f'The analyzer is ready.\n  python: {status["python"]}\n  script: {status["script"]}\n\nRun "ste lint --analyze docs/" to use it.\nIt makes rule STE-3.6 more exact, and it is never necessary.\n'
+        text = (
+            "The analyzer is ready.\n  python: "
+            f"{status['python']}"
+            "\n  script: "
+            f"{status['script']}"
+            '\n\nRun "ste lint --analyze docs/" to use it.\nIt makes rule STE-3.6 '
+            "more exact, and it is never necessary.\n"
+        )
     else:
         text = f"The analyzer cannot run: {status['problem']}\n"
         if status["fix"]:
             text += "\nTo make it work:\n" + "".join(f"  {fix}\n" for fix in status["fix"])
         text += "\nThe analyzer is optional. Each rule works without it.\n"
-    _write_plan(stdout, format, status, text)
+    _write_plan(stdout, output_format, status, text)
     return 0
 
 
 def _run_eval(
-    directory: str, format: str, fail_under: float, stdout: TextIO, stderr: TextIO
+    directory: str, output_format: str, fail_under: float, stdout: TextIO, stderr: TextIO
 ) -> int:
     data = evaluation.run(directory)
-    if format == "json":
+    if output_format == "json":
         stdout.write(json.dumps(data, indent=2) + "\n")
     else:
         evaluation.write_text(stdout, data)
     totals = data["totals"]
     if fail_under >= 0 and (totals["precision"] < fail_under or totals["recall"] < fail_under):
         stderr.write(
-            f"ste: precision {totals['precision']:.2f} and recall {totals['recall']:.2f}, and the limit is {fail_under:.2f}\n"
+            f"ste: precision {totals['precision']:.2f} and recall {totals['recall']:.2f}, "
+            f"and the limit is {fail_under:.2f}\n"
         )
         return 1
     return 0
@@ -629,14 +794,15 @@ dict_app = typer.Typer(
 app.add_typer(dict_app, name="dict")
 
 
-def _version_option(value: bool) -> None:
+def _version_option(*, value: bool) -> None:
     if value:
         typer.echo(f"ste {__version__}")
-        raise typer.Exit()
+        raise typer.Exit
 
 
 @app.callback()
 def root(
+    *,
     version: Annotated[
         bool,
         typer.Option(
@@ -644,17 +810,18 @@ def root(
         ),
     ] = False,
 ) -> None:
-    """Findings alone do not change the exit code. Give a gate to fail a run."""
+    """Select a command or print the version before it runs."""
 
 
 @app.command("lint", cls=SteCommand, help="Check files, directories, or standard input.")
 @app.command("baseline", cls=SteCommand, help="Accept the findings of today.")
-def lint_command(
+def lint_command(  # noqa: PLR0913 - Typer needs one typed parameter per CLI option.
     ctx: typer.Context,
+    *,
     paths: Annotated[
         list[str] | None, typer.Argument(help="Files, directories, or - for standard input.")
     ] = None,
-    format: Annotated[
+    output_format: Annotated[
         OutputFormat, typer.Option("--format", help="Output format.")
     ] = OutputFormat.text,
     mode: Annotated[str, typer.Option("--mode", help="flavored or strict.")] = "",
@@ -676,7 +843,7 @@ def lint_command(
     no_config: Annotated[
         bool, typer.Option("--no-config", help="Do not read a configuration file.")
     ] = False,
-    all: Annotated[bool, typer.Option("--all", help="Read files that git ignores.")] = False,
+    read_all: Annotated[bool, typer.Option("--all", help="Read files that git ignores.")] = False,
     no_baseline: Annotated[
         bool, typer.Option("--no-baseline", help="Report all findings.")
     ] = False,
@@ -703,10 +870,11 @@ def lint_command(
         float, typer.Option("--fail-over", help="Maximum findings for each 100 words.")
     ] = -1,
 ) -> None:
+    """Check prose or record its accepted findings."""
     io = streams(ctx)
     opts = LintOptions(
         paths=paths or [],
-        format=format.value,
+        output_format=output_format.value,
         mode=mode,
         fields=fields,
         config=config,
@@ -716,7 +884,7 @@ def lint_command(
         analyzer=analyzer,
         summary=summary,
         no_config=no_config,
-        all=all,
+        read_all=read_all,
         no_baseline=no_baseline,
         fail_on_new=fail_on_new,
         warnings_as_errors=warnings_as_errors,
@@ -727,13 +895,14 @@ def lint_command(
         max_words=max_words,
         fail_over=fail_over,
     )
-    raise typer.Exit(_run_lint(opts, io.stdin, io.stdout, io.stderr, ctx.info_name == "baseline"))
+    raise typer.Exit(_run_lint(opts, io, write=ctx.info_name == "baseline"))
 
 
 @app.command("init", cls=SteCommand)
 def init_command(
     ctx: typer.Context,
-    format: Annotated[
+    *,
+    output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
     dry_run: Annotated[
@@ -744,25 +913,29 @@ def init_command(
     ] = False,
 ) -> None:
     """Write a start configuration in .ste.yml."""
-    raise typer.Exit(_run_init(format.value, dry_run, force, streams(ctx).stdout))
+    raise typer.Exit(
+        _run_init(output_format.value, streams(ctx).stdout, dry_run=dry_run, force=force)
+    )
 
 
 @app.command("analyzer", cls=SteCommand)
 def analyzer_command(
     ctx: typer.Context,
-    format: Annotated[
+    *,
+    output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
 ) -> None:
     """Show the grammar analyzer and what it needs."""
-    raise typer.Exit(_run_analyzer(format.value, streams(ctx).stdout))
+    raise typer.Exit(_run_analyzer(output_format.value, streams(ctx).stdout))
 
 
 @app.command("eval", cls=SteCommand)
 def eval_command(
     ctx: typer.Context,
+    *,
     directory: Annotated[str, typer.Argument(help="Directory of the labeled corpus.")] = "testdata",
-    format: Annotated[
+    output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
     fail_under: Annotated[
@@ -771,7 +944,7 @@ def eval_command(
 ) -> None:
     """Measure rules against a labeled corpus."""
     io = streams(ctx)
-    raise typer.Exit(_run_eval(directory, format.value, fail_under, io.stdout, io.stderr))
+    raise typer.Exit(_run_eval(directory, output_format.value, fail_under, io.stdout, io.stderr))
 
 
 @app.command("schema", cls=SteCommand)
@@ -789,14 +962,16 @@ def version_command(ctx: typer.Context) -> None:
 @app.command("help", hidden=True)
 def help_command(ctx: typer.Context) -> None:
     """Show the command help."""
-    assert ctx.parent is not None
+    if ctx.parent is None:
+        raise typer.Exit(2)
     streams(ctx).stdout.write(ctx.parent.get_help() + "\n")
 
 
 @dict_app.callback()
 def dictionary_group(
     ctx: typer.Context,
-    format: Annotated[
+    *,
+    output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
     out: Annotated[str, typer.Option("--out", help="Path of the dictionary index.")] = "",
@@ -804,23 +979,32 @@ def dictionary_group(
         bool, typer.Option("--dry-run", help="Show the plan without a change.")
     ] = False,
 ) -> None:
-    ctx.meta["dictionary_options"] = DictOptions(format.value, out, dry_run)
+    """Set defaults for the dictionary subcommands."""
+    ctx.meta["dictionary_options"] = DictOptions(output_format.value, out, dry_run)
 
 
-def _dict_options(ctx: typer.Context, format: SimpleFormat, out: str, dry_run: bool) -> DictOptions:
+def _dict_options(
+    ctx: typer.Context, output_format: SimpleFormat, out: str, *, dry_run: bool
+) -> DictOptions:
     options = ctx.meta.get("dictionary_options", DictOptions())
-    changes: dict[str, object] = {}
-    for name, value in (("format", format.value), ("out", out), ("dry_run", dry_run)):
-        if ctx.get_parameter_source(name) == ParameterSource.COMMANDLINE:
-            changes[name] = value
+    changes = {
+        name: value
+        for name, value in (
+            ("output_format", output_format.value),
+            ("out", out),
+            ("dry_run", dry_run),
+        )
+        if ctx.get_parameter_source(name) == ParameterSource.COMMANDLINE
+    }
     return replace(options, **changes)
 
 
 @dict_app.command("import", cls=SteCommand)
 def dict_import(
     ctx: typer.Context,
+    *,
     source: Annotated[str, typer.Argument(help="The user's dictionary in Markdown or plain text.")],
-    format: Annotated[
+    output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
     out: Annotated[str, typer.Option("--out", help="Path of the dictionary index.")] = "",
@@ -830,7 +1014,12 @@ def dict_import(
 ) -> None:
     """Read the user's dictionary and write an index."""
     raise typer.Exit(
-        _run_dict("import", source, _dict_options(ctx, format, out, dry_run), streams(ctx).stdout)
+        _run_dict(
+            "import",
+            source,
+            _dict_options(ctx, output_format, out, dry_run=dry_run),
+            streams(ctx).stdout,
+        )
     )
 
 
@@ -839,7 +1028,8 @@ def dict_import(
 @dict_app.command("remove", cls=SteCommand, help="Delete the index.")
 def dict_status(
     ctx: typer.Context,
-    format: Annotated[
+    *,
+    output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
     out: Annotated[str, typer.Option("--out", help="Path of the dictionary index.")] = "",
@@ -847,13 +1037,21 @@ def dict_status(
         bool, typer.Option("--dry-run", help="Show the plan without a change.")
     ] = False,
 ) -> None:
-    assert ctx.info_name is not None
+    """Run a dictionary status or removal command."""
+    if ctx.info_name is None:
+        raise typer.Exit(2)
     raise typer.Exit(
-        _run_dict(ctx.info_name, "", _dict_options(ctx, format, out, dry_run), streams(ctx).stdout)
+        _run_dict(
+            ctx.info_name,
+            "",
+            _dict_options(ctx, output_format, out, dry_run=dry_run),
+            streams(ctx).stdout,
+        )
     )
 
 
 def run(args: list[str], stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
+    """Run the Typer application with the given streams and return its exit code."""
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             result = app(
@@ -874,6 +1072,7 @@ def run(args: list[str], stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
 
 
 def main() -> int:
+    """Run the command with the process arguments and standard streams."""
     try:
         return run(sys.argv[1:], sys.stdin, sys.stdout, sys.stderr)
     except BrokenPipeError:

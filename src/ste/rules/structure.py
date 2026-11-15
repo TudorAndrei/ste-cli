@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Rules for document structure and conditions."""
 
 from ste.models import Diagnostic, Document, Options, Sentence
@@ -10,8 +11,17 @@ from ste.rules.data import (
     SAFETY_WORDS,
 )
 
+MAX_PARAGRAPH_SENTENCES = 6
+MAX_UNEXPLAINED_SAFETY_WORDS = 12
+MIN_LIST_WORDS = 3
+MIN_LIST_ITEMS = 2
+MIN_WORDS_BEFORE_CONDITION = 3
+MIN_INFLECTION_LENGTH = 3
+INFINITIVE_LOOKBEHIND = 2
+
 
 def paragraphs(doc: Document) -> list[list[Sentence]]:
+    """Group sentences by their paragraph blocks."""
     groups: list[list[Sentence]] = []
     for s in doc.sentences:
         if s.kind != "paragraph":
@@ -22,7 +32,8 @@ def paragraphs(doc: Document) -> list[list[Sentence]]:
     return groups
 
 
-def paragraph_length(doc: Document, opts: Options) -> list[Diagnostic]:
+def paragraph_length(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report paragraphs with too many sentences."""
     return [
         Diagnostic(
             "STE-6.6",
@@ -34,11 +45,12 @@ def paragraph_length(doc: Document, opts: Options) -> list[Diagnostic]:
             "Divide the paragraph.",
         )
         for group in paragraphs(doc)
-        if len(group) > 6
+        if len(group) > MAX_PARAGRAPH_SENTENCES
     ]
 
 
-def note_instruction(doc: Document, opts: Options) -> list[Diagnostic]:
+def note_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report an instruction in an information note."""
     out = []
     for s in doc.sentences:
         if s.admonition not in {"note", "notes"}:
@@ -56,21 +68,23 @@ def note_instruction(doc: Document, opts: Options) -> list[Diagnostic]:
                     0.8,
                     t.start,
                     t.end,
-                    "A note gives information only. Move the instruction to a step of the procedure.",
+                    "A note gives information only. "
+                    "Move the instruction to a step of the procedure.",
                 )
             )
             break
     return out
 
 
-def safety_instruction(doc: Document, opts: Options) -> list[Diagnostic]:
+def safety_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report a safety instruction with no risk explanation."""
     by_block: dict[int, list[Sentence]] = {}
     for s in doc.sentences:
         if s.admonition in SAFETY_WORDS:
             by_block.setdefault(s.block, []).append(s)
     out = []
     for group in by_block.values():
-        if len(group) > 1 or sum(s.words for s in group) > 12:
+        if len(group) > 1 or sum(s.words for s in group) > MAX_UNEXPLAINED_SAFETY_WORDS:
             continue
         out.append(
             Diagnostic(
@@ -86,7 +100,8 @@ def safety_instruction(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
-def safety_word(doc: Document, opts: Options) -> list[Diagnostic]:
+def safety_word(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report a risk under a label that gives no risk level."""
     out = []
     reported = set()
     for s in doc.sentences:
@@ -96,23 +111,22 @@ def safety_word(doc: Document, opts: Options) -> list[Diagnostic]:
             risk = t.lower in RISK_WORDS
             if not risk and i + 1 < len(s.tokens):
                 next_word = s.tokens[i + 1].lower
-                risk = (
-                    t.lower == "data"
-                    and next_word == "loss"
-                    or t.lower in {"lose", "loses"}
-                    and next_word == "data"
+                risk = (t.lower == "data" and next_word == "loss") or (
+                    t.lower in {"lose", "loses"} and next_word == "data"
                 )
             if risk:
                 reported.add(s.block)
                 out.append(
                     Diagnostic(
                         "STE-7.1",
-                        f'The {s.admonition} tells of a risk ("{t.text}"), but its label does not give the level of the risk.',
+                        f'The {s.admonition} tells of a risk ("{t.text}"), '
+                        "but its label does not give the level of the risk.",
                         "warning",
                         0.7,
                         t.start,
                         t.end,
-                        'Use "warning" for a risk of injury or death, and "caution" for a risk of damage.',
+                        'Use "warning" for a risk of injury or death, '
+                        'and "caution" for a risk of damage.',
                     )
                 )
                 break
@@ -120,6 +134,7 @@ def safety_word(doc: Document, opts: Options) -> list[Diagnostic]:
 
 
 def hidden_start(source: str, start: int) -> bool:
+    """Check for masked content before the first prose word."""
     if start > len(source):
         return False
     line_start = source.rfind("\n", 0, start) + 1
@@ -127,13 +142,14 @@ def hidden_start(source: str, start: int) -> bool:
 
 
 def lists(doc: Document) -> list[list[Sentence]]:
+    """Group consecutive list items that start with prose."""
     groups: list[list[Sentence]] = []
     previous = -2
     for s in doc.sentences:
         if (
             s.kind != "list-item"
             or not s.first
-            or len(s.tokens) < 3
+            or len(s.tokens) < MIN_LIST_WORDS
             or hidden_start(doc.source, s.start)
         ):
             continue
@@ -144,12 +160,13 @@ def lists(doc: Document) -> list[list[Sentence]]:
     return groups
 
 
-def vertical_list(doc: Document, opts: Options) -> list[Diagnostic]:
+def vertical_list(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report inconsistent initial letters in a vertical list."""
     out = []
     for group in lists(doc):
         upper = sum(bool(s.text) and "A" <= s.text[0] <= "Z" for s in group)
         lower = sum(bool(s.text) and "a" <= s.text[0] <= "z" for s in group)
-        if not upper or not lower or len(group) < 2:
+        if not upper or not lower or len(group) < MIN_LIST_ITEMS:
             continue
         report_lower = lower <= upper
         for s in group:
@@ -174,7 +191,8 @@ def vertical_list(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
-def condition_order(doc: Document, opts: Options) -> list[Diagnostic]:
+def condition_order(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report an instruction with a condition after its command."""
     out = []
     for s in doc.sentences:
         if not s.procedural or s.note:
@@ -184,15 +202,19 @@ def condition_order(doc: Document, opts: Options) -> list[Diagnostic]:
                 continue
             if i == 0:
                 break
-            if i < 3 or s.tokens[i - 1].lower in CLAUSE_VERBS:
+            if i < MIN_WORDS_BEFORE_CONDITION or s.tokens[i - 1].lower in CLAUSE_VERBS:
                 continue
             previous = s.tokens[i - 1].text
-            if i >= 2 and s.tokens[i - 2].lower == "to" and previous and "a" <= previous[0] <= "z":
+            if (
+                i >= INFINITIVE_LOOKBEHIND
+                and s.tokens[i - 2].lower == "to"
+                and previous
+                and "a" <= previous[0] <= "z"
+            ):
                 continue
             if not any(
                 token.lower in CLAUSE_MARKERS
-                or len(token.lower) > 3
-                and token.lower.endswith(("ed", "es"))
+                or (len(token.lower) > MIN_INFLECTION_LENGTH and token.lower.endswith(("ed", "es")))
                 for token in s.tokens[i + 1 :]
             ):
                 continue

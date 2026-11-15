@@ -1,10 +1,11 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Read Markdown prose and preserve positions in the original source."""
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from markdown_it import MarkdownIt
 from markdown_it.rules_inline import (
@@ -16,21 +17,125 @@ from markdown_it.rules_inline import (
     link,
     strikethrough,
 )
-from markdown_it.rules_inline.state_inline import StateInline
-from markdown_it.token import Token as MarkdownToken
 
 from ste.models import Document, Sentence, Token
 
-_ABBREVIATIONS = set(
-    "e.g i.e etc vs fig no ref approx min max sec para ch al inc ltd dr mr mrs ms st vol cf ca dept".split()
-)
-_UNITS = set(
-    "mm cm m km in ft mg g kg lb lbs ml l gal ms s sec min h hr hrs day days week weeks month months year years hz khz mhz ghz b kb mb gb tb kib mib gib tib bit bits byte bytes v a ma w kw psi bar kpa mpa n nm px pt em rem dpi rpm c f k %".split()
-)
-_ADMONITIONS = set("warning caution danger note notes important attention tip info".split())
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from markdown_it.rules_inline.state_inline import StateInline
+    from markdown_it.token import Token as MarkdownToken
+
+_ABBREVIATIONS = {
+    "e.g",
+    "i.e",
+    "etc",
+    "vs",
+    "fig",
+    "no",
+    "ref",
+    "approx",
+    "min",
+    "max",
+    "sec",
+    "para",
+    "ch",
+    "al",
+    "inc",
+    "ltd",
+    "dr",
+    "mr",
+    "mrs",
+    "ms",
+    "st",
+    "vol",
+    "cf",
+    "ca",
+    "dept",
+}
+_UNITS = {
+    "mm",
+    "cm",
+    "m",
+    "km",
+    "in",
+    "ft",
+    "mg",
+    "g",
+    "kg",
+    "lb",
+    "lbs",
+    "ml",
+    "l",
+    "gal",
+    "ms",
+    "s",
+    "sec",
+    "min",
+    "h",
+    "hr",
+    "hrs",
+    "day",
+    "days",
+    "week",
+    "weeks",
+    "month",
+    "months",
+    "year",
+    "years",
+    "hz",
+    "khz",
+    "mhz",
+    "ghz",
+    "b",
+    "kb",
+    "mb",
+    "gb",
+    "tb",
+    "kib",
+    "mib",
+    "gib",
+    "tib",
+    "bit",
+    "bits",
+    "byte",
+    "bytes",
+    "v",
+    "a",
+    "ma",
+    "w",
+    "kw",
+    "psi",
+    "bar",
+    "kpa",
+    "mpa",
+    "n",
+    "nm",
+    "px",
+    "pt",
+    "em",
+    "rem",
+    "dpi",
+    "rpm",
+    "c",
+    "f",
+    "k",
+    "%",
+}
+_ADMONITIONS = {
+    "warning",
+    "caution",
+    "danger",
+    "note",
+    "notes",
+    "important",
+    "attention",
+    "tip",
+    "info",
+}
 _SPACE = " \t\n\r"
 _CLOSING = "*_) ]\"'`".replace(" ", "")
-_JOIN = "'’ʼ-._"
+_JOIN = "'\u2019\u02bc-._"
 
 
 @dataclass
@@ -63,51 +168,65 @@ def _admonition_word(text: str) -> str:
     return word if word in _ADMONITIONS and (not rest or rest[0] in ":]*!") else ""
 
 
-def _inline_visibility(content: str, md: MarkdownIt, env: dict) -> list[bool]:
-    """Record source spans while the CommonMark inline rules consume them.
+@dataclass
+class _InlineTracker:
+    visible: list[bool]
+    root_state: StateInline | None = None
+    delimiters: list[tuple[MarkdownToken, int, int]] = field(default_factory=list)
 
-    Link labels are parsed in the same state. Image alternatives use a new
-    state, whose positions must not enter the outer document.
-    """
-    visible = [True] * len(content)
-    root_state: list[StateInline] = []
-    delimiters: list[tuple[MarkdownToken, int, int]] = []
-
-    def track(
-        name: str, rule: Callable[[StateInline, bool], bool]
+    def wrap(
+        self, name: str, rule: Callable[[StateInline, bool], bool]
     ) -> Callable[[StateInline, bool], bool]:
-        def wrapped(state: StateInline, silent: bool) -> bool:
-            if not root_state and not silent:
-                root_state.append(state)
+        """Wrap an inline rule with source-position recording."""
+
+        # The parser calls each rule with a positional silent flag.
+        def wrapped(state: StateInline, silent: bool) -> bool:  # noqa: FBT001
+            if self.root_state is None and not silent:
+                self.root_state = state
             start = state.pos
             count = len(state.tokens)
             label_end = -1
             if name == "link" and state.src[start : start + 1] == "[":
-                label_end = state.md.helpers.parseLinkLabel(state, start, True)
+                label_end = state.md.helpers.parseLinkLabel(state, start, disableNested=True)
             matched = rule(state, silent)
-            if not matched or silent or not root_state or state is not root_state[0]:
-                return matched
-            end = state.pos
-            if name == "link":
-                if label_end >= 0:
-                    visible[start] = False
-                    visible[label_end:end] = [False] * (end - label_end)
-            elif name in {"emphasis", "strikethrough"}:
-                tokens = [
-                    t
-                    for t in state.tokens[count:]
-                    if t.type == "text" and t.content and set(t.content) <= {state.src[start]}
-                ]
-                offset = start
-                for token in tokens:
-                    delimiters.append((token, offset, offset + len(token.content)))
-                    offset += len(token.content)
-            elif name != "backticks" or any(t.type == "code_inline" for t in state.tokens[count:]):
-                visible[start:end] = [False] * (end - start)
+            if matched and not silent and state is self.root_state:
+                self.record(state, name, start, count, label_end)
             return matched
 
         return wrapped
 
+    def record(self, state: StateInline, name: str, start: int, count: int, label_end: int) -> None:
+        """Exclude inline syntax while retaining a link's visible label."""
+        end = state.pos
+        if name == "link":
+            if label_end >= 0:
+                self.visible[start] = False
+                self.visible[label_end:end] = [False] * (end - label_end)
+        elif name in {"emphasis", "strikethrough"}:
+            self.record_delimiters(state, start, count)
+        elif name != "backticks" or any(t.type == "code_inline" for t in state.tokens[count:]):
+            self.visible[start:end] = [False] * (end - start)
+
+    def record_delimiters(self, state: StateInline, start: int, count: int) -> None:
+        """Keep delimiter spans until the parser resolves emphasis pairs."""
+        tokens = [
+            token
+            for token in state.tokens[count:]
+            if token.type == "text" and token.content and set(token.content) <= {state.src[start]}
+        ]
+        offset = start
+        for token in tokens:
+            self.delimiters.append((token, offset, offset + len(token.content)))
+            offset += len(token.content)
+
+
+def _inline_visibility(content: str, md: MarkdownIt, env: dict) -> list[bool]:
+    """Record source spans while CommonMark inline rules consume them.
+
+    Link labels use the same state. Image alternatives use a separate state,
+    whose source positions must not enter the outer document.
+    """
+    tracker = _InlineTracker([True] * len(content))
     rules = {
         "link": link,
         "image": image,
@@ -118,13 +237,13 @@ def _inline_visibility(content: str, md: MarkdownIt, env: dict) -> list[bool]:
         "strikethrough": strikethrough.tokenize,
     }
     for name, rule in rules.items():
-        md.inline.ruler.at(name, track(name, rule))
+        md.inline.ruler.at(name, tracker.wrap(name, rule))
     children: list[MarkdownToken] = []
     md.inline.parse(content, md, env, children)
-    for token, start, end in delimiters:
+    for token, start, end in tracker.delimiters:
         if token.type != "text" or not token.content:
-            visible[start:end] = [False] * (end - start)
-    return visible
+            tracker.visible[start:end] = [False] * (end - start)
+    return tracker.visible
 
 
 def _source_positions(
@@ -160,20 +279,38 @@ def _source_positions(
     return positions
 
 
-def parse(src: str) -> Document:
-    """Return prose sentences with character offsets in *src*."""
-    md = MarkdownIt("commonmark").enable(["table", "strikethrough"])
-    md.core.ruler.disable("inline")
-    md.inline.ruler2.disable("fragments_join")
-    env: dict = {}
+def _copy_segments(
+    src: str, masked: list[str], positions: list[int], visible: list[bool], front: int
+) -> list[tuple[int, int]]:
+    segments: list[tuple[int, int]] = []
+    for index, pos in enumerate(positions):
+        if pos < front or not visible[index]:
+            continue
+        masked[pos] = src[pos]
+        if segments and pos == segments[-1][1]:
+            segments[-1] = (segments[-1][0], pos + 1)
+        else:
+            segments.append((pos, pos + 1))
+    return segments
+
+
+def _block_kind(stack: list[str]) -> str:
+    if "heading_open" in stack:
+        return "heading"
+    if "td_open" in stack or "th_open" in stack:
+        return "table-cell"
+    if "list_item_open" in stack:
+        return "list-item"
+    return "paragraph"
+
+
+def _collect_blocks(src: str, md: MarkdownIt, env: dict, masked: list[str]) -> list[_Block]:
     tokens = md.parse(src, env)
-    lines = [0]
-    lines.extend(m.end() for m in re.finditer(r"\r\n|\r|\n", src))
+    lines = [0, *(match.end() for match in re.finditer(r"\r\n|\r|\n", src))]
     if lines[-1] != len(src):
         lines.append(len(src))
     elif len(lines) == 1:
         lines.append(0)
-    masked = [c if c in "\r\n" else " " for c in src]
     blocks: list[_Block] = []
     stack: list[str] = []
     front = _front_matter_end(src)
@@ -186,34 +323,29 @@ def parse(src: str) -> Document:
             if positions:
                 cursor = positions[-1] + 1
             visible = _inline_visibility(token.content, md, env)
-            segments: list[tuple[int, int]] = []
-            for index, pos in enumerate(positions):
-                if pos < front or not visible[index]:
-                    continue
-                masked[pos] = src[pos]
-                if segments and pos == segments[-1][1]:
-                    segments[-1] = (segments[-1][0], pos + 1)
-                else:
-                    segments.append((pos, pos + 1))
+            segments = _copy_segments(src, masked, positions, visible, front)
             if segments:
-                kind = "paragraph"
-                if "heading_open" in stack:
-                    kind = "heading"
-                elif "td_open" in stack or "th_open" in stack:
-                    kind = "table-cell"
-                elif "list_item_open" in stack:
-                    kind = "list-item"
                 start = segments[0][0]
                 blocks.append(
                     _Block(
                         segments,
                         "ordered_list_open" in stack,
-                        kind,
+                        _block_kind(stack),
                         _admonition_word(src[start : start + 48]),
                     )
                 )
         if token.nesting == -1 and stack:
             stack.pop()
+    return blocks
+
+
+def parse(src: str) -> Document:
+    """Return prose sentences with character offsets in *src*."""
+    md = MarkdownIt("commonmark").enable(["table", "strikethrough"])
+    md.core.ruler.disable("inline")
+    md.inline.ruler2.disable("fragments_join")
+    masked = [char if char in "\r\n" else " " for char in src]
+    blocks = _collect_blocks(src, md, {}, masked)
     doc = Document(src, "".join(masked))
     for number, block in enumerate(blocks):
         doc.sentences.extend(_sentences(doc, block, number))
@@ -226,9 +358,9 @@ def _is_word(char: str) -> bool:
 
 def _end_of_word(text: str, pos: int, end: int) -> int:
     while pos < end:
-        if _is_word(text[pos]):
-            pos += 1
-        elif text[pos] in _JOIN and pos + 1 < end and _is_word(text[pos + 1]):
+        if _is_word(text[pos]) or (
+            text[pos] in _JOIN and pos + 1 < end and _is_word(text[pos + 1])
+        ):
             pos += 1
         else:
             break
@@ -246,49 +378,63 @@ def tokenize(masked: str, start: int = 0, end: int | None = None) -> list[Token]
             continue
         stop = _end_of_word(masked, pos, end)
         word = masked[pos:stop]
-        out.append(Token(word, word.replace("’", "'").replace("ʼ", "'").lower(), pos, stop))
+        out.append(
+            Token(word, word.replace("\u2019", "'").replace("\u02bc", "'").lower(), pos, stop)
+        )
         pos = stop
     return out
 
 
+def _parenthesis_end(masked: str, pos: int, end: int) -> int:
+    depth = 0
+    for close in range(pos, end):
+        depth += (masked[close] == "(") - (masked[close] == ")")
+        if depth == 0:
+            return close + 1
+    return pos
+
+
+def _group_end(masked: str, pos: int, end: int) -> int:
+    char = masked[pos]
+    if char == "(":
+        return _parenthesis_end(masked, pos, end)
+    if char in {'"', "“"}:
+        close = masked.find("”" if char == "“" else '"', pos + 1, end)
+        if close >= 0:
+            return close + 1
+    return pos
+
+
+def _quantity_end(masked: str, start: int, pos: int, end: int) -> int:
+    if not re.fullmatch(r"[0-9.,]+", masked[start:pos]):
+        return pos
+    next_pos = pos
+    while next_pos < end and masked[next_pos] in _SPACE:
+        next_pos += 1
+    if pos < next_pos < end:
+        unit_end = _end_of_word(masked, next_pos, end)
+        if unit_end > next_pos and masked[next_pos:unit_end].lower() in _UNITS:
+            return unit_end
+    return pos
+
+
 def count_words(masked: str, start: int = 0, end: int | None = None) -> int:
-    """Apply the word-count rules for quantities, quotations, and parentheses."""
+    """Apply word-count rules for quantities, quotations, and parentheses."""
     end = len(masked) if end is None else end
     count = 0
     pos = start
     while pos < end:
-        char = masked[pos]
-        if char == "(":
-            depth = 0
-            for close in range(pos, end):
-                depth += (masked[close] == "(") - (masked[close] == ")")
-                if depth == 0:
-                    count += 1
-                    pos = close + 1
-                    break
-            else:
-                pos += 1
+        group_end = _group_end(masked, pos, end)
+        if group_end > pos:
+            count += 1
+            pos = group_end
             continue
-        if char in {'"', "“"}:
-            close = masked.find("”" if char == "“" else '"', pos + 1, end)
-            if close >= 0:
-                count += 1
-                pos = close + 1
-                continue
-        if not _is_word(char):
+        if not _is_word(masked[pos]):
             pos += 1
             continue
         start_word = pos
-        pos = _end_of_word(masked, pos, end)
+        pos = _quantity_end(masked, start_word, _end_of_word(masked, pos, end), end)
         count += 1
-        if re.fullmatch(r"[0-9.,]+", masked[start_word:pos]):
-            next_pos = pos
-            while next_pos < end and masked[next_pos] in _SPACE:
-                next_pos += 1
-            if pos < next_pos < end:
-                unit_end = _end_of_word(masked, next_pos, end)
-                if unit_end > next_pos and masked[next_pos:unit_end].lower() in _UNITS:
-                    pos = unit_end
     return count
 
 
@@ -307,6 +453,32 @@ def _ends_sentence(src: str, masked: str, pos: int) -> bool:
     if len(word) == 1 and "a" <= word <= "z":
         return False
     return word not in _ABBREVIATIONS
+
+
+def _sentence_boundary(
+    doc: Document, block: _Block, segment_start: int, pos: int, end: int
+) -> tuple[int, bool]:
+    masked = doc.masked
+    char = masked[pos]
+    colon = char == ":" and block.kind == "list-item"
+    if not colon and char not in ".!?":
+        return pos + 1, False
+    stop = pos + 1
+    if not colon:
+        while stop < end and masked[stop] in ".!?":
+            stop += 1
+    punctuation_end = stop
+    while stop < end and masked[stop] in _CLOSING:
+        stop += 1
+    if stop < end and masked[stop] not in _SPACE:
+        return punctuation_end, False
+    if colon and block.admonition:
+        label = re.sub(r"^[^\w]+|[^\w]+$", "", masked[segment_start:pos].strip())
+        if label.lower() == block.admonition:
+            return pos + 1, False
+    if char == "." and not _ends_sentence(doc.source, masked, pos):
+        return punctuation_end, False
+    return stop, True
 
 
 def _sentences(doc: Document, block: _Block, number: int) -> list[Sentence]:
@@ -342,31 +514,9 @@ def _sentences(doc: Document, block: _Block, number: int) -> list[Sentence]:
 
     pos = start
     while pos < end:
-        char = masked[pos]
-        colon = char == ":" and block.kind == "list-item"
-        if not colon and char not in ".!?":
-            pos += 1
-            continue
-        stop = pos + 1
-        if not colon:
-            while stop < end and masked[stop] in ".!?":
-                stop += 1
-        punctuation_end = stop
-        while stop < end and masked[stop] in _CLOSING:
-            stop += 1
-        if stop < end and masked[stop] not in _SPACE:
-            pos = punctuation_end
-            continue
-        if colon and block.admonition:
-            label = masked[segment_start:pos].strip()
-            label = re.sub(r"^[^\w]+|[^\w]+$", "", label)
-            if label.lower() == block.admonition:
-                pos += 1
-                continue
-        if char == "." and not _ends_sentence(src, masked, pos):
-            pos = punctuation_end
-            continue
-        flush(stop)
+        stop, boundary = _sentence_boundary(doc, block, segment_start, pos, end)
+        if boundary:
+            flush(stop)
         pos = stop
     if segment_start < end:
         flush(end)

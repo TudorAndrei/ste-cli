@@ -1,10 +1,15 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Checks that use syntax from an NLP analyzer."""
 
 from ste.models import Diagnostic, Document, Options, Sentence, SyntaxToken
 from ste.rules.data import ADJECTIVAL_ING, BE_FORMS, CONDITION_WORDS, GERUND_DEPS
 
+MIN_PROCEDURE_ITEMS = 2
+MAX_NOUN_WORDS = 3
+
 
 def grammar_of(opts: Options, s: Sentence) -> list[SyntaxToken]:
+    """Return sentence grammar when an analyzer gives a result."""
     if opts.syntax is None:
         return []
     tokens, ok = opts.syntax.grammar(s.text)
@@ -12,12 +17,14 @@ def grammar_of(opts: Options, s: Sentence) -> list[SyntaxToken]:
 
 
 def syntax_span(s: Sentence, t: SyntaxToken) -> tuple[int, int]:
+    """Convert a sentence token position to a document span."""
     start = s.start + t.start
     end = start + len(t.text)
     return (s.start, s.end) if start < s.start or end > s.end else (start, end)
 
 
 def procedures(doc: Document) -> list[list[Sentence]]:
+    """Group first sentences of consecutive numbered steps."""
     groups: list[list[Sentence]] = []
     previous = -2
     for s in doc.sentences:
@@ -31,6 +38,7 @@ def procedures(doc: Document) -> list[list[Sentence]]:
 
 
 def command_start(s: Sentence, grammar: list[SyntaxToken]) -> int:
+    """Find the command after an initial condition or location phrase."""
     if not grammar:
         return -1
     first = grammar[0]
@@ -43,6 +51,7 @@ def command_start(s: Sentence, grammar: list[SyntaxToken]) -> int:
 
 
 def reads_as_command_with_please(s: Sentence, opts: Options, index: int) -> bool:
+    """Use explicit command context to resolve an ambiguous first word."""
     if opts.syntax is None:
         return False
     text = s.text
@@ -53,6 +62,7 @@ def reads_as_command_with_please(s: Sentence, opts: Options, index: int) -> bool
 
 
 def not_imperative(s: Sentence, grammar: list[SyntaxToken], opts: Options) -> Diagnostic | None:
+    """Report a first command word that is not an imperative verb."""
     first = command_start(s, grammar)
     if first < 0 or first >= len(grammar):
         return None
@@ -61,7 +71,7 @@ def not_imperative(s: Sentence, grammar: list[SyntaxToken], opts: Options) -> Di
     if first >= len(grammar):
         return None
     t = grammar[first]
-    if t.tag == "VB" or t.pos == "VERB" and t.dep == "ROOT":
+    if t.tag == "VB" or (t.pos == "VERB" and t.dep == "ROOT"):
         return None
     if (
         t.pos == "AUX"
@@ -85,6 +95,7 @@ def not_imperative(s: Sentence, grammar: list[SyntaxToken], opts: Options) -> Di
 
 
 def imperative(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report a descriptive item in a sequence of commands."""
     out = []
     for group in procedures(doc):
         items = []
@@ -96,7 +107,7 @@ def imperative(doc: Document, opts: Options) -> list[Diagnostic]:
             d = not_imperative(s, grammar, opts)
             items.append((s, grammar, d is None))
             commands += d is None
-        if len(items) < 2 or commands * 2 <= len(items):
+        if len(items) < MIN_PROCEDURE_ITEMS or commands * 2 <= len(items):
             continue
         for s, grammar, command in items:
             if not command and (d := not_imperative(s, grammar, opts)):
@@ -105,6 +116,7 @@ def imperative(doc: Document, opts: Options) -> list[Diagnostic]:
 
 
 def noun_cluster(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report a noun cluster that exceeds its word limit."""
     out = []
     for s in doc.sentences:
         grammar = grammar_of(opts, s)
@@ -119,7 +131,7 @@ def noun_cluster(doc: Document, opts: Options) -> list[Diagnostic]:
             tokens = grammar[i : j + 1]
             phrase = " ".join(t.text for t in tokens)
             if (
-                len(tokens) > 3
+                len(tokens) > MAX_NOUN_WORDS
                 and not all(t.pos == "PROPN" for t in tokens)
                 and not opts.allowed(phrase)
             ):
@@ -141,6 +153,7 @@ def noun_cluster(doc: Document, opts: Options) -> list[Diagnostic]:
 
 
 def gerund(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report an ing-form verb outside a permitted noun or modifier."""
     out = []
     for s in doc.sentences:
         grammar = grammar_of(opts, s)

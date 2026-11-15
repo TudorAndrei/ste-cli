@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Sentence length, punctuation, and contractions."""
 
 import re
@@ -7,6 +8,7 @@ from ste.rules.data import CONTRACTION_EXPANSIONS, S_CONTRACTIONS
 
 
 def sentence_length(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report sentences that exceed their word limit."""
     out = []
     for s in doc.sentences:
         limit = opts.max_words if opts.max_words > 0 else s.limit()
@@ -26,7 +28,8 @@ def sentence_length(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
-def semicolons(doc: Document, opts: Options) -> list[Diagnostic]:
+def semicolons(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report prose semicolons that are not part of an HTML entity."""
     out = []
     for s in doc.sentences:
         for i in range(s.start, s.end):
@@ -49,7 +52,8 @@ def semicolons(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
-def contractions(doc: Document, opts: Options) -> list[Diagnostic]:
+def contractions(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report contracted verb forms."""
     out = []
     suffixes = ("n't", "'re", "'ve", "'ll", "'m", "'d")
     for s in doc.sentences:

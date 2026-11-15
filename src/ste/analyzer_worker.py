@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """A syntax analyzer for the ste checker.
 
 Some rules of ASD-STE100 need the syntax of a sentence, and not only its
@@ -27,32 +28,57 @@ from __future__ import annotations
 import importlib
 import json
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 MODEL = "en_core_web_sm"
 
 
-def load_model() -> Any:
+class NLPToken(Protocol):
+    """Token attributes that the grammar protocol reads from an NLP model."""
+
+    i: int
+    text: str
+    pos_: str
+    tag_: str
+    dep_: str
+    idx: int
+    head: NLPToken
+
+
+class NLPModel(Protocol):
+    """A callable language model that returns annotated tokens."""
+
+    def __call__(self, text: str) -> Iterable[NLPToken]:
+        """Analyze one sentence and return its grammar tokens."""
+        ...
+
+
+def load_model() -> NLPModel:
     """Load spaCy. Only the parts that the rules need stay in the pipeline."""
     try:
         spacy = importlib.import_module("spacy")
     except ImportError:
-        raise SystemExit(
+        msg = (
             "ste-analyzer: spacy is not installed.\n"
             "  uv pip install spacy\n"
             f"  python -m spacy download {MODEL}"
-        ) from None
+        )
+        raise SystemExit(msg) from None
     try:
         # The rules need the tagger and the parser. The other parts of the
         # pipeline are not necessary, and they make each sentence slower.
-        return spacy.load(MODEL, exclude=["ner", "lemmatizer", "textcat"])
+        return cast("NLPModel", spacy.load(MODEL, exclude=["ner", "lemmatizer", "textcat"]))
     except OSError:
-        raise SystemExit(
+        msg = (
             f"ste-analyzer: the model {MODEL} is not installed.\n  python -m spacy download {MODEL}"
-        ) from None
+        )
+        raise SystemExit(msg) from None
 
 
-def analyze(nlp: Any, text: str) -> list[dict[str, Any]]:
+def analyze(nlp: NLPModel, text: str) -> list[dict[str, str | int]]:
     """Give one object for each token of the sentence."""
     doc = nlp(text)
     return [
@@ -69,27 +95,36 @@ def analyze(nlp: Any, text: str) -> list[dict[str, Any]]:
     ]
 
 
-def main() -> int:
-    nlp = load_model()
-    # The command waits for this line before it sends a sentence.
-    print(json.dumps({"ready": True, "model": MODEL}), flush=True)
+def _write_response(payload: dict[str, object]) -> None:
+    sys.stdout.write(json.dumps(payload) + "\n")
+    sys.stdout.flush()
 
-    for line in sys.stdin:
-        line = line.strip()
+
+def _answer(nlp: NLPModel, request: dict[str, object]) -> dict[str, object]:
+    try:
+        return {"id": request.get("id"), "tokens": analyze(nlp, cast("str", request["text"]))}
+    # An NLP component can raise its own exception. One failed sentence must
+    # return an error response without terminating the persistent protocol.
+    except Exception as err:  # noqa: BLE001
+        return {"id": request.get("id"), "error": str(err)}
+
+
+def main() -> int:
+    """Serve grammar requests as one JSON response per input line."""
+    nlp = load_model()
+    _write_response({"ready": True, "model": MODEL})
+    for raw_line in sys.stdin:
+        line = raw_line.strip()
         if not line:
             continue
         try:
             request = json.loads(line)
         except json.JSONDecodeError as err:
-            print(json.dumps({"error": f"the line is not JSON: {err}"}), flush=True)
+            _write_response({"error": f"the line is not JSON: {err}"})
             continue
         if request.get("stop"):
             return 0
-        try:
-            answer = {"id": request.get("id"), "tokens": analyze(nlp, request["text"])}
-        except Exception as err:  # one bad sentence must not stop the run
-            answer = {"id": request.get("id"), "error": str(err)}
-        print(json.dumps(answer), flush=True)
+        _write_response(_answer(nlp, request))
     return 0
 
 

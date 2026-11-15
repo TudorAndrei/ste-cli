@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Shared checker data. Internal offsets count Python characters.
 
 Report writers convert offsets and columns to UTF-8 bytes for CLI compatibility.
@@ -11,6 +12,8 @@ from typing import Protocol
 
 @dataclass
 class Diagnostic:
+    """One finding with its source span and suggested correction."""
+
     rule_id: str
     message: str
     severity: str
@@ -22,6 +25,8 @@ class Diagnostic:
 
 @dataclass
 class Token:
+    """One prose word with its source span."""
+
     text: str
     lower: str
     start: int
@@ -30,6 +35,8 @@ class Token:
 
 @dataclass
 class Sentence:
+    """One sentence and its Markdown block information."""
+
     text: str
     start: int
     end: int
@@ -44,38 +51,52 @@ class Sentence:
     last: bool = False
 
     def limit(self) -> int:
+        """Return the word limit for this sentence type."""
         return 20 if self.procedural and not self.note else 25
 
 
 @dataclass
 class Document:
+    """Source text, masked prose, and parsed sentences."""
+
     source: str
     masked: str
     sentences: list[Sentence] = field(default_factory=list)
 
     def word_count(self) -> int:
+        """Return the total word count of the prose."""
         return sum(s.words for s in self.sentences)
 
 
 @dataclass
 class Preferred:
+    """The project name for an item and its other names."""
+
     name: str
     instead: list[str] = field(default_factory=list)
 
 
 @dataclass
 class DictionaryResult:
+    """The dictionary result for one unapproved word."""
+
     alternatives: list[str] = field(default_factory=list)
     only_verb: bool = False
     technical_noun: bool = False
 
 
 class Dictionary(Protocol):
-    def unapproved(self, word: str) -> tuple[DictionaryResult, bool]: ...
+    """The word lookup contract for an imported dictionary."""
+
+    def unapproved(self, word: str) -> tuple[DictionaryResult, bool]:
+        """Look up an unapproved word and its permitted alternatives."""
+        ...
 
 
 @dataclass
 class SyntaxToken:
+    """One word with its grammar and position in a sentence."""
+
     index: int
     text: str
     pos: str
@@ -86,12 +107,21 @@ class SyntaxToken:
 
 
 class Syntax(Protocol):
-    def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]: ...
-    def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]: ...
+    """The sentence grammar contract for an NLP analyzer."""
+
+    def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]:
+        """Return sentence tokens and whether the grammar is known."""
+        ...
+
+    def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
+        """Return whether a word is passive and whether the answer is known."""
+        ...
 
 
 @dataclass
 class Options:
+    """Settings that control checker behavior."""
+
     mode: str = "flavored"
     max_words: int = 0
     allow_nouns: list[str] = field(default_factory=list)
@@ -105,9 +135,11 @@ class Options:
     syntax: Syntax | None = None
 
     def confidence(self) -> float:
+        """Return the minimum confidence for the current mode."""
         return self.min_confidence or (0 if self.mode == "strict" else 0.6)
 
     def severity(self, rule_id: str, given: str) -> str:
+        """Apply rule severity settings and warning promotion."""
         severity = self.rule_severity.get(rule_id, given)
         if (
             rule_id not in self.rule_severity
@@ -120,4 +152,5 @@ class Options:
         return severity
 
     def allowed(self, word: str) -> bool:
+        """Return whether the glossary permits this word."""
         return word.lower() in {w.lower() for w in self.allow_nouns + self.allow_verbs}

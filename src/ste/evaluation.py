@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Measure rule results against a labeled text corpus."""
 
 from __future__ import annotations
@@ -12,6 +13,8 @@ from ste.models import Options, Preferred
 
 
 class RuleScore(TypedDict):
+    """Precision and recall counts for one rule."""
+
     rule_id: str
     true_positives: int
     false_positives: int
@@ -21,6 +24,8 @@ class RuleScore(TypedDict):
 
 
 class EvaluationReport(TypedDict):
+    """Results of a run against the labeled corpus."""
+
     files: int
     rules: list[RuleScore]
     totals: RuleScore
@@ -38,62 +43,82 @@ def _score(rule: str, counts: list[int]) -> RuleScore:
     }
 
 
+def _invalid(path: Path, reason: str) -> ValueError:
+    return ValueError(f"{path}: {reason}")
+
+
+def _string_list(path: Path, value: object, label: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(word, str) for word in value):
+        raise _invalid(path, f"{label} must be a list of strings")
+    return [str(word) for word in value]
+
+
+def _preferences(path: Path, value: object) -> list[Preferred]:
+    if value is None:
+        return []
+    if not isinstance(value, dict):
+        raise _invalid(path, "prefer must be a mapping")
+    return [
+        Preferred(name, _string_list(path, alternatives, "prefer alternatives"))
+        for name, alternatives in sorted(value.items())
+    ]
+
+
+def _expectations(path: Path, value: object) -> list[dict[str, str]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise _invalid(path, "expect must be a list")
+    expectations = []
+    for item in value:
+        entry = {} if item is None else item
+        if not isinstance(entry, dict) or any(
+            entry.get(key) is not None and not isinstance(entry.get(key), str)
+            for key in ("rule_id", "text")
+        ):
+            raise _invalid(path, "each expectation must have string rule_id and text fields")
+        expectations.append(
+            {"rule_id": entry.get("rule_id") or "", "text": entry.get("text") or ""}
+        )
+    return expectations
+
+
 def _expected(path: Path) -> tuple[Options, list[dict[str, str]]]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         raw = {}
     except json.JSONDecodeError as err:
-        raise ValueError(f"{path}: {err}") from err
+        raise _invalid(path, str(err)) from err
     if raw is None:
         raw = {}
     if not isinstance(raw, dict):
-        raise ValueError(f"{path}: expected a JSON object")
+        raise _invalid(path, "expected a JSON object")
     mode = raw.get("mode")
-    nouns = raw.get("allow_nouns")
-    prefer = raw.get("prefer")
-    expect = raw.get("expect")
     if mode is not None and not isinstance(mode, str):
-        raise ValueError(f"{path}: mode must be a string")
-    if nouns is not None and (
-        not isinstance(nouns, list) or any(not isinstance(w, str) for w in nouns)
-    ):
-        raise ValueError(f"{path}: allow_nouns must be a list of strings")
-    if prefer is not None and not isinstance(prefer, dict):
-        raise ValueError(f"{path}: prefer must be a mapping")
-    preferences = []
-    for name, alternatives in sorted((prefer or {}).items()):
-        if alternatives is not None and (
-            not isinstance(alternatives, list) or any(not isinstance(w, str) for w in alternatives)
-        ):
-            raise ValueError(f"{path}: prefer alternatives must be a list of strings")
-        preferences.append(Preferred(name, alternatives or []))
-    if expect is not None and not isinstance(expect, list):
-        raise ValueError(f"{path}: expect must be a list")
-    expectations = []
-    for item in expect or []:
-        if item is None:
-            item = {}
-        if not isinstance(item, dict) or any(
-            item.get(k) is not None and not isinstance(item.get(k), str)
-            for k in ("rule_id", "text")
-        ):
-            raise ValueError(f"{path}: each expectation must have string rule_id and text fields")
-        expectations.append({"rule_id": item.get("rule_id") or "", "text": item.get("text") or ""})
-    return Options(
-        mode=mode or "flavored", allow_nouns=nouns or [], prefer=preferences
-    ), expectations
+        raise _invalid(path, "mode must be a string")
+    opts = Options(
+        mode=mode or "flavored",
+        allow_nouns=_string_list(path, raw.get("allow_nouns"), "allow_nouns"),
+        prefer=_preferences(path, raw.get("prefer")),
+    )
+    return opts, _expectations(path, raw.get("expect"))
 
 
 def run(directory: str | Path) -> EvaluationReport:
+    """Measure all fixtures in a labeled corpus."""
     root = Path(directory)
     if not root.is_dir():
-        raise ValueError(f"{root}: the corpus directory does not exist")
+        msg = f"{root}: the corpus directory does not exist"
+        raise ValueError(msg)
     files = sorted(
         p for p in root.rglob("*") if p.is_file() and p.suffix in (".md", ".markdown", ".txt")
     )
     if not files:
-        raise ValueError(f"{root}: the corpus has no fixture files")
+        msg = f"{root}: the corpus has no fixture files"
+        raise ValueError(msg)
     counts: defaultdict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
     for path in files:
         source = path.read_text(encoding="utf-8")
@@ -129,11 +154,12 @@ def run(directory: str | Path) -> EvaluationReport:
 
 
 def write_text(stream: TextIO, data: EvaluationReport) -> None:
+    """Write the report in its text format."""
     stream.write(f"{'rule':<10} {'tp':>5} {'fp':>5} {'fn':>5} {'precision':>10} {'recall':>8}\n")
     rows = data["rules"]
-    assert isinstance(rows, list)
-    for row in [*rows, data["totals"]]:
-        stream.write(
-            f"{row['rule_id']:<10} {row['true_positives']:>5} {row['false_positives']:>5} {row['false_negatives']:>5} {row['precision']:>10.2f} {row['recall']:>8.2f}\n"
-        )
+    stream.writelines(
+        f"{row['rule_id']:<10} {row['true_positives']:>5} {row['false_positives']:>5} "
+        f"{row['false_negatives']:>5} {row['precision']:>10.2f} {row['recall']:>8.2f}\n"
+        for row in [*rows, data["totals"]]
+    )
     stream.write(f"\n{data['files']} fixture files\n")

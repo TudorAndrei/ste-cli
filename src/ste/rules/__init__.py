@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """ASD-STE100 checks in their established execution order."""
 
 from collections.abc import Callable
@@ -20,6 +21,7 @@ Rule = Callable[[Document, Options], list[Diagnostic]]
 
 
 def all_rules() -> list[Rule]:
+    """Return the rules in their established execution order."""
     return [
         sentence_length,
         semicolons,

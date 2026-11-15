@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Project word tables. These are not the ASD-STE100 dictionary."""
 
 BE_FORMS = {"be", "was", "were", "are", "is", "am", "being", "been"}

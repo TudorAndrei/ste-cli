@@ -1,19 +1,25 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Read rule suppression comments from the source document."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from ste.models import Diagnostic
+if TYPE_CHECKING:
+    from ste.models import Diagnostic
 
 
 @dataclass
 class Suppression:
+    """A source region in which selected rules do not report findings."""
+
     start: int
     end: int
     rules: list[str]
 
     def covers(self, diagnostic: Diagnostic) -> bool:
+        """Check whether a finding starts in this region."""
         return self.start <= diagnostic.start < self.end and (
             not self.rules or diagnostic.rule_id in self.rules
         )
@@ -33,12 +39,47 @@ def _parse_directive(line: str) -> tuple[str, list[str]]:
     return "", []
 
 
+@dataclass
+class _SuppressionState:
+    opened: dict[str, int] = field(default_factory=dict)
+    open_all: int = -1
+    regions: list[Suppression] = field(default_factory=list)
+
+    def disable(self, ids: list[str], start: int) -> None:
+        """Start suppressions that are not already open."""
+        if ids:
+            for rule_id in ids:
+                self.opened.setdefault(rule_id, start)
+        elif self.open_all < 0:
+            self.open_all = start
+
+    def enable(self, ids: list[str], end: int) -> None:
+        """Close the requested rules, or all rules when no ID is given."""
+        if ids:
+            self.regions.extend(
+                Suppression(self.opened.pop(rule_id), end, [rule_id])
+                for rule_id in ids
+                if rule_id in self.opened
+            )
+            return
+        self.finish(end)
+        self.opened.clear()
+        self.open_all = -1
+
+    def finish(self, end: int) -> None:
+        """Record each suppression that is still open at this position."""
+        if self.open_all >= 0:
+            self.regions.append(Suppression(self.open_all, end, []))
+        self.regions.extend(
+            Suppression(start, end, [rule_id]) for rule_id, start in self.opened.items()
+        )
+
+
 def suppressions(source: str) -> list[Suppression]:
+    """Read all rule suppression regions from HTML comments."""
     if "ste-disable" not in source:
         return []
-    out: list[Suppression] = []
-    opened: dict[str, int] = {}
-    open_all = -1
+    state = _SuppressionState()
     line_start = 0
     for line in source.split("\n"):
         line_end = line_start + len(line)
@@ -46,29 +87,15 @@ def suppressions(source: str) -> list[Suppression]:
         directive, ids = _parse_directive(line)
         if directive == "ste-disable-next-line":
             next_end = source.find("\n", next_start)
-            out.append(Suppression(next_start, next_end + 1 if next_end >= 0 else len(source), ids))
+            state.regions.append(
+                Suppression(next_start, next_end + 1 if next_end >= 0 else len(source), ids)
+            )
         elif directive == "ste-disable-line":
-            out.append(Suppression(line_start, line_end, ids))
+            state.regions.append(Suppression(line_start, line_end, ids))
         elif directive == "ste-disable":
-            if ids:
-                for rule_id in ids:
-                    opened.setdefault(rule_id, line_start)
-            elif open_all < 0:
-                open_all = line_start
+            state.disable(ids, line_start)
         elif directive == "ste-enable":
-            if not ids:
-                if open_all >= 0:
-                    out.append(Suppression(open_all, line_end, []))
-                    open_all = -1
-                for rule_id, start in opened.items():
-                    out.append(Suppression(start, line_end, [rule_id]))
-                opened.clear()
-            else:
-                for rule_id in ids:
-                    if rule_id in opened:
-                        out.append(Suppression(opened.pop(rule_id), line_end, [rule_id]))
+            state.enable(ids, line_end)
         line_start = next_start
-    if open_all >= 0:
-        out.append(Suppression(open_all, len(source), []))
-    out.extend(Suppression(start, len(source), [rule_id]) for rule_id, start in opened.items())
-    return out
+    state.finish(len(source))
+    return state.regions

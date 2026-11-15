@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Verb construction checks."""
 
 from ste.models import Diagnostic, Document, Options, Sentence
@@ -14,6 +15,10 @@ from ste.rules.data import (
 )
 
 VERB_DATA_VERSION = "1.1.0"
+MIN_PARTICIPLE_LENGTH = 3
+MIN_ING_LENGTH = 4
+MIN_ADVERB_LENGTH = 3
+SYNTAX_CONFIDENCE = 0.9
 PHRASAL_INDEX: dict[str, list[tuple[list[str], str]]] = {}
 for _base, _particles, _suggestion in PHRASAL_VERBS:
     for _form in VERB_FORMS[_base]:
@@ -21,26 +26,29 @@ for _base, _particles, _suggestion in PHRASAL_VERBS:
 
 
 def is_participle(word: str) -> bool:
+    """Check for a past participle that is not a compound word."""
     return "-" not in word and (
-        word in IRREGULAR_PARTICIPLES or len(word) > 3 and word.endswith("ed")
+        word in IRREGULAR_PARTICIPLES or (len(word) > MIN_PARTICIPLE_LENGTH and word.endswith("ed"))
     )
 
 
 def is_ing_form(word: str) -> bool:
-    return "-" not in word and len(word) > 4 and word.endswith("ing")
+    """Check for an ing-form word that is not a compound."""
+    return "-" not in word and len(word) > MIN_ING_LENGTH and word.endswith("ing")
 
 
 def next_content(s: Sentence, i: int) -> int:
+    """Find the next token after adverbs and other interrupters."""
     while i < len(s.tokens) and (
         s.tokens[i].lower in INTERRUPTERS
-        or len(s.tokens[i].lower) > 3
-        and s.tokens[i].lower.endswith("ly")
+        or (len(s.tokens[i].lower) > MIN_ADVERB_LENGTH and s.tokens[i].lower.endswith("ly"))
     ):
         i += 1
     return i
 
 
 def joined(s: Sentence, first: int, last: int) -> bool:
+    """Check that adjacent tokens form one unmasked construction."""
     if last <= first:
         return False
     for k in range(first, last):
@@ -53,9 +61,11 @@ def joined(s: Sentence, first: int, last: int) -> bool:
 
 
 def perfect_diag(s: Sentence, first: int, last: int, confidence: float) -> Diagnostic:
+    """Make a finding for a perfect-tense construction."""
     return Diagnostic(
         "STE-3.4",
-        f'"{span(s, first, last)}" is a perfect tense. ASD-STE100 approves only the simple present, the simple past, and the simple future.',
+        f'"{span(s, first, last)}" is a perfect tense. '
+        "ASD-STE100 approves only the simple present, the simple past, and the simple future.",
         "warning",
         confidence,
         s.tokens[first].start,
@@ -65,6 +75,7 @@ def perfect_diag(s: Sentence, first: int, last: int, confidence: float) -> Diagn
 
 
 def match_perfect(s: Sentence, i: int) -> Diagnostic | None:
+    """Find a perfect-tense construction at one token."""
     j = next_content(s, i + 1)
     if j >= len(s.tokens) or not joined(s, i, j) or s.tokens[j].lower == "to":
         return None
@@ -81,6 +92,7 @@ def match_perfect(s: Sentence, i: int) -> Diagnostic | None:
 
 
 def match_progressive(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
+    """Find a progressive verb construction at one token."""
     j = next_content(s, i + 1)
     if j >= len(s.tokens) or not joined(s, i, j):
         return None
@@ -89,7 +101,8 @@ def match_progressive(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
         return None
     return Diagnostic(
         "STE-3.5",
-        f'"{span(s, i, j)}" is a progressive form. ASD-STE100 does not approve the "-ing" verb forms.',
+        f'"{span(s, i, j)}" is a progressive form. '
+        'ASD-STE100 does not approve the "-ing" verb forms.',
         "warning",
         0.9,
         s.tokens[i].start,
@@ -99,6 +112,7 @@ def match_progressive(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
 
 
 def match_passive(s: Sentence, i: int, opts: Options) -> tuple[Diagnostic, bool] | None:
+    """Find a passive construction and whether it has a by-agent."""
     j = next_content(s, i + 1)
     if j >= len(s.tokens) or not joined(s, i, j):
         return None
@@ -113,8 +127,8 @@ def match_passive(s: Sentence, i: int, opts: Options) -> tuple[Diagnostic, bool]
         passive, known = opts.syntax.passive_at(s.text, s.tokens[j].start - s.start)
         if known and not passive:
             return None
-        if known and passive and confidence < 0.9:
-            confidence = 0.9
+        if known and passive and confidence < SYNTAX_CONFIDENCE:
+            confidence = SYNTAX_CONFIDENCE
     return Diagnostic(
         "STE-3.6",
         f'"{span(s, i, j)}" is the passive voice.',
@@ -127,6 +141,7 @@ def match_passive(s: Sentence, i: int, opts: Options) -> tuple[Diagnostic, bool]
 
 
 def match_phrasal(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
+    """Find a phrasal verb that starts at one token."""
     for particles, suggestion in PHRASAL_INDEX.get(s.tokens[i].lower, []):
         if [t.lower for t in s.tokens[i + 1 : i + 1 + len(particles)]] != particles:
             continue
@@ -147,6 +162,7 @@ def match_phrasal(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
 
 
 def verbs(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Find perfect, passive, progressive, and phrasal verb forms."""
     out = []
     for s in doc.sentences:
         perfect = []

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Word and phrase checks."""
 
 from ste.models import Diagnostic, Document, Options, Sentence
@@ -16,6 +17,7 @@ TERM_DATA_VERSION = "1.0.0"
 
 
 def preceded_by_determiner(s: Sentence, i: int) -> bool:
+    """Check for a determiner in the same noun phrase."""
     for back in range(1, min(3, i) + 1):
         previous = s.tokens[i - back].lower
         if previous in DETERMINERS or previous.endswith("'s"):
@@ -26,18 +28,22 @@ def preceded_by_determiner(s: Sentence, i: int) -> bool:
 
 
 def lookup_dictionary(opts: Options, s: Sentence, i: int) -> Diagnostic | None:
+    """Make a term finding when the dictionary rejects a word."""
     if opts.dictionary is None:
         return None
     word = s.tokens[i].lower
     result, unapproved = opts.dictionary.unapproved(word)
-    if not unapproved or result.only_verb and preceded_by_determiner(s, i):
+    if not unapproved or (result.only_verb and preceded_by_determiner(s, i)):
         return None
     confidence = 0.6 if result.only_verb else 0.95
     suggestion = "The dictionary gives no alternative. Write the idea in approved words."
     if result.alternatives:
         suggestion = 'Write "' + '", or "'.join(result.alternatives) + '".'
     elif result.technical_noun:
-        suggestion = f'The dictionary approves "{word}" as a technical noun only. If this sentence uses it as a verb, write a different verb.'
+        suggestion = (
+            f'The dictionary approves "{word}" as a technical noun only. '
+            "If this sentence uses it as a verb, write a different verb."
+        )
     token = s.tokens[i]
     return Diagnostic(
         "STE-1.1",
@@ -51,6 +57,7 @@ def lookup_dictionary(opts: Options, s: Sentence, i: int) -> Diagnostic | None:
 
 
 def terms(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report words and phrases that have simpler alternatives."""
     out = []
     for s in doc.sentences:
         i = 0
@@ -101,6 +108,7 @@ def terms(doc: Document, opts: Options) -> list[Diagnostic]:
 
 
 def spelling(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report British spelling outside a permitted project name."""
     out = []
     for s in doc.sentences:
         for i, t in enumerate(s.tokens):
@@ -122,7 +130,8 @@ def spelling(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
-def nominalizations(doc: Document, opts: Options) -> list[Diagnostic]:
+def nominalizations(doc: Document, _opts: Options) -> list[Diagnostic]:
+    """Report a noun phrase that describes an action."""
     out = []
     for s in doc.sentences:
         i = 0
@@ -149,6 +158,7 @@ def nominalizations(doc: Document, opts: Options) -> list[Diagnostic]:
 
 
 def latin_abbreviations(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report a lower-case Latin abbreviation with a final period."""
     out = []
     for s in doc.sentences:
         for t in s.tokens:
@@ -171,6 +181,7 @@ def latin_abbreviations(doc: Document, opts: Options) -> list[Diagnostic]:
 
 
 def one_name(doc: Document, opts: Options) -> list[Diagnostic]:
+    """Report an alternative name for an item with a preferred name."""
     out = []
     for s in doc.sentences:
         for preferred in opts.prefer:
@@ -184,7 +195,8 @@ def one_name(doc: Document, opts: Options) -> list[Diagnostic]:
                         out.append(
                             Diagnostic(
                                 "STE-1.11",
-                                f'The text uses "{span(s, i, last)}" and "{preferred.name}" for the same item.',
+                                f'The text uses "{span(s, i, last)}" and '
+                                f'"{preferred.name}" for the same item.',
                                 "warning",
                                 0.95,
                                 s.tokens[i].start,

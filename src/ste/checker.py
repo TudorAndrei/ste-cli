@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Run the checks, apply settings, and return ordered findings."""
 
 from __future__ import annotations
@@ -11,10 +12,12 @@ from ste.suppress import suppressions
 
 
 def lint(text: str, options: Options | None = None) -> list[Diagnostic]:
+    """Find violations in Markdown or plain text."""
     return lint_document(parse(text), options)
 
 
 def lint_document(doc: Document, options: Options | None = None) -> list[Diagnostic]:
+    """Run all rules and apply settings and suppressions."""
     opts = options or Options()
     disabled = set(opts.disable_rules)
     hidden = suppressions(doc.source)

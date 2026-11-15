@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Stable reports for people, agents, editors, and code hosts."""
 
 from __future__ import annotations
@@ -5,9 +6,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
-from ste.models import Diagnostic
+if TYPE_CHECKING:
+    from ste.models import Diagnostic
 
 FORMATS = ("text", "json", "ndjson", "sarif", "github")
 FIELDS = (
@@ -27,23 +29,28 @@ FIELDS = (
 
 @dataclass
 class Finding:
+    """A diagnostic with its report fields and editor region."""
+
     data: dict[str, str | int | float]
     region: dict[str, int]
 
     def project(self, fields: list[str]) -> dict[str, str | int | float]:
+        """Select report fields and omit an empty suggestion."""
         if fields:
             return {name: self.data.get(name, "") for name in fields}
         return {name: value for name, value in self.data.items() if name != "suggestion" or value}
 
 
-def position(source: str, offset: int, byte_column: bool = False) -> tuple[int, int]:
+def position(source: str, offset: int, *, byte_column: bool = False) -> tuple[int, int]:
+    """Return the source line and column for a character offset."""
     prefix = source[: max(0, min(len(source), offset))]
     tail = prefix.rsplit("\n", 1)[-1]
     return prefix.count("\n") + 1, len(tail.encode("utf-8") if byte_column else tail) + 1
 
 
 def make_finding(path: str, source: str, diag: Diagnostic) -> Finding:
-    line, column = position(source, diag.start, True)
+    """Add report positions and source text to a diagnostic."""
+    line, column = position(source, diag.start, byte_column=True)
     start_line, start_column = position(source, diag.start)
     end_line, end_column = position(source, diag.end)
     text = source[diag.start : diag.end] if 0 <= diag.start < diag.end <= len(source) else ""
@@ -72,6 +79,8 @@ def make_finding(path: str, source: str, diag: Diagnostic) -> Finding:
 
 @dataclass
 class FileResult:
+    """Word count and findings for one source file."""
+
     path: str
     words: int
     findings: list[Finding] = field(default_factory=list)
@@ -79,12 +88,15 @@ class FileResult:
 
 @dataclass
 class Report:
+    """Results and baseline counts for one checker run."""
+
     mode: str
     files: list[FileResult]
     accepted: int = 0
     stale: int = 0
 
     def summary(self) -> dict[str, int | float | bool]:
+        """Count all results before output limits apply."""
         total = sum(len(f.findings) for f in self.files)
         words = sum(f.words for f in self.files)
         out: dict[str, int | float | bool] = {
@@ -103,6 +115,7 @@ class Report:
         return out
 
     def limited(self, limit: int) -> tuple[list[Finding], bool]:
+        """Order findings and apply the requested output limit."""
         findings = sorted(
             (d for f in self.files for d in f.findings),
             key=lambda d: (str(d.data["file"]), int(d.data["start"])),
@@ -114,6 +127,8 @@ class Report:
 
 @dataclass
 class Options:
+    """Settings that control checker behavior."""
+
     format: str = "text"
     limit: int = 0
     fields: list[str] = field(default_factory=list)
@@ -123,30 +138,38 @@ class Options:
 
 
 def count(n: int, noun: str) -> str:
+    """Write a count with the singular or plural noun."""
     return f"{n} {noun}{'' if n == 1 else 's'}"
 
 
 def write_text(stream: TextIO, rep: Report, opts: Options) -> None:
+    """Write the report in its text format."""
     findings, truncated = rep.limited(opts.limit)
     if not opts.summary_only:
         for item in findings:
             d = item.data
             stream.write(
-                f"{d['file']}:{d['line']}:{d['column']}: {d['severity']} [{d['rule_id']}] {d['message']}\n"
+                f"{d['file']}:{d['line']}:{d['column']}: "
+                f"{d['severity']} [{d['rule_id']}] {d['message']}\n"
             )
             if d["suggestion"]:
                 stream.write(f"    {d['suggestion']}\n")
     summary = rep.summary()
     if truncated:
         stream.write(
-            f"\n{count(len(findings), 'finding')} of {count(int(summary['findings']), 'finding')} are in this report. Give a higher --limit for more.\n"
+            f"\n{count(len(findings), 'finding')} of "
+            f"{count(int(summary['findings']), 'finding')} are in this report. "
+            "Give a higher --limit for more.\n"
         )
     stream.write(
-        f"\n{count(int(summary['findings']), 'finding')} in {count(int(summary['words']), 'word')} of {count(len(rep.files), 'file')} ({summary['score']:.2f} for each 100 words)\n"
+        f"\n{count(int(summary['findings']), 'finding')} in "
+        f"{count(int(summary['words']), 'word')} of "
+        f"{count(len(rep.files), 'file')} ({summary['score']:.2f} for each 100 words)\n"
     )
 
 
 def write(stream: TextIO, rep: Report, opts: Options) -> None:
+    """Write the report in the requested output format."""
     findings, truncated = rep.limited(opts.limit)
     summary = rep.summary()
     summary["shown"] = 0 if opts.summary_only else len(findings)
@@ -169,11 +192,10 @@ def write(stream: TextIO, rep: Report, opts: Options) -> None:
             data["findings"] = [f.project(opts.fields) for f in shown]
         stream.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
     elif opts.format == "ndjson":
-        for item in shown:
-            stream.write(
-                json.dumps({**item.project(opts.fields), "type": "finding"}, ensure_ascii=False)
-                + "\n"
-            )
+        stream.writelines(
+            json.dumps({**item.project(opts.fields), "type": "finding"}, ensure_ascii=False) + "\n"
+            for item in shown
+        )
         stream.write(
             json.dumps(
                 {
@@ -193,24 +215,29 @@ def write(stream: TextIO, rep: Report, opts: Options) -> None:
             d, r = item.data, item.region
             level = {"error": "error", "info": "notice"}.get(str(d["severity"]), "warning")
             message = str(d["message"]) + (" " + str(d["suggestion"]) if d["suggestion"] else "")
+            file = _escape(str(d["file"]).replace("\\", "/"), is_property=True)
+            title = _escape(str(d["rule_id"]), is_property=True)
             stream.write(
-                f"::{level} file={_escape(str(d['file']).replace(chr(92), '/'), True)},line={r['startLine']},col={r['startColumn']},endLine={r['endLine']},endColumn={r['endColumn']},title={_escape(str(d['rule_id']), True)}::{_escape(message)}\n"
+                f"::{level} file={file},line={r['startLine']},col={r['startColumn']},"
+                f"endLine={r['endLine']},endColumn={r['endColumn']},"
+                f"title={title}::{_escape(message)}\n"
             )
         write_text(stream, rep, Options(summary_only=True, limit=opts.limit))
     else:
         write_text(stream, rep, opts)
 
 
-def _escape(value: str, property: bool = False) -> str:
+def _escape(value: str, *, is_property: bool = False) -> str:
     for old, new in (("%", "%25"), ("\r", "%0D"), ("\n", "%0A")):
         value = value.replace(old, new)
-    if property:
+    if is_property:
         value = value.replace(":", "%3A").replace(",", "%2C")
     return value
 
 
 def _write_sarif(stream: TextIO, findings: list[Finding], opts: Options) -> None:
     def level(severity: str) -> str:
+        """Map a checker severity to its SARIF level."""
         return {"error": "error", "info": "note"}.get(severity, "warning")
 
     rules = [
