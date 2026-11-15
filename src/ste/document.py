@@ -136,6 +136,19 @@ _ADMONITIONS = {
 _SPACE = " \t\n\r"
 _CLOSING = "*_) ]\"'`".replace(" ", "")
 _JOIN = "'\u2019\u02bc-._"
+# "[^\W_]" is a letter or a number. It also matches a number that is not a
+# digit, such as "½", that _is_word does not accept. _word_span finds and
+# corrects this case.
+_LETTER = r"[^\W_]"
+_JOINED = rf"(?:{_LETTER}|[{re.escape(_JOIN)}](?={_LETTER}))*"
+_JOINED_RUN = re.compile(_JOINED)
+_WORD = re.compile(_LETTER + _JOINED)
+_COUNT_START = re.compile(rf'[("“]|{_LETTER}{_JOINED}')
+_PARENTHESIS = re.compile(r"[()]")
+_NUMBER = re.compile(r"[0-9.,]+")
+_SPACES = re.compile(r"[ \t\n\r]*")
+_PUNCTUATION = re.compile(r"[.!?]")
+_LIST_PUNCTUATION = re.compile(r"[.!?:]")
 
 
 @dataclass
@@ -356,7 +369,19 @@ def _is_word(char: str) -> bool:
     return char.isalpha() or char.isdigit()
 
 
+def _match_end(pattern: re.Pattern[str], text: str, pos: int, end: int) -> int:
+    match = pattern.match(text, pos, end)
+    return match.end() if match else pos
+
+
+def _all_words(run: str) -> bool:
+    return run.isascii() or all(_is_word(char) for char in run if char not in _JOIN)
+
+
 def _end_of_word(text: str, pos: int, end: int) -> int:
+    stop = _match_end(_JOINED_RUN, text, pos, end)
+    if _all_words(text[pos:stop]):
+        return stop
     while pos < end:
         if _is_word(text[pos]) or (
             text[pos] in _JOIN and pos + 1 < end and _is_word(text[pos + 1])
@@ -367,16 +392,26 @@ def _end_of_word(text: str, pos: int, end: int) -> int:
     return pos
 
 
+def _word_span(text: str, match: re.Match[str], end: int) -> tuple[int, int]:
+    """Return the word of a _WORD match, or an empty span at a character that is not a word."""
+    start, stop = match.span()
+    if _all_words(text[start:stop]):
+        return start, stop
+    if not _is_word(text[start]):
+        return start, start
+    return start, _end_of_word(text, start, end)
+
+
 def tokenize(masked: str, start: int = 0, end: int | None = None) -> list[Token]:
     """Return word tokens without removing their original source positions."""
     end = len(masked) if end is None else end
     out: list[Token] = []
     pos = start
-    while pos < end:
-        if not _is_word(masked[pos]):
+    while match := _WORD.search(masked, pos, end):
+        pos, stop = _word_span(masked, match, end)
+        if stop == pos:
             pos += 1
             continue
-        stop = _end_of_word(masked, pos, end)
         word = masked[pos:stop]
         out.append(
             Token(word, word.replace("\u2019", "'").replace("\u02bc", "'").lower(), pos, stop)
@@ -387,10 +422,10 @@ def tokenize(masked: str, start: int = 0, end: int | None = None) -> list[Token]
 
 def _parenthesis_end(masked: str, pos: int, end: int) -> int:
     depth = 0
-    for close in range(pos, end):
-        depth += (masked[close] == "(") - (masked[close] == ")")
+    for match in _PARENTHESIS.finditer(masked, pos, end):
+        depth += 1 if match.group() == "(" else -1
         if depth == 0:
-            return close + 1
+            return match.end()
     return pos
 
 
@@ -406,11 +441,9 @@ def _group_end(masked: str, pos: int, end: int) -> int:
 
 
 def _quantity_end(masked: str, start: int, pos: int, end: int) -> int:
-    if not re.fullmatch(r"[0-9.,]+", masked[start:pos]):
+    if not _NUMBER.fullmatch(masked, start, pos):
         return pos
-    next_pos = pos
-    while next_pos < end and masked[next_pos] in _SPACE:
-        next_pos += 1
+    next_pos = _match_end(_SPACES, masked, pos, end)
     if pos < next_pos < end:
         unit_end = _end_of_word(masked, next_pos, end)
         if unit_end > next_pos and masked[next_pos:unit_end].lower() in _UNITS:
@@ -423,17 +456,21 @@ def count_words(masked: str, start: int = 0, end: int | None = None) -> int:
     end = len(masked) if end is None else end
     count = 0
     pos = start
-    while pos < end:
-        group_end = _group_end(masked, pos, end)
-        if group_end > pos:
-            count += 1
-            pos = group_end
+    while match := _COUNT_START.search(masked, pos, end):
+        pos = match.start()
+        if masked[pos] in '("“':
+            group_end = _group_end(masked, pos, end)
+            if group_end > pos:
+                count += 1
+                pos = group_end
+            else:
+                pos += 1
             continue
-        if not _is_word(masked[pos]):
+        pos, stop = _word_span(masked, match, end)
+        if stop == pos:
             pos += 1
             continue
-        start_word = pos
-        pos = _quantity_end(masked, start_word, _end_of_word(masked, pos, end), end)
+        pos = _quantity_end(masked, pos, stop, end)
         count += 1
     return count
 
@@ -490,10 +527,8 @@ def _sentences(doc: Document, block: _Block, number: int) -> list[Sentence]:
     def flush(stop: int) -> None:
         nonlocal segment_start
         left, right = segment_start, stop
-        while left < right and masked[left] in _SPACE:
-            left += 1
-        while right > left and masked[right - 1] in _SPACE:
-            right -= 1
+        left = _match_end(_SPACES, masked, left, right)
+        right = left + len(masked[left:right].rstrip(_SPACE))
         tokens = tokenize(masked, left, right)
         if tokens:
             out.append(
@@ -512,9 +547,10 @@ def _sentences(doc: Document, block: _Block, number: int) -> list[Sentence]:
             )
         segment_start = stop
 
+    candidate = _LIST_PUNCTUATION if block.kind == "list-item" else _PUNCTUATION
     pos = start
-    while pos < end:
-        stop, boundary = _sentence_boundary(doc, block, segment_start, pos, end)
+    while match := candidate.search(masked, pos, end):
+        stop, boundary = _sentence_boundary(doc, block, segment_start, match.start(), end)
         if boundary:
             flush(stop)
         pos = stop
