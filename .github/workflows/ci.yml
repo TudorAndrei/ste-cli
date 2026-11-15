@@ -20,19 +20,18 @@ jobs:
           python-version: "3.14"
           enable-cache: true
 
+      # CI has no spaCy. The eval skips the fixtures that need the analyzer,
+      # and the pre-push hook runs them (mise run pre-push).
       - name: Install dependencies
-        run: uv sync --locked --extra nlp
-
-      - name: Install the English model
-        run: uv run --locked --extra nlp python -m spacy download en_core_web_sm
+        run: uv sync --locked
 
       - name: Check
         run: |
-          uv run --locked --extra nlp ruff format --check .
-          uv run --locked --extra nlp ruff check .
-          uv run --locked --extra nlp ty check
-          uv run --locked --extra nlp vulture
-          uv run --locked --extra nlp pytest
-          uv run --locked --extra nlp ste eval --fail-under 1.0 testdata
-          uv run --locked --extra nlp ste lint README.md AGENTS.md docs/ skill/
+          uv run --locked ruff format --check .
+          uv run --locked ruff check .
+          uv run --locked ty check
+          uv run --locked vulture
+          uv run --locked pytest
+          uv run --locked ste eval --fail-under 1.0 testdata
+          uv run --locked ste lint README.md AGENTS.md docs/ skill/
           uv build
