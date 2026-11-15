@@ -1,5 +1,4 @@
 [tools]
-python = "3.14"
 uv = "0.13.8"
 
 [tasks.sync]
@@ -44,7 +43,15 @@ depends = ["fmt-check", "lint", "typecheck", "dead-code", "test"]
 
 [tasks.ci]
 description = "Run all checks without a change to a source file"
-depends = ["fmt-check", "lint", "typecheck", "dead-code", "test", "eval", "lint-docs"]
+depends = [
+  "fmt-check",
+  "lint",
+  "typecheck",
+  "dead-code",
+  "test",
+  "eval",
+  "lint-docs",
+]
 
 [tasks.build]
 description = "Build the Python wheel and source archive"
