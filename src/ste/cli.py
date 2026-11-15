@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
 import subprocess
 import sys
 from collections.abc import Mapping
-from dataclasses import dataclass
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
-from typing import Never, TextIO
+from typing import Annotated, TextIO
+
+import typer
+from typer._click.core import Context, ParameterSource
+from typer.core import TyperCommand, TyperGroup, TyperOption
 
 from ste import __version__, analyzer, baseline, config, dictionary, evaluation, report
 from ste.checker import lint_document
@@ -20,22 +25,6 @@ from ste.document import parse
 from ste.models import Options
 
 STDIN_NAME = "(standard input)"
-USAGE = """ste finds ASD-STE100 violations in Markdown and plain text.
-
-Usage:
-  ste lint [flags] [path ...]   Check files, directories, or standard input
-  ste baseline [flags] [path]   Accept the findings of today
-  ste init [--dry-run]          Write a start config, .ste.yml
-  ste analyzer                 Show the grammar analyzer and what it needs
-  ste dict <command>           Manage a local dictionary index
-  ste eval [flags] <dir>       Measure rules against a labeled corpus
-  ste schema                   Print the command interface as JSON
-  ste version                  Print the version
-
-Findings alone do not change the exit code. Give --fail-on-new,
---warnings-as-errors, or --fail-over to use a gate.
-Run ste lint --help for all flags.
-"""
 STARTER_CONFIG = """# The config of ste. Each key is optional. Run "ste schema" for all keys.
 
 mode: flavored          # or strict: also report the low-confidence findings
@@ -84,49 +73,124 @@ GENERATED_FILES = {
 }
 
 
-class Parser(argparse.ArgumentParser):
-    output: TextIO
-
-    def print_help(self, file=None) -> None:
-        super().print_help(file or self.output)
-
-    def error(self, message: str) -> Never:
-        raise ValueError(message)
-
-
-def _bool(text: str) -> bool:
-    if text.lower() in ("true", "1", "t"):
-        return True
-    if text.lower() in ("false", "0", "f"):
-        return False
-    raise ValueError(f"invalid boolean: {text}")
-
-
-def _parse(parser: Parser, args: list[str], stdout: TextIO) -> argparse.Namespace:
-    parser.output = stdout
-    # pflag accepts --flag=false while a bare boolean flag consumes no word.
-    converted = []
-    bools: dict[str, bool] = {}
-    options_done = False
-    for arg in args:
-        if arg == "--":
-            options_done = True
+def _boolean_args(params, ctx: Context, args: list[str], group: bool = False):
+    """Keep explicit boolean values while Typer reads all other arguments."""
+    options = {
+        name: param for param in params if isinstance(param, TyperOption) for name in param.opts
+    }
+    converted: list[str] = []
+    values: dict[str, bool] = {}
+    at = 0
+    while at < len(args):
+        arg = args[at]
+        if arg == "--" or (group and not arg.startswith("-")):
+            converted.extend(args[at:])
+            break
         name, sep, value = arg.partition("=")
-        action = parser._option_string_actions.get(name)
-        if not options_done and isinstance(action, argparse._StoreTrueAction):
-            bools[action.dest] = _bool(value) if sep else True
+        option = options.get(name)
+        if option is not None and option.is_bool_flag and not option.is_eager:
+            if option.name is not None:
+                if sep and value.lower() not in {"true", "false", "1", "0", "t", "f"}:
+                    raise typer.BadParameter(f"invalid boolean: {value}", ctx=ctx, param=option)
+                values[option.name] = not sep or value.lower() in {"true", "1", "t"}
         else:
             converted.append(arg)
-    result = parser.parse_intermixed_args(converted)
-    for name, value in bools.items():
-        setattr(result, name, value)
-    return result
+            # An option value can look like a flag. Leave it for Typer to read.
+            if option is not None and not option.is_flag and not sep and at + 1 < len(args):
+                at += 1
+                converted.append(args[at])
+        at += 1
+    return converted, values
 
 
-def _parser(command: str, formats: tuple[str, ...] = ("text", "json")) -> Parser:
-    parser = Parser(prog=f"ste {command}", allow_abbrev=False)
-    parser.add_argument("--format", default="text", choices=formats)
-    return parser
+def _set_booleans(ctx: Context, values: dict[str, bool]) -> None:
+    for name, value in values.items():
+        ctx.params[name] = value
+        ctx.set_parameter_source(name, ParameterSource.COMMANDLINE)
+
+
+class SteCommand(TyperCommand):
+    """Accept the existing --flag=true and --flag=false forms."""
+
+    def parse_args(self, ctx: Context, args: list[str]) -> list[str]:
+        converted, values = _boolean_args(self.params, ctx, args)
+        rest = super().parse_args(ctx, converted)
+        _set_booleans(ctx, values)
+        return rest
+
+    def invoke(self, ctx: Context):
+        try:
+            return super().invoke(ctx)
+        except (OSError, ValueError) as err:
+            raise typer.BadParameter(str(err), ctx=ctx) from err
+
+
+class SteGroup(TyperGroup):
+    """Apply the same boolean syntax to options before a subcommand."""
+
+    def parse_args(self, ctx: Context, args: list[str]) -> list[str]:
+        converted, values = _boolean_args(self.params, ctx, args, group=True)
+        rest = super().parse_args(ctx, converted)
+        _set_booleans(ctx, values)
+        return rest
+
+
+class OutputFormat(StrEnum):
+    text = "text"
+    json = "json"
+    ndjson = "ndjson"
+    sarif = "sarif"
+    github = "github"
+
+
+class SimpleFormat(StrEnum):
+    text = "text"
+    json = "json"
+
+
+@dataclass
+class Streams:
+    stdin: TextIO
+    stdout: TextIO
+    stderr: TextIO
+
+
+def streams(ctx: typer.Context) -> Streams:
+    if isinstance(ctx.obj, Streams):
+        return ctx.obj
+    return Streams(sys.stdin, sys.stdout, sys.stderr)
+
+
+@dataclass
+class LintOptions:
+    paths: list[str] = field(default_factory=list)
+    format: str = "text"
+    mode: str = ""
+    fields: str = ""
+    config: str = ""
+    baseline: str = ""
+    dict: str = ""
+    preset: str = ""
+    analyzer: str = ""
+    summary: bool = False
+    no_config: bool = False
+    all: bool = False
+    no_baseline: bool = False
+    fail_on_new: bool = False
+    warnings_as_errors: bool = False
+    use_dict: bool = False
+    analyze: bool = False
+    dry_run: bool = False
+    limit: int = 0
+    max_words: int = 0
+    fail_over: float = -1
+
+
+@dataclass
+class DictOptions:
+    format: str = "text"
+    out: str = ""
+    dry_run: bool = False
 
 
 @dataclass
@@ -276,27 +340,7 @@ def _baseline_key(path: str, file: str) -> str:
     return file if file == STDIN_NAME else relative_to(Path(path).parent, file)
 
 
-def _run_lint(args: list[str], stdin: TextIO, stdout: TextIO, stderr: TextIO, write: bool) -> int:
-    parser = _parser("baseline" if write else "lint", report.FORMATS)
-    for name in ("mode", "fields", "config", "baseline", "dict", "preset", "analyzer"):
-        parser.add_argument("--" + name, default="")
-    for name in (
-        "summary",
-        "no-config",
-        "all",
-        "no-baseline",
-        "fail-on-new",
-        "warnings-as-errors",
-        "use-dict",
-        "analyze",
-        "dry-run",
-    ):
-        parser.add_argument("--" + name, action="store_true")
-    parser.add_argument("--limit", type=int, default=0)
-    parser.add_argument("--max-words", type=int, default=0)
-    parser.add_argument("--fail-over", type=float, default=-1)
-    parser.add_argument("paths", nargs="*")
-    ns = _parse(parser, args, stdout)
+def _run_lint(ns: LintOptions, stdin: TextIO, stdout: TextIO, stderr: TextIO, write: bool) -> int:
     fields = [f.strip() for f in ns.fields.split(",")] if ns.fields else []
     if unknown := set(fields) - set(report.FIELDS):
         raise ValueError(
@@ -471,48 +515,22 @@ def _schema() -> dict:
     return data
 
 
-def _no_args(command: str, args: list[str]) -> None:
-    if args:
-        raise ValueError(f'the {command} command takes no argument, and it got "{args[0]}"')
-
-
-def _run_init(args: list[str], stdout: TextIO) -> int:
-    parser = _parser("init")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--force", action="store_true")
-    parser.add_argument("args", nargs="*")
-    ns = _parse(parser, args, stdout)
-    _no_args("init", ns.args)
+def _run_init(format: str, dry_run: bool, force: bool, stdout: TextIO) -> int:
     path = Path(config.DEFAULT_NAMES[0])
-    if (existing := config.find(".")) and not ns.force:
+    if (existing := config.find(".")) and not force:
         raise ValueError(f"{existing} exists. Give --force to write {path} all the same.")
-    plan = {"action": "init", "dry_run": ns.dry_run, "path": str(path), "exists": path.is_file()}
-    if ns.dry_run:
+    plan = {"action": "init", "dry_run": dry_run, "path": str(path), "exists": path.is_file()}
+    if dry_run:
         text = f"A real run writes {path}.\n"
     else:
         path.write_text(STARTER_CONFIG, encoding="utf-8")
         text = f'{path} holds the start config. Run "ste lint --summary ." to see the size of the problem.\n'
-    _write_plan(stdout, ns.format, plan, text)
+    _write_plan(stdout, format, plan, text)
     return 0
 
 
-def _run_dict(args: list[str], stdout: TextIO) -> int:
-    parser = _parser("dict")
-    parser.add_argument("--out", default="")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("args", nargs="*")
-    ns = _parse(parser, args, stdout)
+def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int:
     path = Path(ns.out or dictionary.default_path())
-    if not ns.args or ns.args[0] not in ("import", "info", "path", "remove"):
-        raise ValueError(
-            'give "ste dict import <file>", "ste dict info", "ste dict path", or "ste dict remove"'
-        )
-    command = ns.args[0]
-    expected = 2 if command == "import" else 1
-    if len(ns.args) > expected:
-        raise ValueError(f'"ste dict {command}" got an extra argument "{ns.args[expected]}"')
-    if len(ns.args) < expected:
-        raise ValueError('give "ste dict import <file>"')
     if command == "path":
         _write_plan(stdout, ns.format, {"path": str(path)}, f"{path}\n")
     elif command == "remove":
@@ -541,7 +559,6 @@ def _run_dict(args: list[str], stdout: TextIO) -> int:
             text = f"index:        {path}\nsource:       {index.source}\nwords:        {stats['words']}\napproved:     {stats['approved']}\nnot approved: {stats['unapproved']}\nalternatives: {stats['alternatives']}\n"
         _write_plan(stdout, ns.format, plan, text)
     else:
-        source = ns.args[1]
         if Path(source).suffix.lower() == ".pdf":
             raise ValueError(
                 f"{source} is a PDF. This tool reads text, thus make the Markdown first:\n  npx -y @firecrawl/anydoc@0.2.4 {source} -o ste100.md\n  ste dict import ste100.md"
@@ -565,11 +582,7 @@ def _run_dict(args: list[str], stdout: TextIO) -> int:
     return 0
 
 
-def _run_analyzer(args: list[str], stdout: TextIO) -> int:
-    parser = _parser("analyzer")
-    parser.add_argument("args", nargs="*")
-    ns = _parse(parser, args, stdout)
-    _no_args("analyzer", ns.args)
+def _run_analyzer(format: str, stdout: TextIO) -> int:
     status = analyzer.check()
     if status["ready"]:
         text = f'The analyzer is ready.\n  python: {status["python"]}\n  script: {status["script"]}\n\nRun "ste lint --analyze docs/" to use it.\nIt makes rule STE-3.6 more exact, and it is never necessary.\n'
@@ -578,66 +591,286 @@ def _run_analyzer(args: list[str], stdout: TextIO) -> int:
         if status["fix"]:
             text += "\nTo make it work:\n" + "".join(f"  {fix}\n" for fix in status["fix"])
         text += "\nThe analyzer is optional. Each rule works without it.\n"
-    _write_plan(stdout, ns.format, status, text)
+    _write_plan(stdout, format, status, text)
     return 0
 
 
-def _run_eval(args: list[str], stdout: TextIO, stderr: TextIO) -> int:
-    parser = _parser("eval")
-    parser.add_argument("--fail-under", type=float, default=-1)
-    parser.add_argument("args", nargs="*")
-    ns = _parse(parser, args, stdout)
-    if len(ns.args) > 1:
-        raise ValueError(f"the eval command takes one directory, and it got {len(ns.args)}")
-    data = evaluation.run(ns.args[0] if ns.args else "testdata")
-    if ns.format == "json":
+def _run_eval(
+    directory: str, format: str, fail_under: float, stdout: TextIO, stderr: TextIO
+) -> int:
+    data = evaluation.run(directory)
+    if format == "json":
         stdout.write(json.dumps(data, indent=2) + "\n")
     else:
         evaluation.write_text(stdout, data)
     totals = data["totals"]
-    if ns.fail_under >= 0 and (
-        totals["precision"] < ns.fail_under or totals["recall"] < ns.fail_under
-    ):
+    if fail_under >= 0 and (totals["precision"] < fail_under or totals["recall"] < fail_under):
         stderr.write(
-            f"ste: precision {totals['precision']:.2f} and recall {totals['recall']:.2f}, and the limit is {ns.fail_under:.2f}\n"
+            f"ste: precision {totals['precision']:.2f} and recall {totals['recall']:.2f}, and the limit is {fail_under:.2f}\n"
         )
         return 1
     return 0
 
 
+app = typer.Typer(
+    name="ste",
+    help="Find ASD-STE100 violations in Markdown and plain text.",
+    add_completion=False,
+    no_args_is_help=True,
+    pretty_exceptions_enable=False,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+dict_app = typer.Typer(
+    cls=SteGroup,
+    help="Manage a local dictionary index.",
+    no_args_is_help=True,
+    pretty_exceptions_enable=False,
+)
+app.add_typer(dict_app, name="dict")
+
+
+def _version_option(value: bool) -> None:
+    if value:
+        typer.echo(f"ste {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def root(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version", "-v", callback=_version_option, is_eager=True, help="Print the version."
+        ),
+    ] = False,
+) -> None:
+    """Findings alone do not change the exit code. Give a gate to fail a run."""
+
+
+@app.command("lint", cls=SteCommand, help="Check files, directories, or standard input.")
+@app.command("baseline", cls=SteCommand, help="Accept the findings of today.")
+def lint_command(
+    ctx: typer.Context,
+    paths: Annotated[
+        list[str] | None, typer.Argument(help="Files, directories, or - for standard input.")
+    ] = None,
+    format: Annotated[
+        OutputFormat, typer.Option("--format", help="Output format.")
+    ] = OutputFormat.text,
+    mode: Annotated[str, typer.Option("--mode", help="flavored or strict.")] = "",
+    fields: Annotated[
+        str, typer.Option("--fields", help="Finding fields separated by a comma.")
+    ] = "",
+    config: Annotated[str, typer.Option("--config", help="Path of the configuration file.")] = "",
+    baseline: Annotated[
+        str, typer.Option("--baseline", help="Path of the accepted findings.")
+    ] = "",
+    dictionary: Annotated[str, typer.Option("--dict", help="Path of the dictionary index.")] = "",
+    preset: Annotated[
+        str, typer.Option("--preset", help="Technical nouns of a subject field.")
+    ] = "",
+    analyzer: Annotated[
+        str, typer.Option("--analyzer", help="Command of a different analyzer.")
+    ] = "",
+    summary: Annotated[bool, typer.Option("--summary", help="Give only the summary.")] = False,
+    no_config: Annotated[
+        bool, typer.Option("--no-config", help="Do not read a configuration file.")
+    ] = False,
+    all: Annotated[bool, typer.Option("--all", help="Read files that git ignores.")] = False,
+    no_baseline: Annotated[
+        bool, typer.Option("--no-baseline", help="Report all findings.")
+    ] = False,
+    fail_on_new: Annotated[
+        bool, typer.Option("--fail-on-new", help="Exit 1 for a new finding.")
+    ] = False,
+    warnings_as_errors: Annotated[
+        bool, typer.Option("--warnings-as-errors", help="Make warnings errors.")
+    ] = False,
+    use_dict: Annotated[
+        bool, typer.Option("--use-dict", help="Use the imported dictionary.")
+    ] = False,
+    analyze: Annotated[bool, typer.Option("--analyze", help="Use the grammar analyzer.")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the baseline plan without writing.")
+    ] = False,
+    limit: Annotated[
+        int, typer.Option("--limit", min=0, help="Maximum findings to show. 0 gives all.")
+    ] = 0,
+    max_words: Annotated[
+        int, typer.Option("--max-words", min=0, help="Replace the sentence word limit.")
+    ] = 0,
+    fail_over: Annotated[
+        float, typer.Option("--fail-over", help="Maximum findings for each 100 words.")
+    ] = -1,
+) -> None:
+    io = streams(ctx)
+    opts = LintOptions(
+        paths=paths or [],
+        format=format.value,
+        mode=mode,
+        fields=fields,
+        config=config,
+        baseline=baseline,
+        dict=dictionary,
+        preset=preset,
+        analyzer=analyzer,
+        summary=summary,
+        no_config=no_config,
+        all=all,
+        no_baseline=no_baseline,
+        fail_on_new=fail_on_new,
+        warnings_as_errors=warnings_as_errors,
+        use_dict=use_dict,
+        analyze=analyze,
+        dry_run=dry_run,
+        limit=limit,
+        max_words=max_words,
+        fail_over=fail_over,
+    )
+    raise typer.Exit(_run_lint(opts, io.stdin, io.stdout, io.stderr, ctx.info_name == "baseline"))
+
+
+@app.command("init", cls=SteCommand)
+def init_command(
+    ctx: typer.Context,
+    format: Annotated[
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the plan without writing.")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Replace an existing configuration.")
+    ] = False,
+) -> None:
+    """Write a start configuration in .ste.yml."""
+    raise typer.Exit(_run_init(format.value, dry_run, force, streams(ctx).stdout))
+
+
+@app.command("analyzer", cls=SteCommand)
+def analyzer_command(
+    ctx: typer.Context,
+    format: Annotated[
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
+) -> None:
+    """Show the grammar analyzer and what it needs."""
+    raise typer.Exit(_run_analyzer(format.value, streams(ctx).stdout))
+
+
+@app.command("eval", cls=SteCommand)
+def eval_command(
+    ctx: typer.Context,
+    directory: Annotated[str, typer.Argument(help="Directory of the labeled corpus.")] = "testdata",
+    format: Annotated[
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
+    fail_under: Annotated[
+        float, typer.Option("--fail-under", help="Minimum precision and recall.")
+    ] = -1,
+) -> None:
+    """Measure rules against a labeled corpus."""
+    io = streams(ctx)
+    raise typer.Exit(_run_eval(directory, format.value, fail_under, io.stdout, io.stderr))
+
+
+@app.command("schema", cls=SteCommand)
+def schema_command(ctx: typer.Context) -> None:
+    """Print the command interface as JSON."""
+    streams(ctx).stdout.write(json.dumps(_schema(), indent=2) + "\n")
+
+
+@app.command("version", cls=SteCommand)
+def version_command(ctx: typer.Context) -> None:
+    """Print the version."""
+    streams(ctx).stdout.write(f"ste {__version__}\n")
+
+
+@app.command("help", hidden=True)
+def help_command(ctx: typer.Context) -> None:
+    """Show the command help."""
+    assert ctx.parent is not None
+    streams(ctx).stdout.write(ctx.parent.get_help() + "\n")
+
+
+@dict_app.callback()
+def dictionary_group(
+    ctx: typer.Context,
+    format: Annotated[
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
+    out: Annotated[str, typer.Option("--out", help="Path of the dictionary index.")] = "",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the plan without a change.")
+    ] = False,
+) -> None:
+    ctx.meta["dictionary_options"] = DictOptions(format.value, out, dry_run)
+
+
+def _dict_options(ctx: typer.Context, format: SimpleFormat, out: str, dry_run: bool) -> DictOptions:
+    options = ctx.meta.get("dictionary_options", DictOptions())
+    changes: dict[str, object] = {}
+    for name, value in (("format", format.value), ("out", out), ("dry_run", dry_run)):
+        if ctx.get_parameter_source(name) == ParameterSource.COMMANDLINE:
+            changes[name] = value
+    return replace(options, **changes)
+
+
+@dict_app.command("import", cls=SteCommand)
+def dict_import(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="The user's dictionary in Markdown or plain text.")],
+    format: Annotated[
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
+    out: Annotated[str, typer.Option("--out", help="Path of the dictionary index.")] = "",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the plan without writing.")
+    ] = False,
+) -> None:
+    """Read the user's dictionary and write an index."""
+    raise typer.Exit(
+        _run_dict("import", source, _dict_options(ctx, format, out, dry_run), streams(ctx).stdout)
+    )
+
+
+@dict_app.command("path", cls=SteCommand, help="Print the path of the index.")
+@dict_app.command("info", cls=SteCommand, help="Show the index of this user.")
+@dict_app.command("remove", cls=SteCommand, help="Delete the index.")
+def dict_status(
+    ctx: typer.Context,
+    format: Annotated[
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
+    out: Annotated[str, typer.Option("--out", help="Path of the dictionary index.")] = "",
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the plan without a change.")
+    ] = False,
+) -> None:
+    assert ctx.info_name is not None
+    raise typer.Exit(
+        _run_dict(ctx.info_name, "", _dict_options(ctx, format, out, dry_run), streams(ctx).stdout)
+    )
+
+
 def run(args: list[str], stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
-    if not args:
-        stderr.write(USAGE)
-        return 2
-    command, rest = args[0], args[1:]
     try:
-        if command in ("help", "--help", "-h"):
-            stdout.write(USAGE)
-            return 0
-        if command in ("version", "--version", "-v"):
-            _no_args("version", rest)
-            stdout.write(f"ste {__version__}\n")
-            return 0
-        if command == "schema":
-            _no_args("schema", rest)
-            stdout.write(json.dumps(_schema(), indent=2) + "\n")
-            return 0
-        if command in ("lint", "baseline"):
-            return _run_lint(rest, stdin, stdout, stderr, command == "baseline")
-        if command == "init":
-            return _run_init(rest, stdout)
-        if command == "dict":
-            return _run_dict(rest, stdout)
-        if command == "analyzer":
-            return _run_analyzer(rest, stdout)
-        if command == "eval":
-            return _run_eval(rest, stdout, stderr)
-        raise ValueError(f'"{command}" is not a command\n\n{USAGE}')
-    except (OSError, ValueError, UnicodeError) as err:
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            result = app(
+                args=args,
+                prog_name="ste",
+                standalone_mode=False,
+                obj=Streams(stdin, stdout, stderr),
+            )
+        return int(result or 0)
+    except typer.TyperException as err:
+        stderr.write(f"ste: {err.format_message()}\n")
+        return err.exit_code
+    except (OSError, ValueError) as err:
         stderr.write(f"ste: {err}\n")
         return 2
-    except SystemExit as err:
-        return int(err.code or 0)
+    except typer.Exit as err:
+        return err.exit_code
 
 
 def main() -> int:

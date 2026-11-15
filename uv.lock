@@ -1386,6 +1386,7 @@ dependencies = [
     { name = "markdown-it-py" },
     { name = "platformdirs" },
     { name = "pyyaml" },
+    { name = "typer" },
 ]
 
 [package.optional-dependencies]
@@ -1406,6 +1407,7 @@ requires-dist = [
     { name = "platformdirs", specifier = ">=4.3,<5" },
     { name = "pyyaml", specifier = ">=6.0,<7" },
     { name = "spacy", marker = "extra == 'nlp'", specifier = ">=3.8,<4" },
+    { name = "typer", specifier = ">=0.29.1,<0.30" },
 ]
 provides-extras = ["nlp"]
 

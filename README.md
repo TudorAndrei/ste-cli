@@ -428,6 +428,7 @@ and its limits. The numbers are the rule numbers of Issue 9.
 
 - The markdown-it-py library reads CommonMark, tables, and strikethrough text.
 - PyYAML reads the configuration.
+- Typer reads the commands and flags, and supplies command help.
 - The platformdirs library gives the data directory of the user.
 - The spaCy library supplies optional grammar analysis.
 

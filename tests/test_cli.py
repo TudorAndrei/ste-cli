@@ -279,5 +279,29 @@ def test_boolean_flags_use_last_value_and_reject_bad_values(flags, expected):
 def test_command_help_uses_output_stream(command):
     code, output, error = cli(command, "--help")
     assert code == 0
-    assert f"usage: ste {command}" in output
+    assert f"usage: ste {command}" in output.lower()
     assert not error
+
+
+@pytest.mark.parametrize(
+    "args, dry_run",
+    [
+        (["--dry-run=true", "--format=json", "remove"], True),
+        (["--dry-run", "remove", "--dry-run=false", "--format=json"], False),
+        (["--format=json", "path"], None),
+    ],
+)
+def test_dictionary_options_before_and_after_subcommand(tmp_path, args, dry_run):
+    from typer.testing import CliRunner
+
+    from ste.cli import app
+
+    path = tmp_path / "dictionary.json"
+    path.write_text('{"version":1,"source":"fixture","words":[]}')
+    result = CliRunner().invoke(app, ["dict", "--out", str(path), *args])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["path"] == str(path)
+    if dry_run is not None:
+        assert data["dry_run"] is dry_run
+        assert path.exists() is dry_run
