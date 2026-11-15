@@ -65,7 +65,7 @@ column "Needs" gives what that part needs:
 |---|---|---|---|---|
 | 1.1 | An approved word | 38 terms. With `--use-dict`, each word of the dictionary. | Is a word that the dictionary does not give a technical noun or a technical verb? | Reader |
 | 1.2 | The approved part of speech | `STE-1.2`, with `--use-dict` and the analyzer, with the `info` severity | A word that the tagger or the lemmatizer reads incorrectly. A noun and an adjective. | Tagger |
-| 1.4 | The approved forms of an adjective | `STE-1.4`, with `--use-dict`, the analyzer, and an index with the forms | A form that the lemmatizer reads incorrectly, and an entry with no forms | Tagger, dictionary |
+| 1.4 | The approved forms of an adjective | `STE-1.4`, with `--use-dict`, the analyzer, and an index with the forms. A regular ending finds the headword when the lemma is wrong. | An irregular form that the lemmatizer reads incorrectly, and an entry with no forms | Tagger, dictionary |
 | 1.6 | An unapproved word as a technical noun | With `--use-dict`, `STE-1.1` says when the dictionary permits a word as a technical noun. `allow.nouns` permits a word. | Does the word have a category of technical nouns? | Reader |
 | 1.7 | A technical noun as a verb | `STE-1.7`, with the analyzer. It reads the one-word nouns of `allow.nouns`. | A technical noun of many words. The nouns of the software preset do not count. | Tagger |
 | 1.8 | The technical nouns of the company | `STE-1.11` reports a different name that `prefer` gives. | A name that the config does not give | Reader |
@@ -73,7 +73,7 @@ column "Needs" gives what that part needs:
 | 1.11 | Two names for the same item | `STE-1.11` reads `prefer`. | Two names that the config does not give | Reader |
 | 1.13 | A technical verb as a noun | `STE-1.13`, with the analyzer. It reads the one-word verbs of `allow.verbs`. | A technical verb of many words | Tagger |
 | 1.14 | American spelling | `STE-1.14` reports 54 British spellings. With the analyzer, it also reports a spelling that changes with the part of speech, such as "licence". | A British spelling in a word with a capital letter, such as a title | Reader |
-| 3.1 | The verb forms of the dictionary | `STE-3.1`, with `--use-dict`, the analyzer, and an index with the forms | A form that the lemmatizer reads incorrectly, and an entry with no forms | Tagger, dictionary |
+| 3.1 | The verb forms of the dictionary | `STE-3.1`, with `--use-dict`, the analyzer, and an index with the forms. A regular ending finds the headword when the lemma is wrong. | An irregular form that the lemmatizer reads incorrectly, and an entry with no forms | Tagger, dictionary |
 | 3.3 | A past participle as an adjective | `STE-3.3`, with the analyzer. It reports a participle that is the verb of a short clause, with the `info` severity. | A participle after a noun when the parser gives no clause. Does the dictionary approve the participle as an adjective? | Tagger, dictionary |
 | 3.4 | No auxiliary verb for a complex construction | `STE-3.4` reports "have" and a participle, and "is to be" and a participle. `STE-3.6` reports `can be adjusted`. | "have to" and "need to". The meaning of these words is a question of rule 1.3. | Reader |
 | 3.6 | The active voice | `STE-3.6` reports each passive verb. | The standard permits the passive in descriptive text when the agent is not known. | Reader |

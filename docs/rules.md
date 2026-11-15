@@ -769,8 +769,13 @@ number of forms.
 **Limits.**
 
 - The rule checks only an entry that gives one or more forms.
-- The analyzer must give the correct lemma. For a word that it does not
-  know, the lemma can be wrong, and then the rule gives no finding.
+- For a word that the analyzer does not know, the lemma can be wrong. For
+  example, it can give "zorpe" for "zorped". When the lemma has no entry,
+  the rule removes a regular ending to find the headword: "-ed", "-d",
+  "-s", and "-es" for a verb, and "-er" and "-est" for an adjective. It also
+  removes a double consonant ("klapped" gives "klap"), and it changes "i"
+  to "y" ("flimbier" gives "flimby"). An irregular form that the analyzer
+  does not know gives no finding.
 - A word that is a headword or a listed form of a different entry does not
   get a finding.
 - A word with a hyphen or a digit, and a word with a capital letter after

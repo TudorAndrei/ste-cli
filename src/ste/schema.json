@@ -636,7 +636,7 @@
       "confidence": [
         0.8
       ],
-      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It reads a comparative or a superlative adjective."
+      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It reads a comparative or a superlative adjective. When the lemma has no entry, the rules of a regular form find the headword."
     },
     {
       "id": "STE-3.1",
@@ -646,7 +646,7 @@
       "confidence": [
         0.8
       ],
-      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It also applies rule 1.4 to a verb. STE-3.5 reports an -ing form."
+      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It also applies rule 1.4 to a verb. STE-3.5 reports an -ing form. When the lemma has no entry, the rules of a regular form find the headword."
     },
     {
       "id": "STE-8.2",

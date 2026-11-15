@@ -26,6 +26,11 @@ POS_CONFIDENCE = 0.7
 # A shorter sentence is usually a fragment, such as a label.
 MIN_WORDS = 3
 FORM_CONFIDENCE = 0.8
+# The endings of a regular form, the longest first.
+_VERB_SUFFIXES = ("ed", "es", "d", "s")
+_ADJECTIVE_SUFFIXES = ("est", "er")
+# A shorter stem is usually not a headword, such as "b" from "bed".
+_MIN_STEM = 2
 
 
 def _quoted(words: Sequence[str]) -> str:
@@ -110,23 +115,45 @@ def part_of_speech(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
+def _stems(word: str, suffixes: Sequence[str]) -> list[str]:
+    """Get the possible headwords of a regular form, such as "klap" for "klapped"."""
+    out = []
+    for suffix in suffixes:
+        stem = word.removesuffix(suffix)
+        if stem == word or len(stem) < _MIN_STEM:
+            continue
+        # "gribbled" is "gribble" and "-d". "flimbier" is "flimby" and "-er".
+        out.extend([stem, stem + "e"])
+        if stem.endswith("i"):
+            out.append(stem[:-1] + "y")
+        # "klapped" is "klap" with a double consonant and "-ed".
+        if len(stem) > _MIN_STEM and stem[-1] == stem[-2] and stem[-1] not in "aeiou":
+            out.append(stem[:-1])
+    return list(dict.fromkeys(out))
+
+
 def _unlisted_form(dictionary: Dictionary, t: Token) -> tuple[str, WordEntry] | None:
     """Get the rule and the entry when the word is a form that the entry does not give."""
     if t.pos == "VERB" and t.tag != "VBG":
-        rule, code = "STE-3.1", "v"
+        rule, code, suffixes = "STE-3.1", "v", _VERB_SUFFIXES
     elif t.pos == "ADJ" and t.tag in _ADJECTIVE_FORMS:
-        rule, code = "STE-1.4", "adj"
+        rule, code, suffixes = "STE-1.4", "adj", _ADJECTIVE_SUFFIXES
     else:
         return None
-    lemma = t.lemma.lower()
-    if not lemma or lemma == t.lower:
-        return None
-    entries = [e for e in dictionary.lookup(lemma) if e.approved and e.pos == code and e.forms]
-    if not entries or dictionary.lookup(t.lower) or dictionary.by_form(t.lower):
+    if dictionary.lookup(t.lower) or dictionary.by_form(t.lower):
         # The word is a headword or a listed form of some entry. Rule STE-1.1
         # reports an unapproved headword.
         return None
-    return rule, entries[0]
+    # The lemmatizer can give a wrong lemma for a word that it does not know,
+    # such as "zorpe" for "zorped". Then the rules of a regular form find the
+    # headword.
+    lemma = t.lemma.lower()
+    candidates = [lemma] if lemma and lemma != t.lower else []
+    for word in [*candidates, *_stems(t.lower, suffixes)]:
+        entries = [e for e in dictionary.lookup(word) if e.approved and e.pos == code and e.forms]
+        if entries:
+            return rule, entries[0]
+    return None
 
 
 def word_forms(doc: Document, opts: Options) -> list[Diagnostic]:

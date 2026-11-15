@@ -23,6 +23,9 @@ DICTIONARY = """## Part 2 - Dictionary
 |PLONK (n)|A plate|
 |SKREE (v)|To cut|
 |AFTER (prep)|Later than|
+|BLORK (v), BLORKS|To push|
+|KLAP (v), KLAPS|To hit|
+|FLIMBY (adj), FLIMBIER|Soft|
 """
 
 GRAMMAR: Grammar = {
@@ -166,6 +169,27 @@ GRAMMAR: Grammar = {
         "./PUNCT/./punct/3",
     ],
 }
+# The lemmatizer gives a wrong lemma for a word that it does not know.
+for _text, _word, _tag, _lemma in (
+    ("The man blorked the plonk.", "blorked/VERB/VBD", "ROOT/", "blorke"),
+    ("The man klapped the plonk.", "klapped/VERB/VBD", "ROOT/", "klappe"),
+    ("The man zorped the plonk.", "zorped/VERB/VBD", "ROOT/", "zorpe"),
+):
+    GRAMMAR[_text] = [
+        "The/DET/DT/det/1",
+        "man/NOUN/NN/nsubj/2",
+        f"{_word}/{_tag}/{_lemma}",
+        "the/DET/DT/det/4",
+        "plonk/NOUN/NN/dobj/2/plonk",
+        "./PUNCT/./punct/2",
+    ]
+GRAMMAR["The plonk is flimbiest."] = [
+    "The/DET/DT/det/1",
+    "plonk/NOUN/NN/nsubj/2/plonk",
+    "is/AUX/VBZ/ROOT//be",
+    "flimbiest/ADJ/JJS/acomp/2/flimbiest",
+    "./PUNCT/./punct/2",
+]
 INDEX = parse(DICTIONARY)
 
 
@@ -218,6 +242,10 @@ def test_part_of_speech_gives_the_alternatives() -> None:
         ("The plonk is wibblyest.", [("STE-1.4", "wibblyest")]),
         ("The man has re-gribbelt the plonk.", []),
         ("The man gribbled the plonk after the zorped frammis.", []),
+        ("The man blorked the plonk.", [("STE-3.1", "blorked")]),
+        ("The man klapped the plonk.", [("STE-3.1", "klapped")]),
+        ("The man zorped the plonk.", []),
+        ("The plonk is flimbiest.", [("STE-1.4", "flimbiest")]),
     ],
 )
 def test_forms(text: str, want: list[tuple[str, str]]) -> None:
