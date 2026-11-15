@@ -5,7 +5,7 @@ description: Review documentation against the ASD-STE100 rules that a determinis
 
 # ste-review
 
-ASD-STE100 has 53 writing rules. The `ste` command checks 30 of them, in
+ASD-STE100 has 53 writing rules. The `ste` command checks 39 of them, in
 full or in part, because they have a mechanical answer. This skill covers the rules that
 have no mechanical answer: they need a reader who understands the text.
 
@@ -19,8 +19,14 @@ you see, give the rule number, and let the writer decide.
 ste lint --format json --limit 20 <path>
 ```
 
-Each finding of that command is a mechanical rule: punctuation, sentence
-length, the passive voice, a contraction, a phrasal verb, an unapproved word.
+When `ste analyzer` says that the analyzer can run, add `--analyze`. Then
+the command also checks the grammar. It reads the commands of a step, the
+start of a note and of a warning, a participle, an omitted article, and a
+hyphen.
+
+Each finding of that command is for a mechanical rule. Examples are
+punctuation, sentence length, the passive voice, a verb tense, a
+contraction, a phrasal verb, and an unapproved word.
 **Do not repeat that work, and do not disagree with it.** If a finding looks
 wrong, the answer is a config change (`rules:`, `allow.nouns:`, `exclude:`) or
 a comment in the text (`<!-- ste-disable-next-line -->`), and not a rewrite.
@@ -37,6 +43,9 @@ Then read the text yourself for the rules below.
 - **6.2 Give a logical structure with key words.** Does each paragraph start
   with its subject? A reader who reads only the first sentence of each
   paragraph must get the shape of the whole text.
+- **6.4 Paragraphs for related information.** Two paragraphs that tell of
+  the same subject can become one. Information that is not related must
+  not share a paragraph.
 - **6.5 One topic for each paragraph.** Find a paragraph that changes its
   subject in the middle. Propose the place to divide it.
 
@@ -60,7 +69,7 @@ Then read the text yourself for the rules below.
 - **9.2 Use each approved word correctly.** An approved word in the wrong
   place is still wrong.
 - **9.4 A consistent style.** The same action must have the same words in each
-  place: "Remove the panel" and not "Take the panel off" three lines later.
+  place: "Remove the panel" and not "Take the panel off" three lines later. <!-- ste-disable-line STE-9.3 -->
 
 ### The sentences
 
@@ -75,9 +84,27 @@ Then read the text yourself for the rules below.
 - **4.5 Articles.** An article ("the", "a") is necessary before most nouns.
   The standard permits no article in a general statement. Judge which one the
   sentence is.
+- **8.3 Parentheses.** The standard permits parentheses for a small number
+  of uses only. Judge if the text in parentheses is one of them. If it is
+  not, propose a separate sentence.
 - **9.1 A different sentence construction.** When an approved word does not
   fit, the answer is a new sentence, and not a strange word. Look for a
   sentence that obeys each mechanical rule and is still difficult.
+
+### The reader part of a checked rule
+
+The command checks a part of these rules. Read the text for the other part.
+
+- **3.4 "have to" and "need to".** The command does not report them. Judge
+  if the sentence gives an obligation, and propose "must".
+- **4.1 A clear sentence.** The command measures the length. Judge if a
+  short sentence is still unclear.
+- **5.2, 5.3, 5.4 An instruction.** The command reads only a numbered step.
+  Find an instruction in a paragraph or in a bulleted list. It must be a
+  command, it must give one action, and its condition must come first.
+- **7.1, 7.2, 7.3 A safety instruction.** The command reads only a block
+  with a label. Find a risk in text that has no label. Judge if a warning
+  tells of a risk to a person.
 
 ## Step 3: report
 
@@ -117,5 +144,6 @@ docs/guide.md:42  6.5  The paragraph starts with the cache and ends with
 | A contraction, a phrasal verb | One name for each thing |
 | An unapproved word, a British spelling | The correct meaning of a word |
 | The count of words in a paragraph | If a term is a technical noun |
+| A numbered step, a note, a labeled warning | An instruction or a risk in other text |
 
 The command gives a number. You give a judgment. A reader needs both.
