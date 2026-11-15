@@ -45,10 +45,10 @@ The expectation file can also give settings for its fixture:
 | `STE-1.4` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.7` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.9` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-2.1` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.11` | 3 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.13` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.14` | 4 | 0 | 0 | 1.00 | 1.00 |
+| `STE-2.1` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.1` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.2` | 7 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.3` | 2 | 0 | 0 | 1.00 | 1.00 |
@@ -69,9 +69,9 @@ The expectation file can also give settings for its fixture:
 | `STE-7.3` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-8.1` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-8.2` | 3 | 0 | 0 | 1.00 | 1.00 |
-| `STE-9.3` | 6 | 0 | 0 | 1.00 | 1.00 |
+| `STE-9.3` | 8 | 0 | 0 | 1.00 | 1.00 |
 | `STE-GR-6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| **all** | **73** | **0** | **0** | **1.00** | **1.00** |
+| **all** | **75** | **0** | **0** | **1.00** | **1.00** |
 
 The table comes from a run with the analyzer, on 25 fixture files: 10 valid
 and 15 invalid. Each rule in the table has at least one labeled example. The fixtures
@@ -254,7 +254,7 @@ each rule, and the directives in the text give a team a way to start.
 
 ## 5. Known limits of the measurement
 
-- The corpus is small. It has 25 files and 73 labeled findings.
+- The corpus is small. It has 25 files and 75 labeled findings.
 - The unlabeled documents are all software documentation in English. Nobody
   measured the tool on aircraft maintenance procedures, which is the first
   purpose of ASD-STE100.
