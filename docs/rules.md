@@ -28,7 +28,7 @@ severity, and strict mode does not make it an error.
 | `STE-3.5` | Progressive "-ing" form | 0.90 | warning |
 | `STE-3.6` | Passive voice | 0.95, 0.85, or 0.70 | warning |
 | `STE-3.7` | A noun for an action | 0.90, or 0.85 | warning |
-| `STE-4.2` | Contraction | 0.98 | warning |
+| `STE-4.2` | Contraction, or an omitted article | 0.98, or 0.50 | warning, or info |
 | `STE-5.1` | Sentence too long | 0.90 | warning |
 | `STE-8.1` | Semicolon | 1.00 | warning |
 | `STE-9.3` | Phrasal verb | 0.85, or 0.70 | warning |
@@ -52,6 +52,7 @@ severity, and strict mode does not make it an error.
 | `STE-1.2` | A word that is not the approved part of speech | 0.70 | warning |
 | `STE-1.4` | An adjective form that the dictionary does not give | 0.80 | warning |
 | `STE-3.1` | A verb form that the dictionary does not give | 0.80 | warning |
+| `STE-8.2` | A compound modifier with no hyphen | 0.70 | info |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -199,15 +200,34 @@ performed". The confidence is 0.85.
   that is also the name of an item, such as "application", is not in the
   list.
 
-## STE-4.2 Contraction
+## STE-4.2 Contraction, or an omitted article
 
 Reports "n't", "'re", "'ve", "'ll", "'m", "'d", and the known "'s" forms,
 such as "it's".
 
-**Limits.** Rule 4.2 also tells you not to omit a noun, a verb, a subject,
-or an article. The tool checks only the contraction part. An omitted
-word needs a parser. The tool does not report a possessive form, such as
-"the parser's output".
+Rule 4.2 also tells you not to omit a word to make a sentence shorter. With
+the analyzer, the rule also reports a singular noun with no article, as the
+subject or the object of a verb. "Remove cover from the unit" gives
+"cover". This finding has the `info` severity and a confidence of 0.50.
+Thus only `--mode strict` or a lower `min_confidence` shows it.
+
+The rule does not report these nouns:
+
+- A noun after a word such as "the", "this", "each", "its", or a number.
+- A plural noun, a name, and a word with a capital letter.
+- A noun that usually has no plural, such as "data", "software", or
+  "access". A word list and some word endings, such as "-ing" and "-tion",
+  find these nouns.
+- A noun before code, a number, or a quotation, such as "set option
+  `color`". The code is the name of the item.
+- A noun in a heading, in a table cell, or in a list item with no verb.
+
+**Limits.** The tool does not report a possessive form, such as "the
+parser's output". It does not find an omitted verb, an omitted subject, or
+an omitted "that". The analyzer makes errors, and the word lists are not
+complete. On the documentation of 23 Python packages, 92 of 108 findings
+were correct. Many of the incorrect findings were the names of tools in
+lower case, such as "libc". Read the sentence before you change it.
 
 ## STE-5.1 Sentence too long
 
@@ -244,11 +264,16 @@ with no space after it is not a mark of punctuation, and "12:30" stays one
 word. The colon of a label keeps its sentence, thus "**NOTE:** The pump
 needs pressure" is one sentence.
 
-**Limits.** Rule 8.6 also makes a multi-word title, a multi-word proper
-noun, and a multi-word alphanumeric identifier one word. The tool cannot
-find these without a dictionary, and it counts each of their words. The
+**A name of many words (rule 8.6).** With the analyzer, a name of many
+words counts as one word. A name is two or more words that the analyzer
+tags as proper nouns, with only spaces between them. "Amazon Web Services"
+is one word. A comma between two names keeps two words, and a text in
+capital letters is not a name.
+
+**Limits.** Without the analyzer, the tool counts each word of a name. The
 count can therefore be too high for a sentence that has a long title or a
-long name.
+long name. The analyzer does not find a title or an identifier in lower
+case.
 
 **Text in parentheses (rule 8.5).** The text in parentheses counts as one
 word of its sentence. It is also a sentence of its own, with the same limit.
@@ -738,6 +763,33 @@ number of forms.
 - A noun does not get a finding. The dictionary does not list the plural.
 
 <!-- ste-enable -->
+
+## STE-8.2 A compound modifier with no hyphen
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Rule 8.2 tells you to put a hyphen between two words that modify a noun as
+one unit. "high-pressure valve" is a valve for high pressure. Without the
+hyphen, a reader can think that the valve is high.
+
+The rule reports two words before a noun, with no hyphen, when one of these
+is true:
+
+- A noun modifies an adjective or a participle, as in "user friendly page"
+  or "time consuming scan".
+- "well" or "ill" modifies a participle, as in "well known problem".
+- A number modifies a singular noun before a singular noun, as in "32 bit
+  integer".
+- The two words are a known pair, such as "high pressure", "open source",
+  "third party", or "real time".
+
+The finding has the `info` severity. On the documentation of 23 Python
+packages, each of the 11 findings was correct.
+
+**Limits.** The analyzer usually attaches an adjective to the last noun.
+Thus "new user account" and "high pressure valve" have the same grammar.
+The rule reports an adjective and a noun only for a pair of its list. It
+does not report a pair of nouns, such as "command line tool".
 
 ## What the tool does not examine
 

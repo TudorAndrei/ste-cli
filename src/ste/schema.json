@@ -541,13 +541,14 @@
     },
     {
       "id": "STE-4.2",
-      "name": "Contraction",
+      "name": "Contraction or omitted article",
       "standard_rule": "4.2",
       "default_severity": "warning",
       "confidence": [
-        0.98
+        0.98,
+        0.5
       ],
-      "note": "The tool checks only the contraction part of rule 4.2."
+      "note": "0.98 is a contraction, with the warning severity. 0.5 is a singular noun with no article, as a subject or an object, with the info severity. That part needs the analyzer, and only strict mode or a lower min_confidence shows it."
     },
     {
       "id": "STE-5.1",
@@ -557,7 +558,7 @@
       "confidence": [
         0.9
       ],
-      "note": "20 words for a numbered step, and 25 for other text. The text in parentheses is also a sentence with the same limit (rule 8.5)."
+      "note": "20 words for a numbered step, and 25 for other text. The text in parentheses is also a sentence with the same limit (rule 8.5). With the analyzer, a name of many words counts as one word (rule 8.6)."
     },
     {
       "id": "STE-8.1",
@@ -782,6 +783,16 @@
         0.8
       ],
       "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It also applies rule 1.4 to a verb. STE-3.5 reports an -ing form."
+    },
+    {
+      "id": "STE-8.2",
+      "name": "A compound modifier with no hyphen",
+      "standard_rule": "8.2",
+      "default_severity": "info",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reports two words before a noun that modify it as one unit, such as \"high pressure valve\"."
     }
   ],
   "schema_version": 1,
