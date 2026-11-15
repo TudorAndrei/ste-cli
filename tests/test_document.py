@@ -1,12 +1,18 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Source positions, prose boundaries, and standard word counts."""
+
+from __future__ import annotations
 
 import pytest
 
 from ste.document import parse
 
+PARAGRAPH_COUNT = 2
+PROCEDURE_WORD_LIMIT = 20
+
 
 @pytest.mark.parametrize(
-    "src,want",
+    ("src", "want"),
     [
         ("# Installation\n\nStart the pump.\n", ["Installation", "Start the pump."]),
         ("- Open the valve\n- Start the pump\n", ["Open the valve", "Start the pump"]),
@@ -37,7 +43,8 @@ from ste.document import parse
         ("The valve is open.\rThe pump is on.", ["The valve is open.", "The pump is on."]),
     ],
 )
-def test_prose_boundaries(src, want):
+def test_prose_boundaries(src: str, want: list[str]) -> None:
+    """Check prose boundaries."""
     doc = parse(src)
     assert [s.text for s in doc.sentences] == want
     for sentence in doc.sentences:
@@ -60,14 +67,15 @@ def test_prose_boundaries(src, want):
         "<https://example.com/a;b>\n",
     ],
 )
-def test_non_prose_blocks(src):
+def test_non_prose_blocks(src: str) -> None:
+    """Check non prose blocks."""
     doc = parse(src)
     assert doc.sentences == []
     assert doc.word_count() == 0
 
 
 @pytest.mark.parametrize(
-    "src,visible,hidden",
+    ("src", "visible", "hidden"),
     [
         ("Text `code` and [link](http://example.com/a;b).\n", "link", "http://example.com/a;b"),
         (
@@ -80,7 +88,8 @@ def test_non_prose_blocks(src):
         ("Éléments `code` and [link](url).\n", "Éléments", "code"),
     ],
 )
-def test_inline_prose_mask(src, visible, hidden):
+def test_inline_prose_mask(src: str, visible: str, hidden: str) -> None:
+    """Check inline prose mask."""
     doc = parse(src)
     assert len(doc.masked) == len(src)
     assert doc.masked.index(visible) == src.index(visible)
@@ -89,7 +98,7 @@ def test_inline_prose_mask(src, visible, hidden):
 
 
 @pytest.mark.parametrize(
-    "text,want",
+    ("text", "want"),
     [
         ("Set the pressure of the pump.", 6),
         ("Set the pressure to 30 psi.", 5),
@@ -105,12 +114,17 @@ def test_inline_prose_mask(src, visible, hidden):
         ("Use the (damaged pump.", 4),
     ],
 )
-def test_word_count(text, want):
+def test_word_count(text: str, want: int) -> None:
+    """Check word count."""
     assert parse(text).word_count() == want
 
 
-def test_sentence_types_and_limits():
-    src = "Start the pump.\n\n1. Open the valve.\n2. NOTE: The pump needs pressure.\n\n- Open the valve.\n"
+def test_sentence_types_and_limits() -> None:
+    """Check sentence types and limits."""
+    src = (
+        "Start the pump.\n\n1. Open the valve.\n2. NOTE: The pump needs "
+        "pressure.\n\n- Open the valve.\n"
+    )
     doc = parse(src)
     assert [(s.procedural, s.note, s.limit()) for s in doc.sentences] == [
         (False, False, 25),
@@ -122,7 +136,7 @@ def test_sentence_types_and_limits():
 
 
 @pytest.mark.parametrize(
-    "src,want",
+    ("src", "want"),
     [
         ("- The flag: it starts the pump.\n", 2),
         ("The flag: it starts the pump.\n", 1),
@@ -131,34 +145,43 @@ def test_sentence_types_and_limits():
         ("- The flag does this:\n", 1),
     ],
 )
-def test_colon_sentence_boundary(src, want):
+def test_colon_sentence_boundary(src: str, want: int) -> None:
+    """Check colon sentence boundary."""
     assert len(parse(src).sentences) == want
 
 
 @pytest.mark.parametrize("fence", ["---", "+++"])
-def test_front_matter(fence):
+def test_front_matter(fence: str) -> None:
+    """Check front matter."""
     src = f"{fence}\nid: ADR-0035\nstatus: it isn't ready\n{fence}\n\nThe report isn't ready.\n"
     doc = parse(src)
     assert [s.text for s in doc.sentences] == ["The report isn't ready."]
     assert doc.sentences[0].start == src.index("The report")
 
 
-def test_horizontal_rule_keeps_prose():
+def test_horizontal_rule_keeps_prose() -> None:
+    """Check horizontal rule keeps prose."""
     src = "The report isn't ready.\n\n---\n\nThe valve isn't open.\n"
-    assert len(parse(src).sentences) == 2
+    assert len(parse(src).sentences) == PARAGRAPH_COUNT
 
 
-def test_wrapped_list_step_stays_one_sentence():
-    src = "1. Open the valve one two three four five six seven eight nine ten and\n   then start the pump one two three four five six seven.\n"
+def test_wrapped_list_step_stays_one_sentence() -> None:
+    """Check wrapped list step stays one sentence."""
+    src = (
+        "1. Open the valve one two three four five six seven eight "
+        "nine ten and\n   then start the pump one two three four five "
+        "six seven.\n"
+    )
     doc = parse(src)
     assert len(doc.sentences) == 1
     assert doc.sentences[0].procedural
-    assert doc.sentences[0].words > 20
+    assert doc.sentences[0].words > PROCEDURE_WORD_LIMIT
     assert "pump" in doc.sentences[0].text
 
 
-def test_word_tokens_keep_apostrophes_and_positions():
-    src = "Élodie isn’t ready for a quick-release test."
+def test_word_tokens_keep_apostrophes_and_positions() -> None:
+    """Check word tokens keep apostrophes and positions."""
+    src = "Élodie isn\u2019t ready for a quick-release test."
     tokens = parse(src).sentences[0].tokens
     assert [t.lower for t in tokens] == [
         "élodie",

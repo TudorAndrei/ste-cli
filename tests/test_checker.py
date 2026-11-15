@@ -1,4 +1,7 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Checks at the public checker boundary."""
+
+from __future__ import annotations
 
 from dataclasses import asdict
 
@@ -7,9 +10,11 @@ import pytest
 from ste.checker import lint
 from ste.models import Options
 
+MINIMUM_FINDINGS = 3
+
 
 @pytest.mark.parametrize(
-    "text,want",
+    ("text", "want"),
     [
         ("Start the pump. Then open the valve.", []),
         ("The file has been sent to the server.\n", ["STE-3.4"]),
@@ -19,17 +24,19 @@ from ste.models import Options
         ("<!-- ste-disable-next-line STE-4.2 -->\nThe valve isn't open.\n", []),
     ],
 )
-def test_lint_prose(text, want):
+def test_lint_prose(text: str, want: list[str]) -> None:
+    """Check lint prose."""
     found = lint(text)
     assert [d.rule_id for d in found] == want
     for diagnostic in found:
         assert text[diagnostic.start : diagnostic.end]
 
 
-def test_positions_and_sort_order():
+def test_positions_and_sort_order() -> None:
+    """Check positions and sort order."""
     text = "Some `code` here. The pump isn't full; the valve is running."
     found = lint(text)
-    assert len(found) >= 3
+    assert len(found) >= MINIMUM_FINDINGS
     assert found == sorted(found, key=lambda d: (d.start, d.end, d.rule_id))
     contraction = next(d for d in found if d.rule_id == "STE-4.2")
     assert text[contraction.start : contraction.end] == "isn't"
@@ -44,13 +51,15 @@ def test_positions_and_sort_order():
     }
 
 
-def test_per_rule_settings():
+def test_per_rule_settings() -> None:
+    """Check per rule settings."""
     text = "Open the valve; the report isn't ready.\n"
     found = lint(text, Options(rule_severity={"STE-8.1": "error", "STE-4.2": "off"}))
     assert [(d.rule_id, d.severity) for d in found] == [("STE-8.1", "error")]
 
 
-def test_confidence_filter():
+def test_confidence_filter() -> None:
+    """Check confidence filter."""
     text = "The report was approved.\n"
     assert len(lint(text)) == 1
     assert lint(text, Options(min_confidence=0.8)) == []

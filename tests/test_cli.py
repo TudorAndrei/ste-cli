@@ -1,30 +1,54 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
+"""Check cli contracts."""
+
+from __future__ import annotations
+
 import io
 import json
+import shutil
 import subprocess
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
+from typer.testing import CliRunner
 
-from ste.cli import run
+from ste.cli import app, run
+
+SAMPLE_FINDING_COUNT = 3
+EXIT_ERROR = 2
+BASELINE_FINDING_COUNT = 2
+WALK_FILE_COUNT = 6
 
 
-def cli(*args, text=""):
+class LintReport(TypedDict):
+    """The JSON fields read by the command tests."""
+
+    summary: dict[str, int | float | bool]
+    findings: list[dict[str, str | int | float]]
+    mode: str
+
+
+def cli(*args: str, text: str = "") -> tuple[int, str, str]:
+    """Run a command with isolated input and output streams."""
     stdout, stderr = io.StringIO(), io.StringIO()
     code = run(list(args), io.StringIO(text), stdout, stderr)
     return code, stdout.getvalue(), stderr.getvalue()
 
 
-def report(*args, text=""):
+def report(*args: str, text: str = "") -> LintReport:
+    """Read the JSON report of a successful lint command."""
     code, output, error = cli("lint", "--format", "json", *args, text=text)
     assert code == 0, error
     return json.loads(output)
 
 
-def test_json_and_gates(tmp_path, monkeypatch):
+def test_json_and_gates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check json and gates."""
     monkeypatch.chdir(tmp_path)
     text = "The file has been sent; it isn't ready.\n"
     data = report("--no-config", "-", text=text)
-    assert data["summary"]["findings"] == 3
+    assert data["summary"]["findings"] == SAMPLE_FINDING_COUNT
     assert data["summary"]["words"] > 0
     assert all(f["file"] == "(standard input)" for f in data["findings"])
     for flags in (("--fail-over", "2.5"), ("--fail-on-new",), ("--warnings-as-errors",)):
@@ -33,12 +57,15 @@ def test_json_and_gates(tmp_path, monkeypatch):
     assert report("--no-config", "-", text="Open the valve.")["findings"] == []
 
 
-def test_interspersed_flags_and_output_controls(tmp_path, monkeypatch):
+def test_interspersed_flags_and_output_controls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check interspersed flags and output controls."""
     monkeypatch.chdir(tmp_path)
     path = tmp_path / "draft.md"
     path.write_text("It isn't open; it isn't ready.")
     data = report(str(path), "--no-config", "--limit=1", "--fields", "rule_id,text")
-    assert data["summary"]["findings"] == 3
+    assert data["summary"]["findings"] == SAMPLE_FINDING_COUNT
     assert data["summary"]["shown"] == 1
     assert data["summary"]["truncated"]
     assert set(data["findings"][0]) == {"rule_id", "text"}
@@ -51,7 +78,7 @@ def test_interspersed_flags_and_output_controls(tmp_path, monkeypatch):
         "finding",
         "summary",
     ]
-    assert report(str(path), "--no-config=true")["summary"]["findings"] == 3
+    assert report(str(path), "--no-config=true")["summary"]["findings"] == SAMPLE_FINDING_COUNT
 
 
 @pytest.mark.parametrize(
@@ -72,13 +99,15 @@ def test_interspersed_flags_and_output_controls(tmp_path, monkeypatch):
         ("nonesuch",),
     ],
 )
-def test_invalid_arguments_exit_two(args):
+def test_invalid_arguments_exit_two(args: tuple[str, ...]) -> None:
+    """Check invalid arguments exit two."""
     code, _, error = cli(*args)
-    assert code == 2
+    assert code == EXIT_ERROR
     assert error
 
 
-def test_schema_and_help():
+def test_schema_and_help() -> None:
+    """Check schema and help."""
     code, output, error = cli("schema")
     assert code == 0, error
     data = json.loads(output)
@@ -95,10 +124,11 @@ def test_schema_and_help():
     assert data["exit_codes"]["2"]
     assert cli("version")[1].startswith("ste ")
     assert "Usage:" in cli("help")[1]
-    assert cli()[0] == 2
+    assert cli()[0] == EXIT_ERROR
 
 
-def test_init_dry_run_and_force(tmp_path, monkeypatch):
+def test_init_dry_run_and_force(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check init dry run and force."""
     monkeypatch.chdir(tmp_path)
     code, output, error = cli("init", "--dry-run", "--format=json")
     assert code == 0, error
@@ -110,32 +140,37 @@ def test_init_dry_run_and_force(tmp_path, monkeypatch):
     }
     assert not (tmp_path / ".ste.yml").exists()
     assert cli("init")[0] == 0
-    assert cli("init")[0] == 2
+    assert cli("init")[0] == EXIT_ERROR
     assert cli("init", "--force")[0] == 0
     assert report("-", text="Open the valve.")["findings"] == []
 
 
-def test_baseline_workflow_and_stale(tmp_path, monkeypatch):
+def test_baseline_workflow_and_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check baseline workflow and stale."""
     monkeypatch.chdir(tmp_path)
     file = tmp_path / "draft.md"
     file.write_text("It isn't ready; start the pump.")
     args = ("--no-config", "--format=json", str(file))
     code, output, error = cli("baseline", "--dry-run", *args)
     assert code == 0, error
-    assert json.loads(output)["findings"] == 2
+    assert json.loads(output)["findings"] == BASELINE_FINDING_COUNT
     assert not (tmp_path / ".ste-baseline.json").exists()
     assert cli("baseline", *args)[0] == 0
     data = report("--no-config", "--fail-on-new", str(file))
     assert data["summary"]["findings"] == 0
-    assert data["summary"]["accepted"] == 2
-    assert report("--no-config", "--no-baseline", str(file))["summary"]["findings"] == 2
+    assert data["summary"]["accepted"] == BASELINE_FINDING_COUNT
+    assert (
+        report("--no-config", "--no-baseline", str(file))["summary"]["findings"]
+        == BASELINE_FINDING_COUNT
+    )
     file.write_text("It is not ready; start the pump.")
     data = report("--no-config", str(file))
     assert data["summary"]["accepted"] == 1
     assert data["summary"]["stale"] == 1
 
 
-def test_baseline_merge_and_path_spelling(tmp_path, monkeypatch):
+def test_baseline_merge_and_path_spelling(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check baseline merge and path spelling."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".git").mkdir()
     (tmp_path / ".ste.yml").write_text("mode: flavored")
@@ -151,7 +186,8 @@ def test_baseline_merge_and_path_spelling(tmp_path, monkeypatch):
     assert report(str(tmp_path / "b/draft.md"))["summary"]["accepted"] == 1
 
 
-def test_config_search_exclude_and_flags(tmp_path, monkeypatch):
+def test_config_search_exclude_and_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check config search exclude and flags."""
     (tmp_path / ".git").mkdir()
     (tmp_path / ".ste.yml").write_text(
         'mode: strict\nexclude: ["docs/legacy/**"]\nrules: {STE-4.2: info}\nfail_over: 0\n'
@@ -172,9 +208,12 @@ def test_config_search_exclude_and_flags(tmp_path, monkeypatch):
     assert report("--no-config", "guide.md")["findings"][0]["severity"] == "warning"
 
 
-def test_git_walk_and_explicit_paths(tmp_path, monkeypatch):
+def test_git_walk_and_explicit_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check git walk and explicit paths."""
     monkeypatch.chdir(tmp_path)
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "-q", str(tmp_path)], check=True)  # noqa: S603 -- fixed arguments in a pytest temporary directory
     (tmp_path / ".gitignore").write_text("generated.md\nprivate/\n")
     for name in ("guide.md", "generated.md", "CHANGELOG.md"):
         (tmp_path / name).write_text("It isn't ready.")
@@ -182,23 +221,26 @@ def test_git_walk_and_explicit_paths(tmp_path, monkeypatch):
         (tmp_path / name).mkdir()
         (tmp_path / name / "draft.md").write_text("It isn't ready.")
     assert report("--no-config", ".")["summary"]["files"] == 1
-    assert report("--no-config", "--all", ".")["summary"]["files"] == 6
+    assert report("--no-config", "--all", ".")["summary"]["files"] == WALK_FILE_COUNT
     assert report("--no-config", "generated.md")["summary"]["files"] == 1
     assert report("--no-config", "dist")["summary"]["files"] == 1
     assert report("--no-config", "CHANGELOG.md")["summary"]["files"] == 1
 
 
-@pytest.mark.parametrize("format", ["github", "sarif"])
-def test_code_host_paths_are_relative_to_repository(tmp_path, monkeypatch, format):
+@pytest.mark.parametrize("output_format", ["github", "sarif"])
+def test_code_host_paths_are_relative_to_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, output_format: str
+) -> None:
+    """Check code host paths are relative to repository."""
     (tmp_path / ".git").mkdir()
     docs = tmp_path / "docs"
     docs.mkdir()
     file = docs / "guide.md"
     file.write_text("It isn't ready.")
     monkeypatch.chdir(docs)
-    code, output, error = cli("lint", "--no-config", "--format", format, str(file))
+    code, output, error = cli("lint", "--no-config", "--format", output_format, str(file))
     assert code == 0, error
-    if format == "github":
+    if output_format == "github":
         assert "file=docs/guide.md" in output
     else:
         assert (
@@ -209,7 +251,8 @@ def test_code_host_paths_are_relative_to_repository(tmp_path, monkeypatch, forma
         )
 
 
-def test_dict_mutation_plans_and_load(tmp_path, monkeypatch):
+def test_dict_mutation_plans_and_load(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check dict mutation plans and load."""
     monkeypatch.chdir(tmp_path)
     source = tmp_path / "sample.txt"
     source.write_text("""## Part 2 - Dictionary
@@ -233,12 +276,13 @@ def test_dict_mutation_plans_and_load(tmp_path, monkeypatch):
         cli("lint", "--no-config", "--use-dict", "--dict", str(index), "-", text="Open the valve.")[
             0
         ]
-        == 2
+        == EXIT_ERROR
     )
-    assert cli("dict", "import", "input.PDF")[0] == 2
+    assert cli("dict", "import", "input.PDF")[0] == EXIT_ERROR
 
 
-def test_eval_and_analyzer_status():
+def test_eval_and_analyzer_status() -> None:
+    """Check eval and analyzer status."""
     directory = str(Path(__file__).parents[1] / "testdata")
     code, output, error = cli("eval", "--format=json", "--fail-under=1", directory)
     assert code == 0, error
@@ -255,12 +299,12 @@ def test_eval_and_analyzer_status():
             "-",
             text="Open the valve.",
         )[0]
-        == 2
+        == EXIT_ERROR
     )
 
 
 @pytest.mark.parametrize(
-    "flags, expected",
+    ("flags", "expected"),
     [
         (["--warnings-as-errors=false", "--warnings-as-errors"], 1),
         (["--warnings-as-errors", "--warnings-as-errors=false"], 0),
@@ -268,15 +312,19 @@ def test_eval_and_analyzer_status():
         (["--summary=bad"], 2),
     ],
 )
-def test_boolean_flags_use_last_value_and_reject_bad_values(flags, expected):
+def test_boolean_flags_use_last_value_and_reject_bad_values(
+    flags: list[str], expected: int
+) -> None:
+    """Check boolean flags use last value and reject bad values."""
     code, _, error = cli("lint", "--no-config", *flags, "-", text="The valve isn't open.")
     assert code == expected
-    if expected == 2:
+    if expected == EXIT_ERROR:
         assert "invalid boolean" in error
 
 
 @pytest.mark.parametrize("command", ["lint", "baseline", "init", "dict", "analyzer", "eval"])
-def test_command_help_uses_output_stream(command):
+def test_command_help_uses_output_stream(command: str) -> None:
+    """Check command help uses output stream."""
     code, output, error = cli(command, "--help")
     assert code == 0
     assert f"usage: ste {command}" in output.lower()
@@ -284,18 +332,17 @@ def test_command_help_uses_output_stream(command):
 
 
 @pytest.mark.parametrize(
-    "args, dry_run",
+    ("args", "dry_run"),
     [
         (["--dry-run=true", "--format=json", "remove"], True),
         (["--dry-run", "remove", "--dry-run=false", "--format=json"], False),
         (["--format=json", "path"], None),
     ],
 )
-def test_dictionary_options_before_and_after_subcommand(tmp_path, args, dry_run):
-    from typer.testing import CliRunner
-
-    from ste.cli import app
-
+def test_dictionary_options_before_and_after_subcommand(
+    tmp_path: Path, args: tuple[str, ...], *, dry_run: bool
+) -> None:
+    """Check dictionary options before and after subcommand."""
     path = tmp_path / "dictionary.json"
     path.write_text('{"version":1,"source":"fixture","words":[]}')
     result = CliRunner().invoke(app, ["dict", "--out", str(path), *args])

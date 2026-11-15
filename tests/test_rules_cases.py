@@ -1,4 +1,25 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Rule cases retained from the Go test suite."""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+
+class VerbFinding(TypedDict):
+    """An independently specified rule and text span."""
+
+    rule_id: str
+    text: str
+
+
+class VerbCase(TypedDict):
+    """A source sentence and its independently specified findings."""
+
+    name: str
+    text: str
+    expect: list[VerbFinding]
+
 
 STRUCTURE_CASES = [
     (
@@ -188,7 +209,10 @@ STRUCTURE_CASES = [
     (
         "one item of three is different",
         "STE-4.3",
-        "- Open the valve of the pump\n- Start the pump of the system\n- close the valve of the tank\n",
+        (
+            "- Open the valve of the pump\n- Start the pump of the "
+            "system\n- close the valve of the tank\n"
+        ),
         1,
         False,
     ),
@@ -197,7 +221,10 @@ STRUCTURE_CASES = [
     (
         "two lists do not join",
         "STE-4.3",
-        "- Open the valve of the pump\n\nSome text between them here.\n\n- close the valve of the tank\n",
+        (
+            "- Open the valve of the pump\n\nSome text between them "
+            "here.\n\n- close the valve of the tank\n"
+        ),
         0,
         False,
     ),
@@ -467,7 +494,7 @@ SYNTAX_CASES = [
     ),
 ]
 
-VERB_CASES = [
+VERB_CASES: list[VerbCase] = [
     {
         "expect": [{"rule_id": "STE-3.4", "text": "has been sent"}],
         "name": "perfect/present-perfect-passive",

@@ -1,17 +1,22 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
 """A stub analyzer for the tests. It needs no library.
 
 It gives a passive construction for the word "signed" only, thus a test can
 see the veto of the analyzer without spaCy and its model.
 """
 
+from __future__ import annotations
+
 import json
 import sys
 
 
 def main() -> int:
-    print(json.dumps({"ready": True, "model": "stub"}), flush=True)
-    for line in sys.stdin:
-        line = line.strip()
+    """Answer analyzer requests with an independent token stream."""
+    sys.stdout.write(json.dumps({"ready": True, "model": "stub"}) + "\n")
+    sys.stdout.flush()
+    for raw_line in sys.stdin:
+        line = raw_line.strip()
         if not line:
             continue
         request = json.loads(line)
@@ -20,8 +25,7 @@ def main() -> int:
         text = request.get("text", "")
         tokens = []
         offset = 0
-        index = 0
-        for word in text.split(" "):
+        for index, word in enumerate(text.split(" ")):
             start = text.find(word, offset)
             tokens.append(
                 {
@@ -35,7 +39,6 @@ def main() -> int:
                 }
             )
             offset = start + len(word)
-            index += 1
         # "signed" gets a child with the relation auxpass, thus it is a
         # passive verb. Each other word gets none.
         for token in list(tokens):
@@ -51,7 +54,8 @@ def main() -> int:
                         "start": -1,
                     }
                 )
-        print(json.dumps({"id": request.get("id"), "tokens": tokens}), flush=True)
+        sys.stdout.write(json.dumps({"id": request.get("id"), "tokens": tokens}) + "\n")
+        sys.stdout.flush()
     return 0
 
 

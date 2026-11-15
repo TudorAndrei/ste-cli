@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
+"""Check evaluation contracts."""
+
+from __future__ import annotations
+
 import io
 import json
 from pathlib import Path
@@ -6,16 +11,22 @@ import pytest
 
 from ste import evaluation
 
+CORPUS_FILE_COUNT = 10
+CORPUS_FINDING_COUNT = 30
+PARTIAL_ACCURACY = 0.5
 
-def test_corpus_matches_existing_labels():
+
+def test_corpus_matches_existing_labels() -> None:
+    """Check corpus matches existing labels."""
     data = evaluation.run(Path(__file__).parents[1] / "testdata")
-    assert data["files"] == 10
+    assert data["files"] == CORPUS_FILE_COUNT
     assert data["totals"]["precision"] == 1
     assert data["totals"]["recall"] == 1
-    assert data["totals"]["true_positives"] == 30
+    assert data["totals"]["true_positives"] == CORPUS_FINDING_COUNT
 
 
-def test_counts_each_outcome_and_wildcard_label(tmp_path):
+def test_counts_each_outcome_and_wildcard_label(tmp_path: Path) -> None:
+    """Check counts each outcome and wildcard label."""
     (tmp_path / "sample.md").write_text("It isn't open; start the pump.")
     (tmp_path / "sample.expected.json").write_text(
         json.dumps(
@@ -29,13 +40,14 @@ def test_counts_each_outcome_and_wildcard_label(tmp_path):
         1,
         1,
     )
-    assert totals["precision"] == totals["recall"] == 0.5
+    assert totals["precision"] == totals["recall"] == PARTIAL_ACCURACY
     stream = io.StringIO()
     evaluation.write_text(stream, data)
     assert "1 fixture files" in stream.getvalue()
 
 
-def test_label_options(tmp_path):
+def test_label_options(tmp_path: Path) -> None:
+    """Check label options."""
     (tmp_path / "sample.md").write_text("Use the settings file.")
     (tmp_path / "sample.expected.json").write_text(
         json.dumps(
@@ -48,26 +60,29 @@ def test_label_options(tmp_path):
     assert evaluation.run(tmp_path)["totals"]["true_positives"] == 1
 
 
-def test_empty_and_invalid_corpus(tmp_path):
+def test_empty_and_invalid_corpus(tmp_path: Path) -> None:
+    """Check empty and invalid corpus."""
     with pytest.raises(ValueError, match="no fixture files"):
         evaluation.run(tmp_path)
     (tmp_path / "sample.md").write_text("Open the valve.")
     (tmp_path / "sample.expected.json").write_text("{")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"sample\.expected\.json"):
         evaluation.run(tmp_path)
 
 
 @pytest.mark.parametrize(
     "expected", [[], {"prefer": []}, {"allow_nouns": 5}, {"expect": 5}, {"expect": [{"text": 5}]}]
 )
-def test_invalid_label_shapes_are_errors(tmp_path, expected):
+def test_invalid_label_shapes_are_errors(tmp_path: Path, expected: object) -> None:
+    """Check invalid label shapes are errors."""
     (tmp_path / "sample.md").write_text("Open the valve.")
     (tmp_path / "sample.expected.json").write_text(json.dumps(expected))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"sample\.expected\.json"):
         evaluation.run(tmp_path)
 
 
-def test_null_labels_and_missing_fields_follow_json_contract(tmp_path):
+def test_null_labels_and_missing_fields_follow_json_contract(tmp_path: Path) -> None:
+    """Check null labels and missing fields follow json contract."""
     (tmp_path / "sample.md").write_text("Open the valve.")
     labels = tmp_path / "sample.expected.json"
     labels.write_text('{"expect": null}')

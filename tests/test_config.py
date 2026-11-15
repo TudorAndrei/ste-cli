@@ -1,8 +1,15 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
+"""Check config contracts."""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
 
 from ste import config
+
+OVERRIDE_WORD_LIMIT = 18
 
 
 @pytest.mark.parametrize(
@@ -23,12 +30,14 @@ from ste import config
         "allow: {nouns: parser}",
     ],
 )
-def test_bad_config_is_an_error(text):
-    with pytest.raises(ValueError):
+def test_bad_config_is_an_error(text: str) -> None:
+    """Check bad config is an error."""
+    with pytest.raises(ValueError, match=r".+"):
         config.parse(text)
 
 
-def test_yaml_features_and_options():
+def test_yaml_features_and_options() -> None:
+    """Check yaml features and options."""
     cfg = config.parse("""mode: strict
 max_words: 18
 allow:
@@ -43,7 +52,7 @@ warnings_as_errors: true
 """)
     options = cfg.options()
     assert options.mode == "strict"
-    assert options.max_words == 18
+    assert options.max_words == OVERRIDE_WORD_LIMIT
     assert options.allow_verbs == ["parser", "web#hook"]
     assert {"file", "hook", "build", "web#hook"} <= set(options.allow_nouns)
     assert options.prefer[0].name == "config"
@@ -51,7 +60,8 @@ warnings_as_errors: true
     assert options.warnings_as_errors
 
 
-def test_find_and_load(tmp_path):
+def test_find_and_load(tmp_path: Path) -> None:
+    """Check find and load."""
     path = tmp_path / ".ste.yml"
     path.write_text("allow: {nouns: [parser, webhook]}")
     assert config.find(tmp_path) == path
@@ -61,9 +71,11 @@ def test_find_and_load(tmp_path):
     assert config.load(Path(__file__).parents[1] / "docs/glossary.yml").mode
 
 
-def test_yaml_boolean_words_and_duplicate_keys():
+def test_yaml_boolean_words_and_duplicate_keys() -> None:
+    """Check yaml boolean words and duplicate keys."""
     cfg = config.parse(
-        "rules: {STE-8.1: off}\nallow: {nouns: [on, off, yes, no]}\nanalyzer: true\ndictionary: false\n"
+        "rules: {STE-8.1: off}\nallow: {nouns: [on, off, yes, "
+        "no]}\nanalyzer: true\ndictionary: false\n"
     )
     assert cfg.rules == {"STE-8.1": "off"}
     assert cfg.allow_nouns == ["on", "off", "yes", "no"]

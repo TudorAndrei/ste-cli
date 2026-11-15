@@ -1,11 +1,21 @@
+# Copyright (c) 2026 Tudor Andrei Dumitrascu
+"""Check baseline contracts."""
+
+from __future__ import annotations
+
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 
 from ste import baseline
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def test_counted_fingerprints_and_stale_scope():
+
+def test_counted_fingerprints_and_stale_scope() -> None:
+    """Check counted fingerprints and stale scope."""
     accepted = baseline.Set()
     accepted.add("a.md", "STE-4.2", "isn't")
     accepted.add("a.md", "STE-4.2", "isn't")
@@ -18,7 +28,8 @@ def test_counted_fingerprints_and_stale_scope():
     assert accepted.take("b.md", "STE-5.1", "one two three")
 
 
-def test_load_legacy_entries_and_errors(tmp_path):
+def test_load_legacy_entries_and_errors(tmp_path: Path) -> None:
+    """Check load legacy entries and errors."""
     path = tmp_path / "baseline.json"
     assert not baseline.load(path).take("a.md", "STE-8.1", ";")
     path.write_text(
@@ -33,11 +44,12 @@ def test_load_legacy_entries_and_errors(tmp_path):
     )
     assert baseline.load(path).take("a.md", "STE-8.1", ";")
     path.write_text("{")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"baseline\.json"):
         baseline.load(path)
 
 
-def test_save_merges_files_outside_run_and_removes_deleted(tmp_path):
+def test_save_merges_files_outside_run_and_removes_deleted(tmp_path: Path) -> None:
+    """Check save merges files outside run and removes deleted."""
     for name in ("a.md", "b.md"):
         (tmp_path / name).touch()
     path = tmp_path / "baseline.json"
