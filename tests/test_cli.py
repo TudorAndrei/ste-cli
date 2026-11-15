@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TypedDict
 
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 from ste.cli import app, run
@@ -323,11 +324,21 @@ def test_boolean_flags_use_last_value_and_reject_bad_values(
 
 
 @pytest.mark.parametrize("command", ["lint", "baseline", "init", "dict", "analyzer", "eval"])
-def test_command_help_uses_output_stream(command: str) -> None:
-    """Check command help uses output stream."""
+@pytest.mark.parametrize("force_color", [False, True])
+def test_command_help_uses_output_stream(
+    command: str, monkeypatch: pytest.MonkeyPatch, *, force_color: bool
+) -> None:
+    """Check the help stream with and without terminal color."""
+    if force_color:
+        monkeypatch.setenv("FORCE_COLOR", "1")
+        monkeypatch.delenv("NO_COLOR", raising=False)
+    else:
+        monkeypatch.delenv("FORCE_COLOR", raising=False)
+        monkeypatch.setenv("NO_COLOR", "1")
     code, output, error = cli(command, "--help")
     assert code == 0
-    assert f"usage: ste {command}" in output.lower()
+    visible_text = Text.from_ansi(output).plain
+    assert f"usage: ste {command}" in visible_text.lower()
     assert not error
 
 
