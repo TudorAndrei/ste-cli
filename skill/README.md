@@ -24,6 +24,9 @@ ln -s "$PWD/skill/ste-review" ~/.claude/skills/ste-review
 
 Then ask for a review: "review docs/ for Simplified Technical English".
 
+`ste review docs/` prints the same request as an instruction for an agent.
+The command reads no file and sends nothing.
+
 ## The division of the work
 
 | Group | Rules | Who |

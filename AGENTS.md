@@ -70,14 +70,13 @@ A baseline of one directory keeps the accepted findings of the other
 directories. `kept` gives their number, and `removed` gives the number of
 accepted findings of the deleted files.
 
-## A review costs money
+## The rules that need a reader
 
-`ste review` sends each paragraph to a language model of Anthropic. It needs
-the `llm` extra and `ANTHROPIC_API_KEY`, and each request costs money. Run
-`ste review --dry-run --format json <path>` first, and give the number of
-requests to the user. Each finding has `"kind": "advice"` and the `info`
-severity. It is not a defect, and a second run can give different advice.
-Refer to [the review page](docs/review.md).
+`ste lint` cannot check 14 rules, because they need a reader. Run
+`ste review <path>` to get the instruction for them. The command reads no
+file and sends nothing. It tells you to start a subagent that loads the
+`ste-review` skill. The findings of that subagent are advice, and not
+defects.
 
 ## Paths start from the project
 

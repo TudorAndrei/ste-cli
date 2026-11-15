@@ -14,7 +14,7 @@ group. Each rule is in one group only, and the groups add up to 53.
 |---|---|---|
 | Built, the full rule | 10 | `ste lint` |
 | Built, a part of the rule | 29 | `ste lint`, and a reader for the other part |
-| Not built, a judgment of a reader | 14 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill), or the optional [`ste review`](review.md) |
+| Not built, a judgment of a reader | 14 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill) |
 | Total | 53 | |
 
 Many checks need the optional analyzer of the grammar. The section
@@ -155,10 +155,8 @@ gives these rules to an agent. The skill states that each finding is advice,
 and not a defect, because no test of this group gives the same answer each
 time.
 
-The optional [`ste review`](review.md) command sends each paragraph to a
-language model with these rules. Each finding has the `info` severity and
-the `advice` kind. The advice is not reproducible, and it never changes the
-exit code of `ste lint` or the baseline.
+The `ste review` command does not check these rules. It prints an
+instruction for an agent: start a subagent, and load the skill.
 
 ## Why the tool does not try each rule
 

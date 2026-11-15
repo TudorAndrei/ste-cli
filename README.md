@@ -485,6 +485,7 @@ ste lint --format json --summary docs/         # 226 bytes, not 4 MB
 ste lint --format json --limit 20 --fields rule_id,file,line,text docs/
 ste lint --format ndjson docs/                 # one object for each line
 ste baseline --dry-run --format json .         # the plan, and no change
+ste review docs/                               # how to review the other rules
 ```
 
 [AGENTS.md](https://github.com/TudorAndrei/ste-cli/blob/main/AGENTS.md)

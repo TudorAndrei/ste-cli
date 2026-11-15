@@ -22,7 +22,6 @@ and this tool does not contain that dictionary. Read
 - [Source code](https://github.com/TudorAndrei/ste-cli)
 - [The rules and their limits](rules.md)
 - [The measurement of the rule quality](evaluation.md)
-- [Advice from a language model](review.md)
 - [The audit of the related projects](upstream-audit.md)
 
 ## Installation
@@ -576,7 +575,7 @@ ste init [--dry-run]          Write a start config, .ste.yml
 ste analyzer                  Show the analyzer of the grammar and what it needs
 ste dict <command>            Make a local index of the dictionary from your copy
 ste eval [flags] <dir>        Measure the rules against a labeled corpus
-ste review [flags] [path ...] Get advice from a language model (optional)
+ste review [path ...]         Tell an agent how to review the other rules
 ste schema                    Print the interface of this tool as JSON
 ste version                   Print the version
 ste help                      Print the usage
@@ -646,10 +645,11 @@ ASD-STE100 has 53 rules. This tool checks 39 of them today, 10 in full and
 gives the rules of judgment to an agent, which reports them as advice, and
 not as a defect.
 
-The optional `ste review` command sends each paragraph to a language model,
-and it gives the answer as advice with the `info` severity. The advice is
-not reproducible, and it never changes the exit code of `ste lint`. Refer to
-[review.md](review.md).
+`ste review <path>` prints an instruction for an agent. The agent runs
+`ste lint` first. Then it starts a subagent that loads the ste-review skill
+for the given paths. The command reads no file and sends no text. It exists
+so that an agent that knows only the command can find the skill.
+`--format json` gives the same instruction as one object.
 
 ## Limits
 
