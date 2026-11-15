@@ -8,12 +8,26 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from markdown_it import MarkdownIt
+from markdown_it.rules_inline import html_inline
 
 if TYPE_CHECKING:
+    from markdown_it.rules_inline import StateInline
+
     from ste.models import Diagnostic
 
+
+def _positioned_html_inline(state: StateInline, silent: bool) -> bool:  # noqa: FBT001
+    """Parse raw inline HTML and record its offset in the content of the inline token."""
+    start = state.pos
+    if not html_inline(state, silent):
+        return False
+    if not silent:
+        state.tokens[-1].meta["pos"] = start
+    return True
+
+
 _MARKDOWN = MarkdownIt("commonmark").enable("table")
-_COMMENT = re.compile(r"<!--.*?-->")
+_MARKDOWN.inline.ruler.at("html_inline", _positioned_html_inline)
 _LINE_END = re.compile(r"\r\n|\r|\n")
 
 
@@ -109,14 +123,14 @@ def _directive_text(source: str, spans: list[tuple[int, int, int]]) -> dict[int,
             for index in range(first, last):
                 found[index] = lines[index]
         elif token.type == "inline":
-            comments = {
-                child.content for child in token.children or () if child.type == "html_inline"
-            }
-            for index in range(first, last):
-                for match in _COMMENT.finditer(lines[index]):
-                    if match.group(0) in comments:
-                        found[index] = match.group(0)
-                        break
+            # The content of an inline token keeps one line break for each source line.
+            # Cells of one table row share a line map, so the first directive is kept.
+            for child in token.children or ():
+                if child.type != "html_inline" or not _parse_directive(child.content)[0]:
+                    continue
+                index = first + token.content.count("\n", 0, child.meta["pos"])
+                if index < last:
+                    found.setdefault(index, child.content)
     return found
 
 

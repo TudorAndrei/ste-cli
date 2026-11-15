@@ -146,6 +146,39 @@ EXPECTED_PROSE_FINDINGS = 3
             "isn't",
             False,
         ),
+        (
+            "Text <!-- ste-disable STE-4.2\n-->\nThe valve isn't open.\n",
+            "STE-4.2",
+            "isn't",
+            True,
+        ),
+        (
+            (
+                "`<!-- ste-disable-next-line -->`\nThe valve isn't open.\n"
+                "Text <!-- ste-disable-next-line -->\nThe pump isn't on.\n"
+            ),
+            "STE-4.2",
+            "valve",
+            False,
+        ),
+        (
+            (
+                "`<!-- ste-disable-next-line -->`\nThe valve isn't open.\n"
+                "Text <!-- ste-disable-next-line -->\nThe pump isn't on.\n"
+            ),
+            "STE-4.2",
+            "pump",
+            True,
+        ),
+        (
+            (
+                "| A | B |\n| --- | --- |\n"
+                "| It isn't ready. <!-- ste-disable-line --> | Note <!-- note --> |\n"
+            ),
+            "STE-4.2",
+            "isn't",
+            True,
+        ),
     ],
 )
 def test_directive_scope(source: str, rule: str, needle: str, *, covered: bool) -> None:
