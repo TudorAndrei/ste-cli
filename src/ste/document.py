@@ -181,11 +181,32 @@ def _admonition_word(text: str) -> str:
     return word if word in _ADMONITIONS and (not rest or rest[0] in ":]*!") else ""
 
 
+_INLINE_RULES: dict[str, Callable[[StateInline, bool], bool]] = {
+    "link": link,
+    "image": image,
+    "autolink": autolink,
+    "html_inline": html_inline,
+    "backticks": backtick,
+    "emphasis": emphasis.tokenize,
+    "strikethrough": strikethrough.tokenize,
+}
+
+
 @dataclass
 class _InlineTracker:
-    visible: list[bool]
+    """Record which characters of the current inline block are prose.
+
+    ``visible`` holds one byte for each character: 1 for prose, 0 for syntax.
+    """
+
+    visible: bytearray = field(default_factory=bytearray)
     root_state: StateInline | None = None
     delimiters: list[tuple[MarkdownToken, int, int]] = field(default_factory=list)
+
+    def install(self, md: MarkdownIt) -> None:
+        """Wrap the recorded inline rules of *md* one time, before the first block."""
+        for name, rule in _INLINE_RULES.items():
+            md.inline.ruler.at(name, self.wrap(name, rule))
 
     def wrap(
         self, name: str, rule: Callable[[StateInline, bool], bool]
@@ -208,17 +229,22 @@ class _InlineTracker:
 
         return wrapped
 
+    def hide(self, start: int, end: int) -> None:
+        """Mark the characters from *start* to *end* as syntax."""
+        if end > start:
+            self.visible[start:end] = bytes(end - start)
+
     def record(self, state: StateInline, name: str, start: int, count: int, label_end: int) -> None:
         """Exclude inline syntax while retaining a link's visible label."""
         end = state.pos
         if name == "link":
             if label_end >= 0:
-                self.visible[start] = False
-                self.visible[label_end:end] = [False] * (end - label_end)
+                self.hide(start, start + 1)
+                self.hide(label_end, end)
         elif name in {"emphasis", "strikethrough"}:
             self.record_delimiters(state, start, count)
         elif name != "backticks" or any(t.type == "code_inline" for t in state.tokens[count:]):
-            self.visible[start:end] = [False] * (end - start)
+            self.hide(start, end)
 
     def record_delimiters(self, state: StateInline, start: int, count: int) -> None:
         """Keep delimiter spans until the parser resolves emphasis pairs."""
@@ -232,38 +258,32 @@ class _InlineTracker:
             self.delimiters.append((token, offset, offset + len(token.content)))
             offset += len(token.content)
 
+    def visibility(self, content: str, md: MarkdownIt, env: dict) -> bytearray:
+        """Record source spans while CommonMark inline rules consume them.
 
-def _inline_visibility(content: str, md: MarkdownIt, env: dict) -> list[bool]:
-    """Record source spans while CommonMark inline rules consume them.
-
-    Link labels use the same state. Image alternatives use a separate state,
-    whose source positions must not enter the outer document.
-    """
-    tracker = _InlineTracker([True] * len(content))
-    rules = {
-        "link": link,
-        "image": image,
-        "autolink": autolink,
-        "html_inline": html_inline,
-        "backticks": backtick,
-        "emphasis": emphasis.tokenize,
-        "strikethrough": strikethrough.tokenize,
-    }
-    for name, rule in rules.items():
-        md.inline.ruler.at(name, tracker.wrap(name, rule))
-    children: list[MarkdownToken] = []
-    md.inline.parse(content, md, env, children)
-    for token, start, end in tracker.delimiters:
-        if token.type != "text" or not token.content:
-            tracker.visible[start:end] = [False] * (end - start)
-    return tracker.visible
+        Link labels use the same state. Image alternatives use a separate
+        state, whose source positions must not enter the outer document.
+        """
+        self.visible = bytearray(b"\x01") * len(content)
+        self.root_state = None
+        self.delimiters = []
+        children: list[MarkdownToken] = []
+        md.inline.parse(content, md, env, children)
+        for token, start, end in self.delimiters:
+            if token.type != "text" or not token.content:
+                self.hide(start, end)
+        return self.visible
 
 
-def _source_positions(
+def _source_runs(
     content: str, src: str, lines: list[int], line_map: list[int], cursor: int
-) -> list[int]:
-    """Map stripped block content back to its original source characters."""
-    positions: list[int] = []
+) -> list[tuple[int, int]]:
+    """Map stripped block content back to its original source characters.
+
+    Each run is a source start and a length. The runs cover the content in
+    order, and the characters of one run are adjacent in the source.
+    """
+    runs: list[tuple[int, int]] = []
     line_no = line_map[0]
     for chunk in content.splitlines(keepends=True):
         if line_no >= len(lines) - 1:
@@ -273,7 +293,8 @@ def _source_positions(
         body = chunk.rstrip("\n")
         found = src.find(body, start, end) if body else start
         if found >= 0:
-            positions.extend(range(found, found + len(body)))
+            if body:
+                runs.append((found, len(body)))
         else:
             # The table rule removes an escape before a pipe. Keep each
             # surviving character at its original position.
@@ -282,28 +303,41 @@ def _source_positions(
                 next_pos = src.find(char, at, end)
                 if next_pos < 0:
                     next_pos = min(at, end - 1)
-                positions.append(next_pos)
+                runs.append((next_pos, 1))
                 at = next_pos + 1
         if chunk.endswith("\n"):
             newline = src.find("\n", lines[line_no], end)
-            positions.append(newline if newline >= 0 else end - 1)
+            runs.append((newline if newline >= 0 else end - 1, 1))
         line_no += 1
         cursor = lines[line_no] if line_no < len(lines) else len(src)
-    return positions
+    return runs
 
 
 def _copy_segments(
-    src: str, masked: list[str], positions: list[int], visible: list[bool], front: int
+    src: str, masked: list[str], runs: list[tuple[int, int]], visible: bytearray, front: int
 ) -> list[tuple[int, int]]:
     segments: list[tuple[int, int]] = []
-    for index, pos in enumerate(positions):
-        if pos < front or not visible[index]:
-            continue
-        masked[pos] = src[pos]
-        if segments and pos == segments[-1][1]:
-            segments[-1] = (segments[-1][0], pos + 1)
-        else:
-            segments.append((pos, pos + 1))
+    offset = 0
+    for pos, length in runs:
+        index, stop = offset, offset + length
+        shift = pos - offset
+        offset = stop
+        while index < stop:
+            index = visible.find(1, index, stop)
+            if index < 0:
+                break
+            hidden = visible.find(0, index, stop)
+            hidden = stop if hidden < 0 else hidden
+            first = max(index + shift, front)
+            last = hidden + shift
+            index = hidden
+            if first >= last:
+                continue
+            masked[first:last] = src[first:last]
+            if segments and first == segments[-1][1]:
+                segments[-1] = (segments[-1][0], last)
+            else:
+                segments.append((first, last))
     return segments
 
 
@@ -319,6 +353,8 @@ def _block_kind(stack: list[str]) -> str:
 
 def _collect_blocks(src: str, md: MarkdownIt, env: dict, masked: list[str]) -> list[_Block]:
     tokens = md.parse(src, env)
+    tracker = _InlineTracker()
+    tracker.install(md)
     lines = [0, *(match.end() for match in re.finditer(r"\r\n|\r|\n", src))]
     if lines[-1] != len(src):
         lines.append(len(src))
@@ -332,11 +368,11 @@ def _collect_blocks(src: str, md: MarkdownIt, env: dict, masked: list[str]) -> l
         if token.nesting == 1:
             stack.append(token.type)
         if token.type == "inline" and token.map is not None and token.content:
-            positions = _source_positions(token.content, src, lines, token.map, cursor)
-            if positions:
-                cursor = positions[-1] + 1
-            visible = _inline_visibility(token.content, md, env)
-            segments = _copy_segments(src, masked, positions, visible, front)
+            runs = _source_runs(token.content, src, lines, token.map, cursor)
+            if runs:
+                cursor = runs[-1][0] + runs[-1][1]
+            visible = tracker.visibility(token.content, md, env)
+            segments = _copy_segments(src, masked, runs, visible, front)
             if segments:
                 start = segments[0][0]
                 blocks.append(
