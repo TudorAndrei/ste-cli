@@ -1,42 +1,51 @@
 [tools]
-go = "1.27.1"
+python = "3.13"
+uv = "0.13.8"
+
+[tasks.sync]
+description = "Install the Python development tools"
+run = "uv sync --locked"
 
 [tasks.fmt]
-description = "Format the Go sources"
-run = "gofmt -w ."
+description = "Format the Python source"
+run = "uv run ruff format ."
 
 [tasks.test]
 description = "Run all tests"
-run = "go test ./..."
+run = "uv run pytest"
 
-[tasks.vet]
-description = "Run the Go static checks"
-run = "go vet ./..."
+[tasks.lint]
+description = "Check the Python source"
+run = "uv run ruff check ."
+
+[tasks.typecheck]
+description = "Check Python types"
+run = "uv run ty check"
 
 [tasks.fmt-check]
-description = "Fail if a file needs gofmt"
-run = 'files="$(gofmt -l .)"; if [ -n "$files" ]; then echo "$files"; exit 1; fi'
+description = "Fail if a file needs formatting"
+run = "uv run ruff format --check ."
 
 [tasks.eval]
 description = "Measure the rules against the labeled corpus"
-run = "go run ./cmd/ste eval --fail-under 1.0 testdata"
+run = "uv run ste eval --fail-under 1.0 testdata"
 
 [tasks.lint-docs]
 description = "Check the documentation with the tool itself"
-run = "go run ./cmd/ste lint README.md AGENTS.md docs/ skill/"
+run = "uv run ste lint README.md AGENTS.md docs/ skill/"
 
 [tasks.check]
-description = "Format, vet, and test"
-depends = ["fmt", "vet", "test"]
+description = "Check the format, source, types, and tests"
+depends = ["fmt-check", "lint", "typecheck", "test"]
 
 [tasks.ci]
-description = "Check the format, vet, and test without a change to a file"
-depends = ["fmt-check", "vet", "test", "eval", "lint-docs"]
+description = "Run all checks without a change to a source file"
+depends = ["fmt-check", "lint", "typecheck", "test", "eval", "lint-docs"]
 
 [tasks.build]
-description = "Build the ste binary"
-run = "go build -o bin/ste ./cmd/ste"
+description = "Build the Python wheel and source archive"
+run = "uv build"
 
 [tasks.dist]
-description = "Build the release archives for all platforms into dist/"
+description = "Build the release files and checksums"
 run = "./scripts/dist.sh"

@@ -1,7 +1,7 @@
 name: ci
 
 # Each push and each pull request runs the same checks as a release: the
-# format, the static checks, the tests, the labeled corpus, and the lint of
+# format, Ruff and ty, the tests, the labeled corpus, and the lint of
 # the documentation with the tool itself.
 
 on:
@@ -15,11 +15,32 @@ permissions:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
       - uses: jdx/mise-action@v4
 
+      - name: Install Python packages
+        run: uv sync --locked --python "${{ matrix.python }}"
+
       - name: Check
         run: mise run ci
+        env:
+          UV_PYTHON: ${{ matrix.python }}
+
+  nlp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+      - name: Install NLP packages and the English model
+        run: |
+          uv sync --locked --extra nlp
+          uv run --extra nlp python -m spacy download en_core_web_sm
+      - name: Check the NLP analyzer
+        run: uv run --extra nlp pytest tests/test_analyzer.py tests/test_cli.py

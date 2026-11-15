@@ -1,10 +1,6 @@
 name: release
 
-# A tag that starts with "v" makes a GitHub release with the binaries for
-# all platforms. mise installs the tool from those release assets.
-#
-#   git tag v0.1.0
-#   git push origin v0.1.0
+# A version tag makes a GitHub release with a Python wheel and source archive.
 
 on:
   push:
@@ -25,7 +21,7 @@ jobs:
       - name: Test
         run: mise run ci
 
-      - name: Build the release archives
+      - name: Build the release files
         run: ./scripts/dist.sh "${GITHUB_REF_NAME}"
 
       - name: Make the GitHub release
