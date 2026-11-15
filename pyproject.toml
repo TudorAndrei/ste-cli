@@ -29,6 +29,7 @@ Repository = "https://github.com/TudorAndrei/ste-cli"
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.170.15",
     "pytest>=8.3",
     "ruff>=0.14",
     "ty>=0.0.1",
