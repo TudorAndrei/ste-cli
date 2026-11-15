@@ -529,9 +529,9 @@ ste analyzer                 # what it needs, and how to install it
 ste lint --analyze docs/     # use it
 ```
 
-The command sends only the sentences of a possible finding, and it keeps
-each answer. On a repository of 180 files, the analyzer removed 26 wrong
-findings of rule 3.6, and the run went from 0.24s to 1.30s.
+The command sends the sentences of a file to the model in one batch. A
+cache on the disk keeps each answer for the next run. The analyzer removes
+wrong findings of rule 3.6. See [the analyzer](analyzer.md) for the times.
 
 The analyzer is optional. Basic checks need no model. Rules 2.1 and 5.3
 need the analyzer. Rules 3.5 and 3.6 can use it for more exact results.
