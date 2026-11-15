@@ -1,0 +1,8 @@
+{
+  "analyze": true,
+  "expect": [
+    { "rule_id": "STE-2.1", "text": "engine fuel pump control unit" },
+    { "rule_id": "STE-2.1", "text": "pressure filter element seal" },
+    { "rule_id": "STE-5.3", "text": "Installation" }
+  ]
+}
