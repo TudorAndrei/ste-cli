@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 4 dependencies. It has 20 checks. The standard has
+It is a Python command with optional NLP analysis. It has 20 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -11,49 +11,47 @@ Documentation: <https://tudorandrei.github.io/ste-cli/>
 
 ## Installation
 
-### With mise
-
-The GitHub backend of [mise](https://mise.jdx.dev) gets the binary from the
-GitHub releases of this repository:
+Python 3.11 or later is necessary. Install from the repository with uv:
 
 ```bash
-mise use -g github:TudorAndrei/ste-cli        # the newest release
-mise use -g github:TudorAndrei/ste-cli@<version>  # one version
+uv tool install git+https://github.com/TudorAndrei/ste-cli
 ste version
 ```
 
-To pin the tool for one project, put this in the `mise.toml` of that
-project:
-
-```toml
-[tools]
-"github:TudorAndrei/ste-cli" = "latest"
-```
-
-mise finds the correct asset for your platform without an option, because
-the archive names use the words that its asset matcher knows. Each
-release also has a `checksums.txt` file. mise verifies the download against
-it and records the result in `mise.lock`.
-
-The releases give binaries for macOS (arm64, x64), Linux (arm64, x64), and
-Windows (x64).
-
-### With Go
-
-This path does not need a release:
+To select a release, append its tag to the repository URL:
 
 ```bash
-mise use -g "go:github.com/TudorAndrei/ste-cli/cmd/ste"
-# or
-go install github.com/TudorAndrei/ste-cli/cmd/ste@latest
+uv tool install git+https://github.com/TudorAndrei/ste-cli@v0.11.0
+```
+
+Each new Python release contains a wheel, a source archive, and
+`checksums.txt`. You can also install a downloaded wheel:
+
+```bash
+uv tool install ./ste_cli-0.11.0-py3-none-any.whl
 ```
 
 ### From the source
 
 ```bash
-mise install        # gets the Go version from mise.toml
-mise run build      # writes bin/ste
+git clone https://github.com/TudorAndrei/ste-cli
+cd ste-cli
+uv sync --locked
+uv run ste version
 ```
+
+### Optional NLP
+
+Install spaCy and its English model in the project environment:
+
+```bash
+uv sync --extra nlp
+uv run python -m spacy download en_core_web_sm
+uv run ste lint --analyze docs/
+```
+
+Basic checks need no NLP model. The analyzer runs in the same Python process.
+`--analyzer` can still select an external analyzer.
 
 ## Usage
 
@@ -369,7 +367,7 @@ each column counts characters, because a code host counts so.
 
 ## Use in CI
 
-This repository is also a GitHub Action. It installs a release, verifies it
+This repository is also a GitHub Action. It installs a Python wheel and verifies it
 against `checksums.txt`, and runs `ste lint` with the `github` format:
 
 ```yaml
@@ -388,7 +386,7 @@ ste lint --format sarif . > ste.sarif
 ```
 
 The repository also has a hook for [pre-commit](https://pre-commit.com).
-The hook builds the command with Go, and it gives `--fail-on-new`:
+The hook installs the command with Python, and it gives `--fail-on-new`:
 
 ```yaml
 repos:
@@ -428,15 +426,13 @@ and its limits. The numbers are the rule numbers of Issue 9.
 
 ## Dependencies
 
-| Module | License | Function |
-|---|---|---|
-| [goldmark](https://github.com/yuin/goldmark) | MIT | Reads the Markdown. It follows CommonMark 0.31.2, and its syntax tree keeps the byte offsets that each finding needs. |
-| [go-yaml](https://github.com/goccy/go-yaml) | MIT | Reads the glossary file. |
-| [pflag](https://github.com/spf13/pflag) | BSD-3-Clause | Reads the command flags. |
-| [xdg](https://github.com/adrg/xdg) | MIT | Gives the data directory of the user for each system. |
+- The markdown-it-py library reads CommonMark, tables, and strikethrough text.
+- PyYAML reads the configuration.
+- The platformdirs library gives the data directory of the user.
+- The spaCy library supplies optional grammar analysis.
 
-All 4 are pure Go. The build needs no C compiler, and it gives one binary
-for each platform.
+Ruff checks and formats the source. ty checks types. pytest runs the tests.
+uv manages the environment, dependencies, and builds.
 
 ## More exact rules with an analyzer
 
@@ -446,8 +442,9 @@ Some rules need the grammar of a sentence. "The demand is measured" and
 "there is measured demand" have the same words, and only the grammar gives
 the difference.
 
-<!-- ste-enable STE-3.6 --> Go has no library that gives the grammar of English with a
-trained model. An external program gives it:
+<!-- ste-enable STE-3.6 -->
+
+The optional spaCy analyzer gives the grammar of English:
 
 ```bash
 ste analyzer                 # what it needs, and how to install it
@@ -458,8 +455,8 @@ The command sends only the sentences of a possible finding, and it keeps
 each answer. On a repository of 180 files, the analyzer removed 26 wrong
 findings of rule 3.6, and the run went from 0.24s to 1.30s.
 
-The analyzer is never necessary. Each rule also works without it, and the
-command stays one binary with no runtime.
+The analyzer is optional. Basic checks need no model. Rules 2.1 and 5.3
+need the analyzer. Rules 3.5 and 3.6 can use it for more exact results.
 
 ## For an agent
 
@@ -483,44 +480,44 @@ person.
 ## Structure
 
 ```text
-cmd/ste/                  the command
-internal/checker/         the parser and the entry point
-internal/checker/rules/   the rules and their data
-internal/config/          the glossary reader
-internal/dict/            the reader of the dictionary of the user
-internal/eval/            the measurement of the rules
-internal/report/          the output: text, JSON, NDJSON, SARIF, and GitHub
-internal/baseline/        the file of accepted findings
-internal/analyzer/        the client of the analyzer of the grammar
-testdata/                 the labeled corpus
-docs/                     the rules, the audit, and the measurement
+src/ste/cli.py           the commands and project paths
+src/ste/document.py      the Markdown parser and source positions
+src/ste/checker.py       the checker entry point
+src/ste/rules/           the rules and their data
+src/ste/config.py        the configuration reader
+src/ste/dictionary.py    the dictionary importer
+src/ste/evaluation.py    the measurement of the rules
+src/ste/report.py        the output formats
+src/ste/baseline.py      the accepted findings
+src/ste/analyzer.py      local NLP and the external analyzer protocol
+tests/                  the Python tests
+testdata/               the labeled corpus
+docs/                   the rules, the audit, and the measurement
 ```
 
-## Tests
+## Development
 
 ```bash
-mise run check      # gofmt, go vet, go test
-mise run ci         # the same, but no file changes: gofmt only reports
+uv sync --locked
+uv run ruff format --check .
+uv run ruff check .
+uv run ty check
+uv run pytest
+uv run ste eval --fail-under 1.0 testdata
 ```
 
-Result on 2026-09-22: all tests pass. 9 packages, 0 failures.
+`mise run ci` runs these checks and the documentation check.
 
 ## Release
 
-A tag that starts with `v` starts the release workflow in
-`.github/workflows/release.yml`. The workflow runs the tests, builds the
-archives for the 5 platforms, and makes the GitHub release with a
-`checksums.txt` file.
-
-To make the same archives on your computer:
+Set the version in `pyproject.toml` and `src/ste/__init__.py` before you tag
+a release. A tag that starts with `v` starts the release workflow. The tag
+must agree with the package version. The workflow builds a wheel and a
+source archive, then adds them and `checksums.txt` to the GitHub release.
 
 ```bash
 mise run dist       # writes dist/
 ```
-
-The version in the binary comes from the tag, through
-`-ldflags "-X main.Version=<version>"`. A build from the source without
-that flag says `dev`.
 
 ## What the tool does not check
 
@@ -535,8 +532,8 @@ not as a defect.
 
 ## Limits
 
-- The tool has no part-of-speech tagger. It uses word lists and short word
-  sequences.
+- Without the optional analyzer, the tool uses word lists and short word
+  sequences. The analyzer supplies parts of speech and grammar relations.
 - The tool does not ship the ASD-STE100 approved-word dictionary. Its
   own list holds 27 words and 11 word groups. `ste dict import` makes an
   index from your copy

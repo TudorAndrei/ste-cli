@@ -8,7 +8,7 @@ description: A deterministic ASD-STE100 checker for Markdown and plain text. Sta
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is one Go binary with 4 dependencies. It gives you the rule identifier,
+It is a Python command with optional NLP analysis. It gives you the rule identifier,
 the exact character range, a message, a severity, and a confidence value for
 each finding. A person or a machine can then make the correction.
 
@@ -26,34 +26,24 @@ and this tool does not contain that dictionary. Read
 
 ## Installation
 
-### With mise
-
-The GitHub backend of [mise](https://mise.jdx.dev) gets the binary from the
-releases of this repository:
+Python 3.11 or later is necessary. Install from the repository with uv:
 
 ```bash
-mise use -g github:TudorAndrei/ste-cli        # the newest release
-mise use -g github:TudorAndrei/ste-cli@<version>  # one version
+uv tool install git+https://github.com/TudorAndrei/ste-cli
 ste version
 ```
 
-To pin the tool for one project, put this in the `mise.toml` of that
-project:
-
-```toml
-[tools]
-"github:TudorAndrei/ste-cli" = "latest"
-```
-
-mise finds the correct asset for your platform without an option. Each
-release also has a `checksums.txt` file. mise verifies the download against
-it and records the result in `mise.lock`. There are binaries for macOS (arm64, x64),
-Linux (arm64, x64), and Windows (x64).
-
-### With Go
+To select a release, append its tag to the repository URL:
 
 ```bash
-go install github.com/TudorAndrei/ste-cli/cmd/ste@latest
+uv tool install git+https://github.com/TudorAndrei/ste-cli@v0.11.0
+```
+
+Each new Python release contains a wheel, a source archive, and
+`checksums.txt`. You can also install a downloaded wheel:
+
+```bash
+uv tool install ./ste_cli-0.11.0-py3-none-any.whl
 ```
 
 ### From the source
@@ -61,9 +51,22 @@ go install github.com/TudorAndrei/ste-cli/cmd/ste@latest
 ```bash
 git clone https://github.com/TudorAndrei/ste-cli
 cd ste-cli
-mise install
-mise run build      # writes bin/ste
+uv sync --locked
+uv run ste version
 ```
+
+### Optional NLP
+
+Install spaCy and its English model in the project environment:
+
+```bash
+uv sync --extra nlp
+uv run python -m spacy download en_core_web_sm
+uv run ste lint --analyze docs/
+```
+
+Basic checks need no NLP model. The analyzer runs in the same Python process.
+`--analyzer` can still select an external analyzer.
 
 ## First steps
 
@@ -413,7 +416,7 @@ ste lint --fail-over 2.5 docs/
 
 ### GitHub Actions
 
-This repository is also an action. It installs a release, verifies it
+This repository is also an action. It installs a Python wheel and verifies it
 against `checksums.txt`, and runs `ste lint` with the `github` format:
 
 ```yaml
@@ -438,7 +441,7 @@ does.
 ### pre-commit
 
 The repository has a hook for [pre-commit](https://pre-commit.com). The
-hook builds the command with Go, and it gives `--fail-on-new`:
+hook installs the command with Python, and it gives `--fail-on-new`:
 
 ```yaml
 repos:
@@ -514,8 +517,9 @@ Some rules need the grammar of a sentence. "The demand is measured" and
 "there is measured demand" have the same words, and only the grammar gives
 the difference.
 
-<!-- ste-enable STE-3.6 --> Go has no library that gives the grammar of English with a
-trained model. An external program gives it:
+<!-- ste-enable STE-3.6 -->
+
+The optional spaCy analyzer gives the grammar of English:
 
 ```bash
 ste analyzer                 # what it needs, and how to install it
@@ -526,8 +530,8 @@ The command sends only the sentences of a possible finding, and it keeps
 each answer. On a repository of 180 files, the analyzer removed 26 wrong
 findings of rule 3.6, and the run went from 0.24s to 1.30s.
 
-The analyzer is never necessary. Each rule also works without it, and the
-command stays one binary with no runtime.
+The analyzer is optional. Basic checks need no model. Rules 2.1 and 5.3
+need the analyzer. Rules 3.5 and 3.6 can use it for more exact results.
 
 ## For an agent
 
@@ -625,8 +629,8 @@ not as a defect.
 
 ## Limits
 
-- The tool has no part-of-speech tagger. It uses word lists and short word
-  sequences. Thus it does not find all violations, and some findings are
+- Without the optional analyzer, the tool uses word lists and short word
+  sequences. The analyzer supplies parts of speech and grammar relations. Thus it does not find all violations, and some findings are
   wrong.
 - The tool does not ship the ASD-STE100 approved-word dictionary. Its
   own list holds 27 words and 11 word groups. `ste dict import` makes an

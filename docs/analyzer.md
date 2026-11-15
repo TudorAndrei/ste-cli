@@ -16,9 +16,8 @@ gives the difference.
 
 <!-- ste-enable STE-3.6 -->
 
-Go has no library that gives the grammar of English with a trained model.
-spaCy does. Thus the grammar comes from this program, and not from the
-binary.
+The Python command uses spaCy to get the grammar of English. The default
+analyzer runs in the same process as the checker.
 
 ## Use
 
@@ -33,18 +32,19 @@ ste lint --analyze docs/     # use it
 The analyzer cannot run: spaCy is not installed for /usr/bin/python3
 
 To make it work:
-  uv pip install spacy
+  uv sync --extra nlp
   /usr/bin/python3 -m spacy download en_core_web_sm
 ```
 
-The binary holds the analyzer. You need no file from this repository.
-The tool writes it to the cache directory and starts it. `$STE_PYTHON`
-gives a different interpreter, and `analyzer: true` in the config makes
-`--analyze` the default.
+The package contains the analyzer. You need no separate script.
+`analyzer: true` in the config makes `--analyze` the default.
+`$STE_PYTHON` selects a separate interpreter when necessary.
 
-The command starts the program one time for each run, and the model loads
-one time. The command sends only the sentences of a possible finding, and it
+The model loads one time for each run. The command sends only the sentences of a possible finding, and it
 keeps the answer for each sentence.
+
+The following measurements come from the earlier Go implementation. They
+do not measure the Python port.
 
 | Run of 180 files | Findings | Time |
 |---|---|---|
@@ -79,6 +79,6 @@ out: {"id": 1, "tokens": [{"i":0,"text":"The","pos":"DET","dep":"det",
 
 The program gives `{"ready": true}` first. `{"stop": true}` ends it. A
 different program can replace spaCy. It must give only a part of speech and
-a relation for each token. `internal/analyzer/testdata/stub_analyzer.py` is
+a relation for each token. `tests/fixtures/stub_analyzer.py` is
 an example that needs no library. `--analyzer "<command>"` gives your own
 program to the tool.

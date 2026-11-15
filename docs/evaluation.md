@@ -7,6 +7,9 @@ description: The measured precision and recall of the rules, the defects that a 
 
 [Back to the start page](index.md)
 
+These measurements describe the Go implementation before the Python port.
+Run the commands below to measure the current version.
+
 Measurement date: 2026-09-02. Verb data version 1.1.0, term data version
 1.0.0. The rules agree with ASD-STE100 Issue 9. Refer to
 [the audit of the standard](#4-audit-against-issue-9).
@@ -14,8 +17,8 @@ Measurement date: 2026-09-02. Verb data version 1.1.0, term data version
 Run the measurement again with:
 
 ```bash
-go run ./cmd/ste eval testdata
-go run ./cmd/ste eval --format json testdata
+uv run ste eval testdata
+uv run ste eval --format json testdata
 ```
 
 ## 1. Labeled corpus
@@ -66,14 +69,14 @@ before:
 recall goes below 1.00:
 
 ```bash
-go run ./cmd/ste eval --fail-under 1.0 testdata
+uv run ste eval --fail-under 1.0 testdata
 ```
 
 **Read these numbers with care.** The same person wrote the rules and the
 fixtures. A score of 1.00 on this corpus shows only that the rules agree
 with their own examples. It is a guard against a change that breaks a rule,
 but it does not measure the quality on new text. The unit tests in
-`internal/checker/rules/testdata/verbs.json` (22 cases) have the same limit.
+`tests/test_rules_cases.py` (22 cases) have the same limit.
 
 ## 2. Unlabeled documents
 
