@@ -17,7 +17,7 @@ mechanical answer.
 | Possible with no new library | 1 | `ste lint`, later |
 | Built, and they use the analyzer | 4 of those 21 | `ste lint --analyze` |
 | Possible with a part-of-speech tagger | 8 | an optional analyzer, later |
-| A judgment of a reader | 13 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill) |
+| A judgment of a reader | 13 | the [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill), or the optional [`ste review`](review.md) |
 | Partial only | 9 | both |
 
 ## Built
@@ -110,6 +110,11 @@ The
 gives these rules to an agent. The skill states that each finding is advice,
 and not a defect, because no test of this group gives the same answer each
 time.
+
+The optional [`ste review`](review.md) command sends each paragraph to a
+language model with these rules. Each finding has the `info` severity and
+the `advice` kind. The advice is not reproducible, and it never changes the
+exit code of `ste lint` or the baseline.
 
 ## Why the tool does not try each rule
 

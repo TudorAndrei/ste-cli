@@ -70,6 +70,15 @@ A baseline of one directory keeps the accepted findings of the other
 directories. `kept` gives their number, and `removed` gives the number of
 accepted findings of the deleted files.
 
+## A review costs money
+
+`ste review` sends each paragraph to a language model of Anthropic. It needs
+the `llm` extra and `ANTHROPIC_API_KEY`, and each request costs money. Run
+`ste review --dry-run --format json <path>` first, and give the number of
+requests to the user. Each finding has `"kind": "advice"` and the `info`
+severity. It is not a defect, and a second run can give different advice.
+Refer to [the review page](docs/review.md).
+
 ## Paths start from the project
 
 The tool looks for the config from the current directory upward, and it
