@@ -3,7 +3,7 @@
 
 from ste.grammar import passive_at
 from ste.models import Diagnostic, Document, Options, Sentence
-from ste.rules.common import span
+from ste.rules.common import QUOTE_MARKS, span
 from ste.rules.data import (
     ADJECTIVAL_ING,
     ADJECTIVAL_PARTICIPLES,
@@ -15,6 +15,7 @@ from ste.rules.data import (
     VERB_FORMS,
 )
 
+PLANNED_BE = frozenset({"am", "are", "is", "was", "were"})
 MIN_PARTICIPLE_LENGTH = 3
 MIN_ING_LENGTH = 4
 MIN_ADVERB_LENGTH = 3
@@ -55,7 +56,7 @@ def joined(s: Sentence, first: int, last: int) -> bool:
         start, end = s.tokens[k].end - s.start, s.tokens[k + 1].start - s.start
         if start < 0 or end > len(s.text) or start > end:
             return False
-        if any(c.isascii() and c.isalnum() for c in s.text[start:end]):
+        if any((c.isascii() and c.isalnum()) or c in QUOTE_MARKS for c in s.text[start:end]):
             return False
     return True
 
@@ -89,6 +90,32 @@ def match_perfect(s: Sentence, i: int) -> Diagnostic | None:
     if is_participle(s.tokens[j].lower):
         return perfect_diag(s, i, j, 0.9)
     return None
+
+
+def match_planned(s: Sentence, i: int) -> Diagnostic | None:
+    """Find "is to be" and a participle, a construction of three auxiliaries."""
+    if s.tokens[i].lower not in PLANNED_BE or i + 2 >= len(s.tokens):
+        return None
+    if [s.tokens[i + 1].lower, s.tokens[i + 2].lower] != ["to", "be"]:
+        return None
+    k = next_content(s, i + 3)
+    if k >= len(s.tokens) or not joined(s, i, k) or not is_participle(s.tokens[k].lower):
+        return None
+    confidence = 0.85
+    if s.tagged and s.tokens[k].tag:
+        if s.tokens[k].tag != "VBN":
+            return None
+        confidence = SYNTAX_CONFIDENCE
+    return Diagnostic(
+        "STE-3.4",
+        f'"{span(s, i, k)}" is a complex verb construction. '
+        "ASD-STE100 does not approve more than one auxiliary verb with a verb.",
+        "warning",
+        confidence,
+        s.tokens[i].start,
+        s.tokens[k].end,
+        'Write a command, or write "must" and the active voice.',
+    )
 
 
 def match_progressive(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
@@ -173,6 +200,8 @@ def verbs(doc: Document, opts: Options) -> list[Diagnostic]:
             if t.lower in PERFECT_AUX and (d := match_perfect(s, i)):
                 perfect.append(d)
             if t.lower in BE_FORMS:
+                if d := match_planned(s, i):
+                    perfect.append(d)
                 if d := match_progressive(s, i, opts):
                     other.append(d)
                 if p := match_passive(s, i, opts):

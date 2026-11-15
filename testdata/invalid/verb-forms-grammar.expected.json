@@ -1,0 +1,12 @@
+{
+  "mode": "flavored",
+  "analyze": true,
+  "expect": [
+    { "rule_id": "STE-3.3", "text": "created" },
+    { "rule_id": "STE-3.3", "text": "installed" },
+    { "rule_id": "STE-3.2", "text": "Should" },
+    { "rule_id": "STE-3.2", "text": "would be" },
+    { "rule_id": "STE-3.6", "text": "be deployed" },
+    { "rule_id": "STE-3.6", "text": "was approved" }
+  ]
+}

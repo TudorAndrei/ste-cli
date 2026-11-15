@@ -2,6 +2,7 @@
 """Checks that use syntax from an NLP analyzer."""
 
 from ste.models import Diagnostic, Document, Options, Sentence, SyntaxToken
+from ste.rules.common import quoted
 from ste.rules.data import ADJECTIVAL_ING, BE_FORMS, CONDITION_WORDS, GERUND_DEPS
 
 MIN_PROCEDURE_ITEMS = 2
@@ -153,7 +154,11 @@ def gerund(doc: Document, opts: Options) -> list[Diagnostic]:
             if t.tag != "VBG" or t.pos != "VERB" or t.dep not in GERUND_DEPS:
                 continue
             word = t.text.lower()
-            if opts.allowed(word) or word in ADJECTIVAL_ING:
+            if (
+                opts.allowed(word)
+                or word in ADJECTIVAL_ING
+                or quoted(s.text, t.start, t.start + len(t.text))
+            ):
                 continue
             if any(
                 other.head == t.index

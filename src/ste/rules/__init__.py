@@ -14,6 +14,7 @@ from ste.rules.structure import (
 )
 from ste.rules.surface import contractions, semicolons, sentence_length
 from ste.rules.syntax import gerund, imperative, noun_cluster
+from ste.rules.verb_forms import participle_use, verb_tense
 from ste.rules.verbs import verbs
 from ste.rules.words import (
     latin_abbreviations,
@@ -49,4 +50,6 @@ def all_rules() -> list[Rule]:
         imperative,
         noun_cluster,
         gerund,
+        verb_tense,
+        participle_use,
     ]

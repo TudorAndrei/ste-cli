@@ -9,6 +9,17 @@ from ahocorasick_rs import AhoCorasick
 if TYPE_CHECKING:
     from ste.models import Sentence
 
+# A quotation mark next to a word makes the word a mention, and not a verb.
+QUOTE_MARKS = frozenset("\"'`\u2018\u2019\u201c\u201d")
+
+
+def quoted(text: str, start: int, end: int) -> bool:
+    """Check that a quotation mark is directly before or after a span of a text."""
+    return (start > 0 and text[start - 1] in QUOTE_MARKS) or (
+        end < len(text) and text[end] in QUOTE_MARKS
+    )
+
+
 # A token never holds this character, so it marks each token boundary.
 _SEPARATOR = "\x00"
 

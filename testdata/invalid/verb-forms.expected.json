@@ -1,0 +1,12 @@
+{
+  "mode": "flavored",
+  "expect": [
+    { "rule_id": "STE-3.2", "text": "would see" },
+    { "rule_id": "STE-3.2", "text": "should not restart" },
+    { "rule_id": "STE-3.2", "text": "may fail" },
+    { "rule_id": "STE-3.2", "text": "might stop" },
+    { "rule_id": "STE-3.2", "text": "shall remove" },
+    { "rule_id": "STE-3.4", "text": "is to be installed" },
+    { "rule_id": "STE-3.4", "text": "is to be sent" }
+  ]
+}

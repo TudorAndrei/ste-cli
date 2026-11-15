@@ -502,8 +502,10 @@
       "default_severity": "warning",
       "confidence": [
         0.9,
+        0.85,
         0.55
-      ]
+      ],
+      "note": "0.9 for a perfect, or for \"is to be\" and a participle that the analyzer gives as a participle. 0.85 for \"is to be\" and a participle without the analyzer. 0.55 for \"has been\" and a word that is not a participle."
     },
     {
       "id": "STE-3.5",
@@ -681,6 +683,28 @@
         0.8
       ],
       "note": "The rule needs the analyzer. A name of many words is one unit by rule 8.6, thus the rule does not report it."
+    },
+    {
+      "id": "STE-3.2",
+      "name": "A verb form that is not an approved tense",
+      "standard_rule": "3.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.9,
+        0.8
+      ],
+      "note": "Reports would, should, shall, may, and might with a verb. 0.9 when the analyzer gives the modal and its verb, 0.8 from the words alone. A perfect after the modal goes to STE-3.4."
+    },
+    {
+      "id": "STE-3.3",
+      "name": "A past participle that is not an adjective",
+      "standard_rule": "3.3",
+      "default_severity": "warning",
+      "confidence": [
+        0.8,
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reports a participle that is the verb of a reduced clause. 0.8 with a by-agent, 0.7 without one."
     }
   ],
   "schema_version": 1,
