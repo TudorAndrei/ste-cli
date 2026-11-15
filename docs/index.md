@@ -10,11 +10,11 @@ violations in Markdown and plain text.
 
 It is a Python command with optional NLP analysis. It gives you the rule identifier,
 the exact character range, a message, a severity, and a confidence value for
-each finding. A person or a machine can then make the correction.
+each finding. A person or a machine can then correct the text.
 
 The rule numbers agree with ASD-STE100 Issue 9.
 
-**It is an aid for a writer. It is not an ASD-certified checker.** It has 21
+**It is an aid for a writer. It is not an ASD-certified checker.** It has 31
 checks. The specification has 53 rules and a dictionary of approved words,
 and this tool does not contain that dictionary. Read
 [the limits](#limits) before you use it.
@@ -155,7 +155,7 @@ ste baseline .                # accept it, and write .ste-baseline.json
 ste lint --fail-on-new .      # from now, only a new violation fails
 ```
 
-The number in the baseline goes down when you correct the text. The report
+The number in the baseline becomes lower when you correct the text. The report
 then gives the number of accepted findings that the text no longer has.
 Write the file again with `ste baseline .` to record the new, lower number.
 
@@ -347,7 +347,7 @@ warnings_as_errors: false
 | `max_noun_words` | The word limit of a technical noun of the config (rule STE-1.9). No default. |
 | `baseline` | The path of the file of accepted findings |
 | `fail_over` | The score that makes the command exit with code 1 |
-| `warnings_as_errors` | Make each warning an error, and exit with code 1 |
+| `warnings_as_errors` | Change each warning to an error, and exit with code 1 |
 | `dictionary` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
 | `presets` | The subject fields whose technical nouns are permitted |
 | `analyzer` | Start the analyzer of the grammar for each run |
@@ -483,23 +483,34 @@ as one word.
 | Rule | Name | Example that it reports |
 |---|---|---|
 | `STE-1.1` | Unapproved word or word group | "Utilize the tool in order to start" |
+| `STE-1.2` | A word that is not the approved part of speech (needs the analyzer and the dictionary) | a noun that the dictionary approves only as a verb |
+| `STE-1.4` | An adjective form that the dictionary does not give (needs the analyzer and the dictionary) | a superlative when the entry gives only the comparative |
+| `STE-1.7` | A technical noun as a verb (needs the analyzer) | "Shim the bracket" when `allow.nouns` gives "shim" |
+| `STE-1.9` | A technical noun that is too long | a noun of the config that is longer than `max_noun_words` |
 | `STE-1.11` | Two names for the same item | "settings file" when `prefer` gives "config file" |
+| `STE-1.13` | A technical verb as a noun (needs the analyzer) | "Do the install again" when `allow.verbs` gives "install" |
 | `STE-1.14` | British spelling | "colour", "centre" |
 | `STE-2.1` | A noun of more than three words (needs the analyzer) | "engine oil pressure sensor cable" |
+| `STE-3.1` | A verb form that the dictionary does not give (needs the analyzer and the dictionary) | a past tense that the entry does not give |
+| `STE-3.2` | A verb form that is not an approved tense | "would see", "may fail" |
+| `STE-3.3` | A past participle that is not an adjective (needs the analyzer) | "the file created by the tool" |
 | `STE-3.4` | Complex verb construction | "has been sent" |
 | `STE-3.5` | Progressive "-ing" form | "is still running" |
 | `STE-3.6` | Passive voice | "was approved by the manager" |
 | `STE-3.7` | A noun for an action | "do a check of" |
-| `STE-4.2` | Contraction | "isn't" |
+| `STE-4.2` | Contraction, or an omitted article | "isn't", "Remove cover from the unit" |
 | `STE-4.3` | A list with two constructions | one item of three starts differently |
 | `STE-5.1` | Sentence too long | a 26-word sentence |
+| `STE-5.2` | More than one instruction in a step (needs the analyzer) | "1. Open the valve and remove the cap." |
 | `STE-5.3` | An instruction that is not a command (needs the analyzer) | "1. You should open the valve." |
 | `STE-5.4` | A condition after the command | "1. Open the valve if the light is on." |
 | `STE-5.5` | An instruction in a note | "NOTE: You must..." |
 | `STE-6.6` | Paragraph too long | a paragraph of 7 sentences |
 | `STE-7.1` | A safety instruction with no word for the level of the risk | "NOTE: This can damage the unit." |
+| `STE-7.2` | A safety instruction that does not start with a command (needs the analyzer) | "WARNING: The surface is hot." |
 | `STE-7.3` | A safety instruction with no explanation | a warning of one sentence |
 | `STE-8.1` | Semicolon | "Open the valve; then start the pump" |
+| `STE-8.2` | A compound modifier with no hyphen (needs the analyzer) | "high pressure valve" |
 | `STE-9.3` | Phrasal verb | "carry out the test" |
 | `STE-GR-6` | Latin abbreviation | "e.g." |
 
@@ -533,8 +544,9 @@ The command sends the sentences of a file to the model in one batch. A
 cache on the disk keeps each answer for the next run. The analyzer removes
 wrong findings of rule 3.6. See [the analyzer](analyzer.md) for the times.
 
-The analyzer is optional. Basic checks need no model. Rules 2.1 and 5.3
-need the analyzer. Rules 3.5 and 3.6 can use it for more exact results.
+The analyzer is optional. Basic checks need no model. 11 rules need the
+analyzer, and they give no finding without it. 12 more rules use it for
+more exact results. [coverage.md](coverage.md#the-analyzer) gives the list.
 
 ## For an agent
 
@@ -578,7 +590,7 @@ asks for a path. Give `-` to read standard input from a terminal.
 | `--mode` | `flavored` (default) or `strict` |
 | `--format` | `text` (default), `json`, `ndjson`, `sarif`, or `github` |
 | `--limit` | Maximum number of findings in the output |
-| `--fields` | The fields of a finding to give, separated by a comma |
+| `--fields` | The fields of a finding to give, with a comma between two fields |
 | `--summary` | Give only the summary |
 | `--fail-over` | Exit with code 1 when the score is more than this value |
 | `--max-words` | Replace the sentence limit of both sentence types |
@@ -587,7 +599,7 @@ asks for a path. Give `-` to read standard input from a terminal.
 | `--baseline` | Path of the file of accepted findings |
 | `--no-baseline` | Report every finding, and not only the new ones |
 | `--fail-on-new` | Exit with code 1 when a finding is not in the baseline |
-| `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
+| `--warnings-as-errors` | Change each warning to an error, and exit with code 1 |
 | `--use-dict` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
 | `--preset` | Add the technical nouns of a subject field: `software` |
 | `--analyze` | Use the analyzer for the rules that need the grammar of a sentence |
@@ -617,14 +629,17 @@ STE-3.6        1     0     0       1.00     1.00
 all           20     0     0       1.00     1.00
 ```
 
+A fixture with `"analyze": true` needs the analyzer. Without it, `ste eval`
+skips the fixture, and the report names it. `ste eval --analyze` stops with
+exit code 2 when the analyzer cannot start.
+
 [evaluation.md](evaluation.md) gives the measurements and says why the
 number on a self-written corpus is weak.
 
 ## What the tool does not check
 
-ASD-STE100 has 53 rules. This tool checks 30 of them today, 9 in full and
-21 in part. 9 more need a part-of-speech tagger. The other rules need a
-reader: "Make sure that each paragraph has only one topic" is an example.
+ASD-STE100 has 53 rules. This tool checks 39 of them today, 10 in full and
+29 in part. The other 14 rules need a reader: "Make sure that each paragraph has only one topic" is an example.
 
 [coverage.md](coverage.md) gives each rule and its group. The
 [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill)
@@ -639,15 +654,16 @@ not reproducible, and it never changes the exit code of `ste lint`. Refer to
 ## Limits
 
 - Without the optional analyzer, the tool uses word lists and short word
-  sequences. The analyzer supplies parts of speech and grammar relations. Thus it does not find all violations, and some findings are
-  wrong.
+  sequences. The analyzer supplies parts of speech and grammar relations,
+  and it also makes errors. Thus the tool does not find all violations, and
+  some findings are wrong.
 - The tool does not ship the ASD-STE100 approved-word dictionary. Its
   own list holds 27 words and 11 word groups. `ste dict import` makes an
   index from your copy
   of the specification, and `--use-dict` then gives rule 1.1 the full list.
   [upstream-audit.md](upstream-audit.md) gives the reason that the tool
   cannot ship it.
-- Recall on new text is low, because the tool has 21 checks and the
+- Recall on new text is low, because the tool has 31 checks and the
   standard has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

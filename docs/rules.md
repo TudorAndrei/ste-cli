@@ -1,14 +1,14 @@
 ---
 title: Rules
-description: The 21 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
+description: The 31 checks of the tool, with the Issue 9 rule number, the confidence value, and the known limits of each one.
 ---
 
 # Rules
 
 [Back to the start page](index.md)
 
-This tool has 21 checks. 2 of them need the analyzer of the grammar, and
-they give no finding without it. ASD-STE100 Issue 9 has 53 rules and a
+This tool has 31 checks. 11 of them need the analyzer of the grammar, and
+they give no finding without it. 3 of these 11 also need the dictionary. ASD-STE100 Issue 9 has 53 rules and a
 dictionary of approved words. The tool does not ship the dictionary. `ste dict import`
 makes an index from your own copy of the specification, and `--use-dict`
 then gives rule 1.1 the full word list.
@@ -762,8 +762,6 @@ number of forms.
 - An "-ing" verb does not get a finding. `STE-3.5` reports it.
 - A noun does not get a finding. The dictionary does not list the plural.
 
-<!-- ste-enable -->
-
 ## STE-8.2 A compound modifier with no hyphen
 
 **This rule needs the analyzer.** Run `ste lint --analyze`.
@@ -790,6 +788,8 @@ packages, each of the 11 findings was correct.
 Thus "new user account" and "high pressure valve" have the same grammar.
 The rule reports an adjective and a noun only for a pair of its list. It
 does not report a pair of nouns, such as "command line tool".
+
+<!-- ste-enable -->
 
 ## What the tool does not examine
 
@@ -843,23 +843,19 @@ The [start page](index.md) gives the full config and the other directives.
 
 ## Rules that this tool does not check
 
-The tool checks 30 of the 53 rules, 9 in full and 21 in part. It does not
-check the other 23. A guess gives wrong findings, thus the tool does not try.
+The tool checks 39 of the 53 rules, 10 in full and 29 in part. It does not
+check the other 14. Each of them needs a judgment of a reader, and a guess
+gives wrong findings. Thus the tool does not try.
 
 | Rule | Subject | Why not |
 |---|---|---|
-| 1.2 | The approved part of speech | Needs a part-of-speech tagger |
 | 1.3 | The approved meaning | A judgment of a reader |
-| 1.4, 3.1 | The forms of the dictionary | Needs a tagger and the forms of the dictionary |
 | 1.5, 1.12 | The category of a technical noun or verb | A judgment about the subject field |
 | 1.10 | Slang and jargon | A judgment of a reader |
 | 2.2 | The full form of a long technical noun | A judgment of a reader |
 | 4.4 | Connecting words | Needs semantics |
 | 4.5 | Articles and demonstrative adjectives | The exceptions of the standard make a check too noisy |
-| 5.2 | One instruction for each sentence | Cannot separate simultaneous actions without a parser |
 | 6.1, 6.2, 6.4, 6.5 | The order, the key words, and the topic of a paragraph | Needs semantics |
-| 7.2 | The order of a safety instruction | Needs a parser to find the command or the condition |
-| 8.2 | A hyphen between related words | Needs a parser to find the related words |
 | 8.3 | The permitted uses of parentheses | Needs semantics |
 | 9.1, 9.2 | A different construction, and each word in its correct place | Needs semantics |
 
@@ -868,10 +864,10 @@ rule that the tool checks.
 
 ## Limits of the tool
 
-- The tool has no part-of-speech tagger. It uses word lists and short word
-  sequences. Thus it does not find all violations, and some findings are
-  wrong.
-- The tool does not have the ASD-STE100 dictionary. It cannot tell you if
-  the standard approves a word.
+- Without the analyzer, the tool has no part-of-speech tagger. It uses word
+  lists and short word sequences. The analyzer also makes errors. Thus the
+  tool does not find all violations, and some findings are wrong.
+- The tool does not ship the ASD-STE100 dictionary. Without your own copy
+  and `--use-dict`, it cannot tell you if the standard approves a word.
 - The tool is an aid for a writer. **It is not an ASD-certified checker**,
   and it cannot give certification.

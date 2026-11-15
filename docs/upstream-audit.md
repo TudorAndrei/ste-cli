@@ -39,7 +39,7 @@ before the first import of an upstream data file.
 | Commit | `e193ecdd66b0` (2026-07-24) |
 | Language | Python |
 | Code license | Apache-2.0 |
-| Vocabulary path | `ste100/` data modules, extracted from the specification |
+| Vocabulary path | `ste100/` data modules that come from the specification |
 | Result | `do not use` (data), `borrow design only` (interfaces) |
 
 The repository holds `ASD-STE100-ISSUE-9.pdf` at its root. This is the
@@ -57,7 +57,7 @@ the later MCP and LSP interfaces.
 |---|---|
 | Commit | `3adb827991ee` (2026-08-21) |
 | Language | Rust |
-| Code license | Blue Oak Model License 1.0.0 |
+| Code license | Blue Oak Model License 1.0.0 <!-- ste-disable-line STE-2.1 --> |
 | Vocabulary path | `ste_checker/src/wordset.rs` with the openste word list |
 | Result | `borrow design only` |
 

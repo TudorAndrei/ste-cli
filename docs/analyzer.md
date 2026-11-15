@@ -109,19 +109,37 @@ measured user demand", where "measured" is an adjective of "demand".
 
 ## The rules that use it
 
-| Rule | Use |
-|---|---|
-| 2.1 noun cluster | The words of a noun cluster. The rule gives no finding without the analyzer. |
-| 3.5 "-ing" form | An "-ing" word that is a verb, and not a noun or a modifier |
-| 3.6 passive voice | A veto. The finding goes when the parser sees no passive relation. |
-| 5.3 command | The part of speech of the first word of a step. The rule gives no finding without the analyzer. |
-| 5.2 one instruction | The commands that join in one step. The rule gives no finding without the analyzer. |
-| 5.4 condition first | A condition clause after the command, such as "before you start the pump" |
-| 5.5 note | A note that starts with a command |
-| 7.2 safety command | The first sentence of a safety instruction. The rule gives no finding without the analyzer. |
+23 rules use the analyzer. 11 of them give no finding without it. Rules
+1.2, 1.4, and 3.1 also need `--use-dict` and an imported dictionary.
 
-Rules 3.5 and 3.6 work without the analyzer, and the analyzer makes them
-more exact. Rules 2.1 and 5.3 need it.
+| Rule | Without the analyzer | Use |
+|---|---|---|
+| 1.1 approved word | A basic check | The part of speech of a word that the dictionary rejects only as a verb |
+| 1.2 part of speech | No finding | The part of speech and the lemma of each word |
+| 1.4 adjective form | No finding | The lemma and the form of an adjective |
+| 1.7 technical noun | No finding | A technical noun that the sentence uses as a verb |
+| 1.13 technical verb | No finding | A technical verb that the sentence uses as a noun |
+| 1.14 spelling | A basic check | The part of speech of "licence" and "practise" |
+| 2.1 noun cluster | No finding | The words of a noun cluster |
+| 3.1 verb form | No finding | The lemma and the form of a verb |
+| 3.2 tense | A basic check | A modal and its verb, also with words between them |
+| 3.3 past participle | No finding | A participle that is the verb of a short clause |
+| 3.4 complex construction | A basic check | A participle after "is to be" |
+| 3.5 "-ing" form | A basic check | An "-ing" word that is a verb, and not a noun or a modifier |
+| 3.6 passive voice | A basic check | A veto. The finding goes when the parser sees no passive relation. |
+| 3.7 noun for an action | A basic check | A verb such as "perform" and a noun for an action as its object |
+| 4.2 omitted article | A basic check | A singular noun with no article |
+| 5.1 word count | A basic check | A name of many words, which counts as one word (rule 8.6) |
+| 5.2 one instruction | No finding | The commands that join in one step |
+| 5.3 command | No finding | The part of speech of the first word of a step |
+| 5.4 condition first | A basic check | A condition clause after the command, such as "before you start the pump" |
+| 5.5 note | A basic check | A note that starts with a command |
+| 7.2 safety command | No finding | The first sentence of a safety instruction |
+| 8.2 hyphen | No finding | Two words that modify a noun as one unit |
+| 9.3 phrasal verb | A basic check | A particle with words between it and its verb |
+
+A rule with a basic check works without the analyzer, and the analyzer
+makes it more exact.
 
 ## For a rule author
 
