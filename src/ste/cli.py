@@ -21,12 +21,12 @@ import typer
 from typer._click.core import Context, ParameterSource
 from typer.core import TyperCommand, TyperGroup, TyperOption
 
-from ste import __version__, analyzer, baseline, config, dictionary, evaluation, report
+from ste import __version__, analyzer, baseline, config, dictionary, evaluation, report, review
 from ste.checker import lint_document
 from ste.document import parse
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
     from typer._click.core import Parameter
 
@@ -165,6 +165,14 @@ class OutputFormat(StrEnum):
     github = "github"
 
 
+class ReviewFormat(StrEnum):
+    """List the report formats accepted by the review command."""
+
+    text = "text"
+    json = "json"
+    ndjson = "ndjson"
+
+
 class SimpleFormat(StrEnum):
     """List formats accepted by status and data commands."""
 
@@ -213,6 +221,25 @@ class LintOptions:
     limit: int = 0
     max_words: int = 0
     fail_over: float = -1
+
+
+@dataclass
+class ReviewOptions:
+    """Hold the parsed review command options."""
+
+    paths: list[str] = field(default_factory=list)
+    output_format: str = "text"
+    model: str = review.DEFAULT_MODEL
+    fields: str = ""
+    config: str = ""
+    summary: bool = False
+    no_config: bool = False
+    read_all: bool = False
+    no_cache: bool = False
+    dry_run: bool = False
+    limit: int = 0
+    jobs: int = review.DEFAULT_JOBS
+    timeout: float = review.DEFAULT_TIMEOUT
 
 
 @dataclass
@@ -467,6 +494,33 @@ def _lint_options(ns: LintOptions, cfg: config.Config) -> Options:
     return opts
 
 
+def _read_sources(
+    paths: list[str], proj: Project, cfg: config.Config, stdin: TextIO, *, read_all: bool
+) -> Iterator[tuple[str, str]]:
+    """Read each permitted file one time, and standard input for "-"."""
+    seen: set[Path] = set()
+    stdin_read = False
+    for path in paths:
+        if path == "-":
+            if not stdin_read:
+                stdin_read = True
+                yield STDIN_NAME, stdin.read()
+            continue
+        for file in text_files(path, proj.directory, cfg.exclude, all_files=read_all):
+            # Follow symbolic links before ".." is removed, as the system does.
+            key = Path(os.path.realpath(file))
+            if key in seen:
+                continue
+            seen.add(key)
+            with Path(file).open(encoding="utf-8", newline="") as stream:
+                try:
+                    text = stream.read()
+                except UnicodeDecodeError as err:
+                    msg = f"{file}: the file is not UTF-8 text"
+                    raise ValueError(msg) from err
+            yield file, text
+
+
 def _read_lint(
     ns: LintOptions, proj: Project, cfg: config.Config, opts: Options, stdin: TextIO
 ) -> list[report.FileResult]:
@@ -479,28 +533,10 @@ def _read_lint(
             raise ValueError(msg) from err
         opts.syntax = client
     try:
-        results = []
-        seen: set[Path] = set()
-        stdin_read = False
-        for path in ns.paths:
-            if path == "-":
-                if not stdin_read:
-                    stdin_read = True
-                    results.append(_lint_one(STDIN_NAME, stdin.read(), opts))
-            else:
-                for file in text_files(path, proj.directory, cfg.exclude, all_files=ns.read_all):
-                    # Follow symbolic links before ".." is removed, as the system does.
-                    key = Path(os.path.realpath(file))
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    with Path(file).open(encoding="utf-8", newline="") as stream:
-                        try:
-                            text = stream.read()
-                        except UnicodeDecodeError as err:
-                            msg = f"{file}: the file is not UTF-8 text"
-                            raise ValueError(msg) from err
-                    results.append(_lint_one(file, text, opts))
+        results = [
+            _lint_one(name, text, opts)
+            for name, text in _read_sources(ns.paths, proj, cfg, stdin, read_all=ns.read_all)
+        ]
     finally:
         if client is not None:
             client.close()
@@ -666,6 +702,87 @@ def _run_lint(ns: LintOptions, io: Streams, *, write: bool) -> int:
     rep = report.Report(opts.mode, results, accepted, stale)
     _lint_report(ns, rep, base_path, io.stdout, fields)
     return _lint_gate(ns, cfg, rep, opts, io.stderr)
+
+
+def _validate_review(ns: ReviewOptions, stdin: TextIO) -> list[str]:
+    fields = [f.strip() for f in ns.fields.split(",")] if ns.fields else []
+    if unknown := set(fields) - set(review.FIELDS):
+        msg = (
+            "no field is named "
+            f"{', '.join(sorted(unknown))}"
+            ". The fields are: "
+            f"{', '.join(review.FIELDS)}"
+        )
+        raise ValueError(msg)
+    if not ns.model.strip():
+        msg = "--model must name a model"
+        raise ValueError(msg)
+    if ns.timeout <= 0:
+        msg = "--timeout must be more than 0"
+        raise ValueError(msg)
+    if not ns.paths:
+        if stdin.isatty():
+            msg = 'give a file or a directory. Give "-" to read standard input.'
+            raise ValueError(msg)
+        ns.paths = ["-"]
+    return fields
+
+
+def _run_review(ns: ReviewOptions, io: Streams) -> int:
+    fields = _validate_review(ns, io.stdin)
+    proj = find_project(ns.config, no_config=ns.no_config)
+    cfg = config.load(proj.config_path)
+    sources = [
+        review.read_source(name, text)
+        for name, text in _read_sources(ns.paths, proj, cfg, io.stdin, read_all=ns.read_all)
+    ]
+    cache = review.Cache(None if ns.no_cache else review.cache_directory())
+    work = review.plan(sources, ns.model, cache)
+    counts = work.counts()
+    if ns.dry_run:
+        data: dict[str, object] = {
+            "action": "review",
+            "dry_run": True,
+            "model": ns.model,
+            **counts,
+        }
+        text = (
+            f"A real run sends {counts['requests']} requests to {ns.model}, "
+            f"for {counts['paragraphs']} paragraphs of {counts['files']} files.\n"
+            f"The cache has an answer for {counts['cached']} paragraphs.\n"
+            f"The input is approximately {counts['approx_input_tokens']} tokens.\n"
+        )
+        _write_plan(io.stdout, ns.output_format, data, text)
+        return 0
+    outcome = review.run(
+        work, cache, lambda: review.make_client(ns.model, ns.timeout), jobs=ns.jobs
+    )
+    for error in outcome.errors:
+        io.stderr.write(f"ste: a review request failed: {error}\n")
+    rep = review.ReviewReport(
+        "review",
+        outcome.results,
+        extra={
+            "model": ns.model,
+            "paragraphs": counts["paragraphs"],
+            "requests": counts["requests"],
+            "cached": counts["cached"],
+            "failed": outcome.failed,
+        },
+    )
+    report.write(
+        io.stdout,
+        rep,
+        report.Options(
+            format=ns.output_format, limit=ns.limit, fields=fields, summary_only=ns.summary
+        ),
+    )
+    if ns.output_format == "text":
+        io.stdout.write(
+            "Each finding is advice from a language model, and not a defect. "
+            "A second run can give different advice.\n"
+        )
+    return 0
 
 
 def _schema() -> dict:
@@ -989,6 +1106,63 @@ def eval_command(
     """Measure rules against a labeled corpus."""
     io = streams(ctx)
     raise typer.Exit(_run_eval(directory, output_format.value, fail_under, io.stdout, io.stderr))
+
+
+@app.command("review", cls=SteCommand)
+def review_command(  # noqa: PLR0913 - Typer needs one typed parameter per CLI option.
+    ctx: typer.Context,
+    *,
+    paths: Annotated[
+        list[str] | None, typer.Argument(help="Files, directories, or - for standard input.")
+    ] = None,
+    output_format: Annotated[
+        ReviewFormat, typer.Option("--format", help="Output format.")
+    ] = ReviewFormat.text,
+    model: Annotated[
+        str, typer.Option("--model", help="The Anthropic model.")
+    ] = review.DEFAULT_MODEL,
+    fields: Annotated[
+        str, typer.Option("--fields", help="Finding fields separated by a comma.")
+    ] = "",
+    config: Annotated[str, typer.Option("--config", help="Path of the configuration file.")] = "",
+    summary: Annotated[bool, typer.Option("--summary", help="Give only the summary.")] = False,
+    no_config: Annotated[
+        bool, typer.Option("--no-config", help="Do not read a configuration file.")
+    ] = False,
+    read_all: Annotated[bool, typer.Option("--all", help="Read files that git ignores.")] = False,
+    no_cache: Annotated[
+        bool, typer.Option("--no-cache", help="Do not read or write the cached answers.")
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the requests without a request.")
+    ] = False,
+    limit: Annotated[
+        int, typer.Option("--limit", min=0, help="Maximum findings to show. 0 gives all.")
+    ] = 0,
+    jobs: Annotated[
+        int, typer.Option("--jobs", min=1, max=32, help="Requests at the same time.")
+    ] = review.DEFAULT_JOBS,
+    timeout: Annotated[
+        float, typer.Option("--timeout", help="Seconds for each request.")
+    ] = review.DEFAULT_TIMEOUT,
+) -> None:
+    """Get advice from a language model for the rules that need a reader."""
+    opts = ReviewOptions(
+        paths=paths or [],
+        output_format=output_format.value,
+        model=model,
+        fields=fields,
+        config=config,
+        summary=summary,
+        no_config=no_config,
+        read_all=read_all,
+        no_cache=no_cache,
+        dry_run=dry_run,
+        limit=limit,
+        jobs=jobs,
+        timeout=timeout,
+    )
+    raise typer.Exit(_run_review(opts, streams(ctx)))
 
 
 @app.command("schema", cls=SteCommand)

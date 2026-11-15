@@ -3,7 +3,8 @@
     "The output can be large: a repository of 180 files gave 4 MB of JSON with the dictionary. Give --limit, --fields, or --summary first.",
     "Findings alone never change the exit code. Ask for a gate when you want one.",
     "A rule identifier is stable. Read it from this document, and not from the text of a message.",
-    "The dictionary is off by default, because it reports about 1 word in 10 of general software documentation."
+    "The dictionary is off by default, because it reports about 1 word in 10 of general software documentation.",
+    "ste review sends text to a language model and costs money. Run it with --dry-run first. Its findings are advice, and they never change an exit code."
   ],
   "command_flags": {
     "analyzer": {
@@ -76,6 +77,77 @@
           "json"
         ]
       }
+    },
+    "review": {
+      "--all": {
+        "type": "boolean",
+        "note": "read every file, including the files that git ignores"
+      },
+      "--config": {
+        "type": "path"
+      },
+      "--dry-run": {
+        "type": "boolean",
+        "note": "give the plan: the files, the paragraphs, the cached answers, the requests, and the approximate input tokens. It sends no request and needs no key."
+      },
+      "--fields": {
+        "type": "string",
+        "note": "separated by a comma",
+        "values": [
+          "rule_id",
+          "message",
+          "severity",
+          "confidence",
+          "start",
+          "end",
+          "suggestion",
+          "file",
+          "line",
+          "column",
+          "text",
+          "kind"
+        ]
+      },
+      "--format": {
+        "type": "string",
+        "default": "text",
+        "values": [
+          "text",
+          "json",
+          "ndjson"
+        ]
+      },
+      "--jobs": {
+        "type": "integer",
+        "default": 4,
+        "note": "requests at the same time, from 1 to 32"
+      },
+      "--limit": {
+        "type": "integer",
+        "default": 0,
+        "note": "0 gives every finding"
+      },
+      "--model": {
+        "type": "string",
+        "default": "claude-haiku-5-5",
+        "note": "an Anthropic model identifier. The model is part of the cache key."
+      },
+      "--no-cache": {
+        "type": "boolean",
+        "note": "do not read or write the cached answers"
+      },
+      "--no-config": {
+        "type": "boolean"
+      },
+      "--summary": {
+        "type": "boolean",
+        "note": "give only the summary"
+      },
+      "--timeout": {
+        "type": "number",
+        "default": 120.0,
+        "note": "seconds for each request. The client tries a request again after a rate limit."
+      }
     }
   },
   "commands": {
@@ -85,6 +157,7 @@
     "eval": "Measure the rules against a labeled corpus.",
     "init": "Write a start config, .ste.yml, in the current directory. It takes --dry-run, --force, and --format.",
     "lint": "Check files, directories, or standard input.",
+    "review": "Get advice from a language model for the 13 rules that need a reader. Each finding is advice with the info severity, and not a defect. It needs the llm extra and ANTHROPIC_API_KEY. It never changes the lint exit code or the baseline.",
     "schema": "Print this document.",
     "version": "Print the version."
   },
@@ -299,6 +372,88 @@
     ]
   },
   "paths": "The project directory is the first directory, from the current directory upward, that holds a config file. The search stops at the top of the git work tree. A path in the config, each exclude pattern, and the default baseline start from the project directory. A key of the baseline is the path from the directory of the baseline file.",
+  "review": {
+    "rules_version": "1",
+    "kind": "advice",
+    "severity": "info",
+    "confidence": 0.5,
+    "cache": "one file for each answer under the user cache directory of ste. The key is a hash of the rule set version, the model, the heading, and the paragraph.",
+    "summary_fields": [
+      "model",
+      "paragraphs",
+      "requests",
+      "cached",
+      "failed"
+    ],
+    "note": "A finding has the usual fields and \"kind\": \"advice\". A model answer is not reproducible: a second run with --no-cache can give different findings. The tool drops each finding whose quote it cannot find in the source.",
+    "rules": [
+      {
+        "id": "STE-1.3",
+        "name": "One meaning for each word",
+        "standard_rule": "1.3"
+      },
+      {
+        "id": "STE-1.5",
+        "name": "The category of a technical noun",
+        "standard_rule": "1.5"
+      },
+      {
+        "id": "STE-1.12",
+        "name": "The category of a technical verb",
+        "standard_rule": "1.12"
+      },
+      {
+        "id": "STE-1.10",
+        "name": "No slang and no jargon",
+        "standard_rule": "1.10"
+      },
+      {
+        "id": "STE-2.2",
+        "name": "The full form of a long technical noun",
+        "standard_rule": "2.2"
+      },
+      {
+        "id": "STE-4.4",
+        "name": "Connecting words",
+        "standard_rule": "4.4"
+      },
+      {
+        "id": "STE-4.5",
+        "name": "Articles and demonstrative adjectives",
+        "standard_rule": "4.5"
+      },
+      {
+        "id": "STE-6.1",
+        "name": "Give information gradually",
+        "standard_rule": "6.1"
+      },
+      {
+        "id": "STE-6.2",
+        "name": "Key words for a logical structure",
+        "standard_rule": "6.2"
+      },
+      {
+        "id": "STE-6.5",
+        "name": "One topic for each paragraph",
+        "standard_rule": "6.5"
+      },
+      {
+        "id": "STE-9.1",
+        "name": "A different sentence construction",
+        "standard_rule": "9.1"
+      },
+      {
+        "id": "STE-9.2",
+        "name": "Each word in its correct place",
+        "standard_rule": "9.2"
+      },
+      {
+        "id": "STE-9.4",
+        "name": "A consistent style",
+        "standard_rule": "9.4"
+      }
+    ]
+  },
   "rules": [
     {
       "id": "STE-1.1",

@@ -130,6 +130,7 @@ def test_schema_and_help() -> None:
         "init",
         "analyzer",
         "eval",
+        "review",
         "schema",
         "version",
     }
