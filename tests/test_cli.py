@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import errno
 import io
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import TypedDict
 
@@ -14,12 +16,21 @@ import pytest
 from rich.text import Text
 from typer.testing import CliRunner
 
-from ste.cli import app, run
+from ste.cli import app, find_project, match_pattern, matches_any, run
 
 SAMPLE_FINDING_COUNT = 3
 EXIT_ERROR = 2
 BASELINE_FINDING_COUNT = 2
 WALK_FILE_COUNT = 6
+MIXED_FILE_COUNT = 2
+
+
+class BrokenStream(io.StringIO):
+    """Fail every write as a reader that closed the pipe would."""
+
+    def write(self, _text: str, /) -> int:
+        """Raise the error of a closed pipe, with its operating system code."""
+        raise BrokenPipeError(errno.EPIPE, "Broken pipe")
 
 
 class LintReport(TypedDict):
@@ -363,3 +374,134 @@ def test_dictionary_options_before_and_after_subcommand(
     if dry_run is not None:
         assert data["dry_run"] is dry_run
         assert path.exists() is dry_run
+
+
+def test_broken_pipe_propagates_to_the_caller() -> None:
+    """Check that a closed output pipe is not turned into a usage error."""
+    with pytest.raises(BrokenPipeError):
+        run(
+            ["lint", "--no-config", "--format", "ndjson", "-"],
+            io.StringIO("The valve isn't open.\n"),
+            BrokenStream(),
+            io.StringIO(),
+        )
+
+
+def test_closed_stdout_pipe_exits_zero(tmp_path: Path) -> None:
+    """Check that a small report to a closed pipe does not fail at interpreter exit."""
+    small = tmp_path / "small.md"
+    small.write_text("It isn't done.\n", encoding="utf-8")
+    process = subprocess.Popen(  # noqa: S603 -- fixed arguments and a temporary file
+        [sys.executable, "-m", "ste", "lint", "--format", "json", str(small)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert process.stdout is not None
+    assert process.stderr is not None
+    process.stdout.close()
+    code = process.wait(timeout=60)
+    stderr = process.stderr.read()
+    process.stderr.close()
+    assert code == 0
+    assert stderr == b""
+
+
+def test_closed_stdout_descriptor_keeps_exit_code(tmp_path: Path) -> None:
+    """Check that a closed standard output descriptor gives the usual exit code."""
+    shell = shutil.which("sh")
+    if shell is None:
+        pytest.skip("this test needs a POSIX shell")
+    small = tmp_path / "small.md"
+    small.write_text("It isn't done.\n", encoding="utf-8")
+    command = [shell, "-c", 'exec "$@" >&-', "sh", sys.executable, "-m", "ste", "lint"]
+    for arguments, expected in (([str(small)], 0), ([str(tmp_path / "absent.md")], 2)):
+        done = subprocess.run(  # noqa: S603 -- fixed arguments and a temporary file
+            [*command, *arguments], capture_output=True, timeout=60, check=False
+        )
+        assert done.returncode == expected
+        assert b"Traceback" not in done.stderr
+
+
+@pytest.mark.parametrize(
+    ("pattern", "path", "expected"),
+    [
+        ("**/*.md", "a/b.md", True),
+        ("docs/**/*.gen.md", "docs/x/y.gen.md", True),
+        ("**/fixtures/**", "a/fixtures/b.md", True),
+        ("docs/*.md", "docs/a.md", True),
+        ("*.md", "a/b.md", False),
+        ("docs", "docs/a.md", True),
+        ("docs/", "docs/a.md", True),
+        ("docs/*.md", "other/a.md", False),
+        ("", "a.md", False),
+    ],
+)
+def test_match_pattern_by_directory_segment(pattern: str, path: str, *, expected: bool) -> None:
+    """Check that exclusion patterns match whole directory segments."""
+    assert match_pattern(pattern, path) is expected
+
+
+@pytest.mark.parametrize(
+    ("pattern", "path", "expected"),
+    [
+        ("docs", "a/docs/b.md", True),
+        ("docs/", "a/docs/b.md", True),
+        ("/docs", "docs/b.md", True),
+        ("/docs", "a/docs/b.md", False),
+        ("*.md", "a/b.md", True),
+        ("docs/*.md", "x/docs/a.md", False),
+    ],
+)
+def test_matches_any_follows_gitignore_depth(
+    tmp_path: Path, pattern: str, path: str, *, expected: bool
+) -> None:
+    """Check that a bare name matches at any depth and a leading slash anchors the pattern."""
+    assert matches_any(tmp_path / path, tmp_path, [pattern]) is expected
+
+
+def test_non_utf8_file_is_named_in_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check that a file that is not UTF-8 is named in the error."""
+    monkeypatch.chdir(tmp_path)
+    file = tmp_path / "latin.md"
+    file.write_bytes("Caf\xe9 is open.\n".encode("latin-1"))
+    code, _, error = cli("lint", "--no-config", str(file))
+    assert code == EXIT_ERROR
+    assert f"{file}: the file is not UTF-8 text" in error
+
+
+def test_duplicate_paths_are_read_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check that a file and standard input are each read once per run."""
+    monkeypatch.chdir(tmp_path)
+    file = tmp_path / "draft.md"
+    file.write_text("It isn't ready.")
+    single = report("--no-config", str(file))
+    doubled = report("--no-config", str(file), str(file))
+    assert doubled["summary"]["files"] == 1
+    assert doubled["summary"]["findings"] == single["summary"]["findings"]
+    mixed = report("--no-config", str(file), ".", "-", "-", text="Open the valve.")
+    assert mixed["summary"]["files"] == MIXED_FILE_COUNT
+
+
+def test_config_in_docs_directory_sets_project_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Check that an explicit docs/glossary.yml gives the same project as discovery."""
+    monkeypatch.chdir(tmp_path)
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    config_file = docs / "glossary.yml"
+    config_file.write_text("mode: flavored\n")
+    discovered = find_project()
+    explicit = find_project(str(config_file))
+    assert discovered.directory == tmp_path
+    assert explicit.directory == tmp_path
+    assert explicit.config_path == config_file
+
+
+def test_dict_path_turns_dictionary_on(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check that a dictionary path alone reads the dictionary index."""
+    monkeypatch.chdir(tmp_path)
+    index = tmp_path / "missing.json"
+    code, _, error = cli("lint", "--no-config", "--dict", str(index), "-", text="Open the valve.")
+    assert code == EXIT_ERROR
+    assert "there is no dictionary index" in error
