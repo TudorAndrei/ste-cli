@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Rules for document structure and conditions."""
 
-from ste.models import Diagnostic, Document, Options, Sentence
+from ste.models import Diagnostic, Document, Options, Sentence, Token
 from ste.rules.data import (
     CLAUSE_MARKERS,
     CLAUSE_VERBS,
@@ -50,17 +50,24 @@ def paragraph_length(doc: Document, _opts: Options) -> list[Diagnostic]:
     ]
 
 
+def instruction_word(s: Sentence) -> Token | None:
+    """Return the first word of a sentence that makes it an instruction."""
+    for i, t in enumerate(s.tokens):
+        if t.lower not in INSTRUCTION_WORDS:
+            continue
+        if t.lower == "do" and (i + 1 >= len(s.tokens) or s.tokens[i + 1].lower != "not"):
+            continue
+        return t
+    return None
+
+
 def note_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
     """Report an instruction in an information note."""
     out = []
     for s in doc.sentences:
         if s.admonition not in {"note", "notes"}:
             continue
-        for i, t in enumerate(s.tokens):
-            if t.lower not in INSTRUCTION_WORDS:
-                continue
-            if t.lower == "do" and (i + 1 >= len(s.tokens) or s.tokens[i + 1].lower != "not"):
-                continue
+        if (t := instruction_word(s)) is not None:
             out.append(
                 Diagnostic(
                     "STE-5.5",
@@ -73,7 +80,6 @@ def note_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
                     "Move the instruction to a step of the procedure.",
                 )
             )
-            break
     return out
 
 

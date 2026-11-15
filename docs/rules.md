@@ -34,11 +34,11 @@ severity, and strict mode does not make it an error.
 | `STE-9.3` | Phrasal verb | 0.85, or 0.70 | warning |
 | `STE-GR-6` | Latin abbreviation | 0.90 | info |
 | `STE-4.3` | A list with two constructions | 0.80 | info |
-| `STE-5.5` | An instruction in a note | 0.80 | warning |
+| `STE-5.5` | An instruction in a note | 0.80, or 0.75 | warning |
 | `STE-6.6` | Paragraph too long | 1.00 | warning |
 | `STE-7.1` | A safety instruction with no word for the level of the risk | 0.70 | warning |
 | `STE-7.3` | A safety instruction with no explanation | 0.70 | warning |
-| `STE-5.4` | A condition after the command | 0.70 | info |
+| `STE-5.4` | A condition after the command | 0.70, or 0.75 | info |
 | `STE-1.11` | Two names for the same item | 0.95 | warning |
 | `STE-1.9` | A technical noun that is too long | 0.95 | warning |
 | `STE-2.1` | A noun of more than three words | 0.80 | warning |
@@ -47,6 +47,8 @@ severity, and strict mode does not make it an error.
 | `STE-3.3` | A past participle that is not an adjective | 0.80, or 0.70 | warning |
 | `STE-1.7` | A technical noun as a verb | 0.70 | warning |
 | `STE-1.13` | A technical verb as a noun | 0.70 | warning |
+| `STE-5.2` | More than one instruction in a step | 0.80 | warning |
+| `STE-7.2` | A safety instruction that does not start with a command | 0.80 | warning |
 
 In `flavored` mode, the tool removes each finding with a confidence of less
 than 0.60. In `strict` mode, it keeps all findings and it makes the severity
@@ -367,6 +369,37 @@ Rule 1.13 tells you to use a technical verb only as a verb. An example is
 - An "-ing" form is for rule 3.5, and this rule does not report it.
 - The confidence is 0.70, because the tagger can confuse a noun and a verb.
 
+## STE-5.2 More than one instruction in a step
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Reports a step of a procedure that gives two commands or more. Rule 5.2
+tells you to write one instruction in each sentence. Two actions that occur
+at the same time are one instruction.
+
+"Open the valve and remove the cap" gives a finding at "remove". Write two
+steps: "Open the valve" and "Remove the cap".
+
+**Limits.**
+
+- The rule reads a numbered step that starts with a command. A second
+  command must join the first command, and it must have no subject of its
+  own.
+- "at the same time" and "simultaneously" stop the rule.
+- "Push and hold the button" gives no finding. The two verbs have one
+  object, and they are one action.
+- "Turn the knob or push the button" gives no finding. The reader does one
+  of the two.
+- The rule ignores a verb in capital letters, in quotation marks, or in
+  parentheses. "Click Build and Deploy" names a button.
+- A verb after a list of nouns is often the last noun of the list, as in
+  "Freeze the ID, the checksum, and stop limits". The rule ignores it.
+- The rule ignores a step in a block quote, and a step that starts with
+  code or a link. Such a step often quotes a prompt or describes the code.
+- On 150 files of software documentation, the rule gave 39 findings. A
+  person found 37 correct. The tagger read "oxfmt" as a verb, and one
+  finding was a choice between two actions.
+
 ## STE-4.3 A list with two constructions
 
 Reports an item of a vertical list that does not agree with the other items.
@@ -403,8 +436,14 @@ sentence is an instruction when it has one of these 5 words: "must",
 
 **Limits.**
 
-- The list of 5 words is the whole test. A command with none of them, such
-  as "Disconnect the power", gives no finding.
+- Without the analyzer, the list of 5 words is the whole test. A command
+  with none of them, such as "Disconnect the power", gives no finding.
+- With the analyzer, the rule also reports a note sentence that starts with
+  a command verb, at the confidence 0.75. The command can follow a condition
+  clause or an adverb. The rule does not read the label "NOTE" as a part of
+  the sentence. "See the guide" and "Refer to the guide" send the reader to
+  other text, and they give no finding. A sentence that has one of the 5
+  words gives one finding only.
 - A warning, a caution, and a danger block can hold an instruction, and the
   rule does not read them. Rule 7.3 reads those.
 
@@ -502,6 +541,14 @@ the light comes on, set the switch to NORMAL" gives none.
   a contrast. The 3 words that stay gave 4 findings on that repository, and
   a person confirmed each one.
 - The condition must hold a verb of its own.
+- With the analyzer, the rule also reads a clause that starts with "before",
+  "after", or "once", and the words "in case" and "as soon as". The clause
+  must come after the command verb, and it must have a subject: "Close the
+  valve before you start the pump" gives a finding, and "Read the guide
+  before using the tool" gives none. A phrase with no verb, such as "after
+  the test", gives no finding. "until" and "while" give a duration, and the
+  rule does not read them. On 150 files of software documentation, the
+  analyzer gave 9 findings, and each one was correct.
 - The severity is `info`, because the tool has no parser and the test is the
   position of a word.
 
@@ -531,6 +578,29 @@ damage the file" gives a finding. A block with no label is not a safety
 instruction for the rule, and the rule does not read it. The rule does not
 report a warning that tells of damage only. A risk analysis decides the
 level, and software text often uses "warning" for a loss of data.
+
+## STE-7.2 A safety instruction that does not start with a command
+
+**This rule needs the analyzer.** Run `ste lint --analyze`.
+
+Reports a warning, a caution, or a danger block whose first sentence is a
+description. Rule 7.2 tells you to start a safety instruction with a clear
+and simple command, so that the reader knows at once what to do. A
+condition can come before the command.
+
+"**WARNING:** The surface is hot. It can burn your skin." gives a finding.
+"**WARNING:** Do not touch the surface. It is hot." gives none, and
+"**CAUTION:** If the pump runs, do not open the valve." gives none.
+
+**Limits.**
+
+- The rule reads the first sentence of the block only.
+- The rule reports a sentence with a subject and a verb that is not a
+  command, such as "This command deletes all data" or "You must wear
+  gloves". A phrase with no verb, such as "High voltage", gives no finding,
+  because a label of the hazard is not a description.
+- A condition and then a description, such as "If you run this, the data
+  is lost", gives a finding. The condition must come before a command.
 
 ## STE-7.3 A safety instruction with no explanation
 

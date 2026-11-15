@@ -605,8 +605,10 @@
       "standard_rule": "5.5",
       "default_severity": "warning",
       "confidence": [
+        0.75,
         0.8
-      ]
+      ],
+      "note": "The rule reads 5 words, such as \"must\". With the analyzer, it also reports a note that starts with a command, at 0.75. A reference such as \"see\" or \"refer to\" gives no finding."
     },
     {
       "id": "STE-6.6",
@@ -644,9 +646,10 @@
       "standard_rule": "5.4",
       "default_severity": "info",
       "confidence": [
-        0.7
+        0.7,
+        0.75
       ],
-      "note": "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it."
+      "note": "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it. With the analyzer, it also reports a clause with \"before\", \"after\", or \"once\", and the words \"in case\" and \"as soon as\", after the command, at 0.75."
     },
     {
       "id": "STE-1.11",
@@ -729,6 +732,26 @@
         0.7
       ],
       "note": "The rule needs the analyzer. It reads the one-word verbs of allow.verbs that are not also in allow.nouns. The rule does not report a verb before a noun, as in \"the lint command\"."
+    },
+    {
+      "id": "STE-5.2",
+      "name": "More than one instruction in a step",
+      "standard_rule": "5.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs the analyzer. It reads a numbered step that starts with a command, and it reports a second command that joins the first. Actions at the same time, alternatives with \"or\", and two verbs with one object, such as \"push and hold\", give no finding."
+    },
+    {
+      "id": "STE-7.2",
+      "name": "A safety instruction that does not start with a command",
+      "standard_rule": "7.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs the analyzer. It reads the first sentence of a warning, a caution, and a danger block. It reports a sentence with a subject and a verb that is not a command. A phrase with no verb gives no finding."
     }
   ],
   "schema_version": 1,

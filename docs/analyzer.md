@@ -115,6 +115,10 @@ measured user demand", where "measured" is an adjective of "demand".
 | 3.5 "-ing" form | An "-ing" word that is a verb, and not a noun or a modifier |
 | 3.6 passive voice | A veto. The finding goes when the parser sees no passive relation. |
 | 5.3 command | The part of speech of the first word of a step. The rule gives no finding without the analyzer. |
+| 5.2 one instruction | The commands that join in one step. The rule gives no finding without the analyzer. |
+| 5.4 condition first | A condition clause after the command, such as "before you start the pump" |
+| 5.5 note | A note that starts with a command |
+| 7.2 safety command | The first sentence of a safety instruction. The rule gives no finding without the analyzer. |
 
 Rules 3.5 and 3.6 work without the analyzer, and the analyzer makes them
 more exact. Rules 2.1 and 5.3 need it.
@@ -129,6 +133,12 @@ A rule reads the grammar from the document, and not from the analyzer:
 | `Sentence.syntax` | Each spaCy token, with the punctuation |
 | `Token.pos`, `tag`, `dep`, `lemma` | The grammar of one word of `Sentence.tokens` |
 | `Token.head` | The index of the head word in `Sentence.tokens`, or -1 |
+
+The analyzer does not read the label of a note or a warning, such as
+`**NOTE:**` or `[!WARNING]`. It also does not read the quote marks at the
+start of each line of a block quote. The offsets of `Sentence.syntax` still
+start at the start of `Sentence.text`. A test with `StubSyntax` gives the
+sentence without its label as the key.
 
 Each rule must also work when `Sentence.tagged` is false. A test can make
 a tagged document without spaCy. The `tagged` function and the

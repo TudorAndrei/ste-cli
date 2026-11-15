@@ -10,6 +10,12 @@ from ste.rules.grammar_words import (
     separated_phrasal,
     technical_words,
 )
+from ste.rules.procedures import (
+    condition_clause_order,
+    note_command,
+    safety_command,
+    step_instructions,
+)
 from ste.rules.structure import (
     condition_order,
     note_instruction,
@@ -62,4 +68,8 @@ def all_rules() -> list[Rule]:
         pos_spelling,
         action_nouns,
         separated_phrasal,
+        step_instructions,
+        safety_command,
+        condition_clause_order,
+        note_command,
     ]
