@@ -3,10 +3,15 @@
     "The output can be large: a repository of 180 files gave 4 MB of JSON with the dictionary. Give --limit, --fields, or --summary first.",
     "Findings alone never change the exit code. Ask for a gate when you want one.",
     "A rule identifier is stable. Read it from this document, and not from the text of a message.",
-    "The dictionary is off by default, because it reports about 1 word in 10 of general software documentation."
+    "The dictionary is off by default, because it reports about 1 word in 10 of general software documentation.",
+    "ste review only prints an instruction: start a subagent with the ste-review skill. It reads no file and sends nothing."
   ],
   "command_flags": {
     "analyzer": {
+      "--clear-cache": {
+        "note": "remove the disk cache of the grammar. $STE_GRAMMAR_CACHE gives the path of the cache, and the value off stops the cache.",
+        "type": "boolean"
+      },
       "--format": {
         "default": "text",
         "type": "string",
@@ -40,13 +45,17 @@
         "type": "path"
       },
       "subcommands": [
-        "import \u003cfile\u003e",
+        "import <file>",
         "info",
         "path",
         "remove"
       ]
     },
     "eval": {
+      "--analyze": {
+        "note": "exit 2 when a fixture needs the analyzer and it cannot start. Without the flag, the run skips such a fixture and names it in skipped.",
+        "type": "boolean"
+      },
       "--fail-under": {
         "note": "exit 1 when the precision or the recall is less",
         "type": "number"
@@ -76,6 +85,16 @@
           "json"
         ]
       }
+    },
+    "review": {
+      "--format": {
+        "default": "text",
+        "type": "string",
+        "values": [
+          "text",
+          "json"
+        ]
+      }
     }
   },
   "commands": {
@@ -85,6 +104,7 @@
     "eval": "Measure the rules against a labeled corpus.",
     "init": "Write a start config, .ste.yml, in the current directory. It takes --dry-run, --force, and --format.",
     "lint": "Check files, directories, or standard input.",
+    "review": "Print an instruction for an agent: run ste lint, then start a subagent that loads the ste-review skill for the rules that need a reader. It reads no file, sends nothing, and exits with 0.",
     "schema": "Print this document.",
     "version": "Print the version."
   },
@@ -119,6 +139,10 @@
     },
     "fail_over": {
       "type": "number"
+    },
+    "max_noun_words": {
+      "type": "integer",
+      "note": "no default. Rule STE-1.9 reports nothing until this key gives a limit. The explanation of rule 1.9 gives 3 words."
     },
     "max_words": {
       "type": "integer"
@@ -310,7 +334,7 @@
         0.95,
         0.6
       ],
-      "note": "0.95 and 0.6 come from the dictionary. 0.6 means that the dictionary has the word only as a verb, and the tool has no part-of-speech tagger."
+      "note": "0.95 and 0.6 come from the dictionary. 0.6 means that the dictionary has the word only as a verb, and the analyzer did not tag the word. With the analyzer, a verb gets 0.95, and a noun or an adjective gives no finding."
     },
     {
       "id": "STE-1.14",
@@ -320,7 +344,7 @@
       "confidence": [
         0.9
       ],
-      "note": "A capitalized word that does not start a sentence is a name, thus the rule does not report it."
+      "note": "A capitalized word that does not start a sentence is a name, thus the rule does not report it. With the analyzer, the rule also reports a pair that changes with the part of speech, such as \"licence\" and \"practise\". A word in quotation marks is a mention, and the analyzer part does not report it."
     },
     {
       "id": "STE-3.4",
@@ -329,8 +353,10 @@
       "default_severity": "warning",
       "confidence": [
         0.9,
+        0.85,
         0.55
-      ]
+      ],
+      "note": "0.9 for a perfect, or for \"is to be\" and a participle that the analyzer gives as a participle. 0.85 for \"is to be\" and a participle without the analyzer. 0.55 for \"has been\" and a word that is not a participle."
     },
     {
       "id": "STE-3.5",
@@ -359,18 +385,34 @@
       "standard_rule": "3.7",
       "default_severity": "warning",
       "confidence": [
-        0.9
-      ]
+        0.9,
+        0.85
+      ],
+      "note": "0.9 for a word group of the list. 0.85 with the analyzer: a verb with little meaning, such as \"perform\" or \"make\", and its object, a noun that names an action."
     },
     {
       "id": "STE-4.2",
-      "name": "Contraction",
+      "name": "Contraction or omitted article",
       "standard_rule": "4.2",
       "default_severity": "warning",
       "confidence": [
-        0.98
+        0.98,
+        0.5
       ],
-      "note": "The tool checks only the contraction part of rule 4.2."
+      "note": "The severity of a finding depends on its part. default_severity is the severity of a contraction. Read the severity of each finding from the finding, and not from default_severity. A contraction has the warning severity and the confidence 0.98. A singular noun with no article, as a subject or an object, has the info severity and the confidence 0.5. That part needs the analyzer, and only strict mode or a lower min_confidence shows it. A rules entry in the config changes the severity of the two parts.",
+      "parts": [
+        {
+          "part": "contraction",
+          "severity": "warning",
+          "confidence": 0.98
+        },
+        {
+          "part": "omitted article",
+          "severity": "info",
+          "confidence": 0.5,
+          "needs": "analyzer"
+        }
+      ]
     },
     {
       "id": "STE-5.1",
@@ -380,7 +422,7 @@
       "confidence": [
         0.9
       ],
-      "note": "20 words for a numbered step, and 25 for other text."
+      "note": "20 words for a numbered step, and 25 for other text. The text in parentheses is also a sentence with the same limit (rule 8.5). With the analyzer, a name of many words counts as one word (rule 8.6)."
     },
     {
       "id": "STE-8.1",
@@ -397,8 +439,10 @@
       "standard_rule": "9.3",
       "default_severity": "warning",
       "confidence": [
-        0.85
-      ]
+        0.85,
+        0.7
+      ],
+      "note": "0.85 for a phrasal verb of the list. With the analyzer, the rule also finds a particle with words between it and its verb. A phrasal verb that is not in the list gets 0.7. A particle that the parser joins to the object, or reads as an adverb, counts only for a verb of the list. \"up to\" before a number is not a particle."
     },
     {
       "id": "STE-GR-6",
@@ -426,8 +470,10 @@
       "standard_rule": "5.5",
       "default_severity": "warning",
       "confidence": [
+        0.75,
         0.8
-      ]
+      ],
+      "note": "The rule reads 5 words, such as \"must\". With the analyzer, it also reports a note that starts with a command, at 0.75. A reference such as \"see\" or \"refer to\" gives no finding."
     },
     {
       "id": "STE-6.6",
@@ -457,7 +503,7 @@
       "confidence": [
         0.7
       ],
-      "note": "The rule reads a note, a tip, an info, an attention, and an important block. It reports one that tells of an injury, of damage, or of a loss of data."
+      "note": "The rule reads a note, a tip, an info, an attention, and an important block. It reports one that tells of an injury, of damage, or of a loss of data. It also reports a caution block that tells of an injury or of death, because that risk needs a warning."
     },
     {
       "id": "STE-5.4",
@@ -465,9 +511,10 @@
       "standard_rule": "5.4",
       "default_severity": "info",
       "confidence": [
-        0.7
+        0.7,
+        0.75
       ],
-      "note": "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it."
+      "note": "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it. With the analyzer, it also reports a clause with \"before\", \"after\", or \"once\", and the words \"in case\" and \"as soon as\", after the command, at 0.75."
     },
     {
       "id": "STE-1.11",
@@ -478,6 +525,16 @@
         0.95
       ],
       "note": "The rule reports nothing until the prefer key of the config gives the names. No tool can know that two nouns mean the same item."
+    },
+    {
+      "id": "STE-1.9",
+      "name": "A technical noun that is too long",
+      "standard_rule": "1.9",
+      "default_severity": "warning",
+      "confidence": [
+        0.95
+      ],
+      "note": "The rule reads only the technical nouns of the config: allow.nouns and the names of prefer. It reports nothing until max_noun_words gives a limit. It reports the first use of each noun in a file."
     },
     {
       "id": "STE-5.3",
@@ -498,6 +555,108 @@
         0.8
       ],
       "note": "The rule needs the analyzer. A name of many words is one unit by rule 8.6, thus the rule does not report it."
+    },
+    {
+      "id": "STE-3.2",
+      "name": "A verb form that is not an approved tense",
+      "standard_rule": "3.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.9,
+        0.8
+      ],
+      "note": "Reports would, should, shall, may, and might with a verb. 0.9 when the analyzer gives the modal and its verb, 0.8 from the words alone. A perfect after the modal goes to STE-3.4."
+    },
+    {
+      "id": "STE-3.3",
+      "name": "A past participle that is not an adjective",
+      "standard_rule": "3.3",
+      "default_severity": "info",
+      "confidence": [
+        0.8,
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reports a participle that is the verb of a reduced clause. 0.8 with a by-agent, 0.7 without one. The severity is info, because it is not certain that rule 3.3 forbids a reduced clause, such as 'the file created by the tool'."
+    },
+    {
+      "id": "STE-1.7",
+      "name": "A technical noun as a verb",
+      "standard_rule": "1.7",
+      "default_severity": "info",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reads the one-word nouns of allow.nouns that are not also in allow.verbs. The nouns of a preset count only when allow.nouns also gives them. A label of one word, a compound such as \"built-in\", a modifier of a noun, and a noun of a list give no finding. The severity is info, because the tagger often reads a software noun as a verb."
+    },
+    {
+      "id": "STE-1.13",
+      "name": "A technical verb as a noun",
+      "standard_rule": "1.13",
+      "default_severity": "warning",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reads the one-word verbs of allow.verbs that are not also in allow.nouns. The rule does not report a verb before a noun, as in \"the lint command\"."
+    },
+    {
+      "id": "STE-5.2",
+      "name": "More than one instruction in a step",
+      "standard_rule": "5.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs the analyzer. It reads a numbered step that starts with a command, and it reports a second command that joins the first. Actions at the same time, alternatives with \"or\" or \"otherwise\", a second verb that is not in the word list of the model, and two verbs with one object, such as \"push and hold\", give no finding."
+    },
+    {
+      "id": "STE-7.2",
+      "name": "A safety instruction that does not start with a command",
+      "standard_rule": "7.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs the analyzer. It reads the first sentence of a warning, a caution, and a danger block. It reports a sentence with a subject and a verb that is not a command. A phrase with no verb gives no finding."
+    },
+    {
+      "id": "STE-1.2",
+      "name": "A word that is not the approved part of speech",
+      "standard_rule": "1.2",
+      "default_severity": "info",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs --use-dict and the analyzer. It reports a verb that the dictionary approves only as a noun or an adjective, and a noun that it approves only as a verb. It does not read a heading or a table cell. The severity is info, because the precision was measured only with an invented dictionary."
+    },
+    {
+      "id": "STE-1.4",
+      "name": "An adjective form that the dictionary does not give",
+      "standard_rule": "1.4",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It reads a comparative or a superlative adjective. When the lemma has no entry, the rules of a regular form find the headword."
+    },
+    {
+      "id": "STE-3.1",
+      "name": "A verb form that the dictionary does not give",
+      "standard_rule": "3.1",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs --use-dict, the analyzer, and an index that has the forms. It also applies rule 1.4 to a verb. STE-3.5 reports an -ing form. When the lemma has no entry, the rules of a regular form find the headword."
+    },
+    {
+      "id": "STE-8.2",
+      "name": "A compound modifier with no hyphen",
+      "standard_rule": "8.2",
+      "default_severity": "info",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule needs the analyzer. It reports two words before a noun that modify it as one unit, such as \"high pressure valve\"."
     }
   ],
   "schema_version": 1,
@@ -511,11 +670,11 @@
   "suppression": {
     "note": "A directive with no rule identifier applies to every rule.",
     "syntax": [
-      "\u003c!-- ste-disable --\u003e",
-      "\u003c!-- ste-disable STE-3.6 --\u003e",
-      "\u003c!-- ste-enable STE-3.6 --\u003e",
-      "\u003c!-- ste-disable-next-line --\u003e",
-      "\u003c!-- ste-disable-line --\u003e"
+      "<!-- ste-disable -->",
+      "<!-- ste-disable STE-3.6 -->",
+      "<!-- ste-enable STE-3.6 -->",
+      "<!-- ste-disable-next-line -->",
+      "<!-- ste-disable-line -->"
     ]
   },
   "tool": "ste",

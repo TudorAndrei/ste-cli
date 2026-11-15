@@ -479,6 +479,39 @@ SYNTAX_CASES = [
         0,
     ),
     (
+        'an "-ing" noun with a determiner',
+        "STE-3.5",
+        "Make each warning an error.\n",
+        {
+            "Make each warning an error.": [
+                "Make/VERB/VB/ROOT/0",
+                "each/PRON/DT/nsubj/2",
+                "warning/VERB/VBG/ccomp/0",
+                "an/DET/DT/det/4",
+                "error/NOUN/NN/dobj/2",
+                "./PUNCT/./punct/0",
+            ]
+        },
+        0,
+    ),
+    (
+        'an "-ing" noun after a possessive',
+        "STE-3.5",
+        "Stop the pump before its cleaning.\n",
+        {
+            "Stop the pump before its cleaning.": [
+                "Stop/VERB/VB/ROOT/0",
+                "the/DET/DT/det/2",
+                "pump/NOUN/NN/dobj/0",
+                "before/ADP/IN/prep/0",
+                "its/PRON/PRP$/poss/5",
+                "cleaning/VERB/VBG/pcomp/3",
+                "./PUNCT/./punct/0",
+            ]
+        },
+        0,
+    ),
+    (
         "a progressive form belongs to the verb rule",
         "STE-3.5",
         "The pump is running.\n",
@@ -586,5 +619,27 @@ VERB_CASES: list[VerbCase] = [
         "name": "phrasal/shut-down",
         "text": "Shut down the computer.",
     },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "Look up"}],
+        "name": "phrasal/look-up",
+        "text": "Look up the key in the table.",
+    },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "goes down"}],
+        "name": "phrasal/go-down",
+        "text": "The service goes down when the disk is full.",
+    },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "came back"}],
+        "name": "phrasal/come-back",
+        "text": "The server came back after the restart.",
+    },
+    {
+        "expect": [{"rule_id": "STE-9.3", "text": "Throw away"}],
+        "name": "phrasal/throw-away",
+        "text": "Throw away the old logs.",
+    },
+    {"expect": [], "name": "phrasal/up-to-a-number", "text": "Show up to 10 results."},
+    {"expect": [], "name": "phrasal/up-to-a-number-word", "text": "Give up to five seconds."},
     {"expect": [], "name": "clean/imperative", "text": "Start the pump. Then open the valve."},
 ]

@@ -1,0 +1,10 @@
+{
+  "mode": "flavored",
+  "expect": [
+    { "rule_id": "STE-7.1", "text": "injury" },
+    {
+      "rule_id": "STE-5.1",
+      "text": "(the pump stops, the light of the panel changes to red, the valve closes, and the pressure of the tank decreases to zero before the next step starts)"
+    }
+  ]
+}

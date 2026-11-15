@@ -70,6 +70,14 @@ A baseline of one directory keeps the accepted findings of the other
 directories. `kept` gives their number, and `removed` gives the number of
 accepted findings of the deleted files.
 
+## The rules that need a reader
+
+`ste lint` cannot check 14 rules, because they need a reader. Run
+`ste review <path>` to get the instruction for them. The command reads no
+file and sends nothing. It tells you to start a subagent that loads the
+`ste-review` skill. The findings of that subagent are advice, and not
+defects.
+
 ## Paths start from the project
 
 The tool looks for the config from the current directory upward, and it
@@ -110,13 +118,17 @@ agent. Use `json` or `ndjson` to read the findings.
 
 ## Do not correct a finding without care
 
-A finding is not always a defect. The tool has no part-of-speech tagger, and
-`confidence` states how sure it is:
+A finding is not always a defect. Without `--analyze`, the tool has no
+part-of-speech tagger, and the analyzer also makes errors. `confidence`
+states how sure it is:
 
 - `1.00` and `0.98`: a semicolon, a contraction. Correct it.
 - `0.90` to `0.95`: usually a defect.
-- `0.60` to `0.70`: the tool cannot separate a noun from a verb, or an
-  adjective from a passive verb. **Read the sentence before you change it.**
+- `0.60` to `0.85`: the tool or the analyzer can confuse a noun and a verb,
+  or an adjective and a passive verb. **Read the sentence before you change
+  it.**
+- `0.50`: an omitted article, with the `info` severity. Only
+  `--mode strict` or a lower `min_confidence` shows it.
 
 `STE-GR-6` is a general recommendation of the standard, and not a rule. It
 always has the `info` severity, and no flag makes it an error.

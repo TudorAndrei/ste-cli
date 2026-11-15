@@ -9,14 +9,16 @@ import json
 import shutil
 import subprocess
 import sys
-from pathlib import Path
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import pytest
 from rich.text import Text
 from typer.testing import CliRunner
 
 from ste.cli import app, find_project, main, match_pattern, matches_any, run
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 SAMPLE_FINDING_COUNT = 3
 EXIT_ERROR = 2
@@ -130,6 +132,7 @@ def test_schema_and_help() -> None:
         "init",
         "analyzer",
         "eval",
+        "review",
         "schema",
         "version",
     }
@@ -293,10 +296,12 @@ def test_dict_mutation_plans_and_load(tmp_path: Path, monkeypatch: pytest.Monkey
     assert cli("dict", "import", "input.PDF")[0] == EXIT_ERROR
 
 
-def test_eval_and_analyzer_status() -> None:
+def test_eval_and_analyzer_status(tmp_path: Path) -> None:
     """Check eval and analyzer status."""
-    directory = str(Path(__file__).parents[1] / "testdata")
-    code, output, error = cli("eval", "--format=json", "--fail-under=1", directory)
+    # The corpus has fixtures that need spaCy. This test uses a fixture without it.
+    (tmp_path / "sample.md").write_text("Open the valve; start the pump.")
+    (tmp_path / "sample.expected.json").write_text('{"expect": [{"rule_id": "STE-8.1"}]}')
+    code, output, error = cli("eval", "--format=json", "--fail-under=1", str(tmp_path))
     assert code == 0, error
     assert json.loads(output)["totals"]["precision"] == 1
     code, output, error = cli("analyzer", "--format=json")

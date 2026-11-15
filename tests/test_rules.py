@@ -3,11 +3,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from ste.checker import lint
-from ste.models import DictionaryResult, Options, Preferred, SyntaxToken
+from ste.models import DictionaryResult, Options, Preferred
+from tests.grammar import StubSyntax
 from tests.test_rules_cases import STRUCTURE_CASES, SYNTAX_CASES, VERB_CASES, VerbCase
+
+if TYPE_CHECKING:
+    from ste.models import WordEntry
 
 DICTIONARY_CONFIDENCE = 0.95
 ANALYZER_CONFIDENCE = 0.9
@@ -43,32 +49,6 @@ def test_structure_cases(
         assert len(got) == want
 
 
-class SpecSyntax:
-    """A token stream fixed independently from the checker rules."""
-
-    def __init__(self, grammar: dict[str, list[str]]) -> None:
-        """Set the independent grammar response."""
-        self.spec = grammar
-
-    def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
-        """Return the specified passive-voice result."""
-        del sentence, offset
-        return False, False
-
-    def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]:
-        """Return the specified grammar for this sentence."""
-        if sentence.strip() not in self.spec:
-            return [], False
-        out = []
-        offset = 0
-        for i, spec in enumerate(self.spec[sentence.strip()]):
-            text, pos, tag, dep, head = spec.split("/")
-            start = sentence.index(text, offset)
-            offset = start + len(text)
-            out.append(SyntaxToken(i, text, pos, tag, dep, int(head) if head else i, start))
-        return out, True
-
-
 @pytest.mark.parametrize(
     ("_name", "rule_id", "text", "grammar", "want"),
     SYNTAX_CASES,
@@ -78,7 +58,7 @@ def test_syntax_cases(
     _name: str, rule_id: str, text: str, grammar: dict[str, list[str]], want: str | int
 ) -> None:
     """Check syntax cases."""
-    got = [d for d in lint(text, Options(syntax=SpecSyntax(grammar))) if d.rule_id == rule_id]
+    got = [d for d in lint(text, Options(syntax=StubSyntax(grammar))) if d.rule_id == rule_id]
     assert len(got) == want
 
 
@@ -172,6 +152,14 @@ class TestDictionary:
             return DictionaryResult(alternatives=["use"]), True
         return DictionaryResult(), False
 
+    def lookup(self, _word: str) -> list[WordEntry]:
+        """Give no entry. These tests read only unapproved words."""
+        return []
+
+    def by_form(self, _form: str) -> list[WordEntry]:
+        """Give no entry. These tests read only unapproved words."""
+        return []
+
 
 @pytest.mark.parametrize(
     ("text", "want"),
@@ -201,27 +189,23 @@ def test_dictionary_alternative_has_priority() -> None:
 
 def test_passive_syntax_veto_and_confidence() -> None:
     """Check passive syntax veto and confidence."""
-
-    class PassiveSyntax:
-        """A fixed passive-voice answer for the analyzer contract."""
-
-        def __init__(self, *, passive: bool) -> None:
-            """Set the independent grammar response."""
-            self.passive = passive
-
-        def grammar(self, sentence: str) -> tuple[list[SyntaxToken], bool]:
-            """Return the specified grammar for this sentence."""
-            del sentence
-            return [], False
-
-        def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
-            """Return the specified passive-voice result."""
-            del sentence, offset
-            return self.passive, True
-
     text = "There is measured user demand."
-    assert lint(text, Options(syntax=PassiveSyntax(passive=False))) == []
-    got = lint("The report was approved.", Options(syntax=PassiveSyntax(passive=True)))
+    adjective = [
+        "There/PRON/EX/expl/1",
+        "is/VERB/VBZ/ROOT/1",
+        "measured/ADJ/JJ/amod/4",
+        "user/NOUN/NN/compound/4",
+        "demand/NOUN/NN/attr/1",
+    ]
+    assert lint(text, Options(syntax=StubSyntax({text: adjective}))) == []
+    passive = [
+        "The/DET/DT/det/1",
+        "report/NOUN/NN/nsubjpass/3",
+        "was/AUX/VBD/auxpass/3",
+        "approved/VERB/VBN/ROOT/3",
+    ]
+    text = "The report was approved."
+    got = lint(text, Options(syntax=StubSyntax({text: passive})))
     assert got[0].confidence == ANALYZER_CONFIDENCE
 
 
@@ -294,7 +278,7 @@ def test_command_forms_in_mixed_procedures(
         **extra,
     }
     findings = [
-        d for d in lint(text, Options(syntax=SpecSyntax(grammar))) if d.rule_id == "STE-5.3"
+        d for d in lint(text, Options(syntax=StubSyntax(grammar))) if d.rule_id == "STE-5.3"
     ]
     assert [text[d.start : d.end] for d in findings] == ["Installation"]
 
@@ -312,9 +296,77 @@ def test_noun_cluster_allowance_and_character_spans() -> None:
             "unit/NOUN/NN/appos/0",
         ]
     }
-    opts = Options(syntax=SpecSyntax(grammar))
+    opts = Options(syntax=StubSyntax(grammar))
     findings = [d for d in lint(text, opts) if d.rule_id == "STE-2.1"]
     assert [text[d.start : d.end] for d in findings] == ["Élan: engine fuel pump control unit"]
     # A project can name a technical noun explicitly.
     opts.allow_nouns = ["Élan engine fuel pump control unit"]
     assert not [d for d in lint(text, opts) if d.rule_id == "STE-2.1"]
+
+
+@pytest.mark.parametrize(
+    ("text", "nouns", "prefer", "limit", "want"),
+    [
+        ("Open the fuel pump control unit.", ["fuel pump control unit"], [], 0, []),
+        (
+            "Open the fuel pump control unit.",
+            ["fuel pump control unit"],
+            [],
+            3,
+            ["fuel pump control unit"],
+        ),
+        ("Open the fuel pump control unit.", ["fuel pump control unit"], [], 4, []),
+        (
+            "Open the Fuel Pump Control Unit.",
+            ["fuel pump control unit"],
+            [],
+            3,
+            ["Fuel Pump Control Unit"],
+        ),
+        ("Open the fuel pump.", ["fuel pump"], [], 1, ["fuel pump"]),
+        ("Open the air-conditioning system.", ["air-conditioning system"], [], 2, []),
+        ("Open the parser.", ["fuel pump control unit"], [], 3, []),
+        (
+            "Open the config file. Then close the config file.",
+            [],
+            [Preferred("config file", ["settings file"])],
+            1,
+            ["config file"],
+        ),
+    ],
+)
+def test_short_technical_noun(
+    text: str, nouns: list[str], prefer: list[Preferred], limit: int, want: list[str]
+) -> None:
+    """Check that a configured technical noun obeys the configured word limit."""
+    opts = Options(allow_nouns=nouns, prefer=prefer, max_noun_words=limit)
+    got = [d for d in lint(text, opts) if d.rule_id == "STE-1.9"]
+    assert [text[d.start : d.end] for d in got] == want
+
+
+@pytest.mark.parametrize(
+    ("text", "want"),
+    [
+        ("> [!CAUTION]\n> Do not touch the blade. The blade can cause injury.\n", ["injury"]),
+        ("> [!CAUTION]\n> Do not drop the unit. A fall can cause damage.\n", []),
+        ("> [!WARNING]\n> Do not touch the blade. The blade can cause injury.\n", []),
+        ("> [!CAUTION]\n> Keep away. Death or injuries can occur.\n", ["Death"]),
+    ],
+)
+def test_caution_that_tells_of_injury(text: str, want: list[str]) -> None:
+    """Check that a caution with a risk of injury or death needs a warning label."""
+    got = [d for d in lint(text) if d.rule_id == "STE-7.1"]
+    assert [text[d.start : d.end] for d in got] == want
+
+
+def test_text_in_parentheses_is_a_sentence_with_its_own_limit() -> None:
+    """Check that the text in parentheses has the limit of its sentence."""
+    inner = " ".join(["word"] * 26)
+    text = f"Open the valve ({inner}).\n"
+    got = [d for d in lint(text) if d.rule_id == "STE-5.1"]
+    assert [text[d.start : d.end] for d in got] == [f"({inner})"]
+    assert "parentheses" in got[0].message
+    short = " ".join(["word"] * 25)
+    assert not [d for d in lint(f"Open the valve ({short}).\n") if d.rule_id == "STE-5.1"]
+    step = " ".join(["word"] * 21)
+    assert [d.rule_id for d in lint(f"1. Open the valve ({step}).\n")] == ["STE-5.1"]

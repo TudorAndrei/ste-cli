@@ -1,0 +1,12 @@
+{
+  "mode": "strict",
+  "analyze": true,
+  "expect": [
+    { "rule_id": "STE-4.2", "text": "filter" },
+    { "rule_id": "STE-4.2", "text": "button" },
+    { "rule_id": "STE-4.2", "text": "file" },
+    { "rule_id": "STE-8.2", "text": "high pressure" },
+    { "rule_id": "STE-8.2", "text": "32 bit" },
+    { "rule_id": "STE-8.2", "text": "user friendly" }
+  ]
+}

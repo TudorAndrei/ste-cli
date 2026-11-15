@@ -7,7 +7,10 @@ Report writers convert offsets and columns to UTF-8 bytes for CLI compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @dataclass
@@ -24,13 +27,55 @@ class Diagnostic:
 
 
 @dataclass
+class SyntaxToken:
+    """One analyzer token with its grammar and its offset in the sentence text.
+
+    ``index`` and ``head`` count analyzer tokens, and the analyzer can split
+    a word or give a token for a punctuation mark.
+    """
+
+    index: int
+    text: str
+    pos: str
+    tag: str
+    dep: str
+    head: int
+    start: int
+    lemma: str = ""
+    # False when the analyzer has a word list and the word is not in it, as
+    # for the name of a tool such as "oxfmt". The tagger can give such a
+    # word any part of speech.
+    in_lexicon: bool = True
+
+
+@dataclass
 class Token:
-    """One prose word with its source span."""
+    """One prose word with its source span and, when known, its grammar.
+
+    The grammar fields stay empty until an analyzer fills the document. A rule
+    must read ``Sentence.tagged`` before it reads them. ``ste.grammar.align``
+    gives the rule that joins the analyzer tokens to these tokens.
+
+    The grammar fields are not arguments of the constructor. Thus a token
+    without grammar keeps only its four source fields in memory.
+    """
 
     text: str
     lower: str
     start: int
     end: int
+    # The universal part of speech, such as "VERB", "NOUN", or "ADJ".
+    pos: str = field(default="", init=False)
+    # The Penn Treebank tag, such as "VB", "VBN", or "NNS".
+    tag: str = field(default="", init=False)
+    # The dependency relation to the head, such as "nsubj" or "ROOT".
+    dep: str = field(default="", init=False)
+    # The index of the head in ``Sentence.tokens``. The root is its own head.
+    # The value is -1 when the head is not a word of the sentence.
+    head: int = field(default=-1, init=False)
+    # The base form, such as "close" for "closed". It is empty when the
+    # analyzer has no lemmatizer.
+    lemma: str = field(default="", init=False)
 
 
 @dataclass
@@ -49,6 +94,17 @@ class Sentence:
     admonition: str = ""
     first: bool = False
     last: bool = False
+    # All analyzer tokens of the sentence, punctuation included, with offsets
+    # from the start of ``text``. It is empty when the grammar is not known.
+    syntax: list[SyntaxToken] = field(default_factory=list)
+    # The inline code spans of the sentence, with offsets from the start of
+    # ``text``. The analyzer does not read their text.
+    code: list[tuple[int, int]] = field(default_factory=list)
+
+    @property
+    def tagged(self) -> bool:
+        """Return whether an analyzer gave the grammar of this sentence."""
+        return bool(self.syntax)
 
     def limit(self) -> int:
         """Return the word limit for this sentence type."""
@@ -62,6 +118,8 @@ class Document:
     source: str
     masked: str
     sentences: list[Sentence] = field(default_factory=list)
+    # True after ``ste.grammar.annotate`` ran on this document.
+    analyzed: bool = False
 
     def word_count(self) -> int:
         """Return the total word count of the prose."""
@@ -85,6 +143,35 @@ class DictionaryResult:
     technical_noun: bool = False
 
 
+class WordEntry(Protocol):
+    """One entry of an imported dictionary: a word, as one part of speech."""
+
+    @property
+    def word(self) -> str:
+        """The headword, in lower case."""
+        ...
+
+    @property
+    def approved(self) -> bool:
+        """Whether the dictionary approves the word as this part of speech."""
+        ...
+
+    @property
+    def pos(self) -> str:
+        """The part of speech of the dictionary, such as "n", "v", or "adj"."""
+        ...
+
+    @property
+    def alternatives(self) -> list[str]:
+        """The approved words to use instead."""
+        ...
+
+    @property
+    def forms(self) -> list[str]:
+        """The other forms that the dictionary gives, in lower case."""
+        ...
+
+
 class Dictionary(Protocol):
     """The word lookup contract for an imported dictionary."""
 
@@ -92,18 +179,13 @@ class Dictionary(Protocol):
         """Look up an unapproved word and its permitted alternatives."""
         ...
 
+    def lookup(self, word: str, /) -> Sequence[WordEntry]:
+        """Get each entry of a headword."""
+        ...
 
-@dataclass
-class SyntaxToken:
-    """One word with its grammar and position in a sentence."""
-
-    index: int
-    text: str
-    pos: str
-    tag: str
-    dep: str
-    head: int
-    start: int
+    def by_form(self, form: str, /) -> Sequence[WordEntry]:
+        """Get each entry that gives this word as one of its other forms."""
+        ...
 
 
 class Syntax(Protocol):
@@ -113,8 +195,8 @@ class Syntax(Protocol):
         """Return sentence tokens and whether the grammar is known."""
         ...
 
-    def passive_at(self, sentence: str, offset: int) -> tuple[bool, bool]:
-        """Return whether a word is passive and whether the answer is known."""
+    def grammar_many(self, sentences: list[str]) -> list[list[SyntaxToken]]:
+        """Return the tokens of each sentence, in order. An empty list is not known."""
         ...
 
 
@@ -124,8 +206,12 @@ class Options:
 
     mode: str = "flavored"
     max_words: int = 0
+    max_noun_words: int = 0
     allow_nouns: list[str] = field(default_factory=list)
     allow_verbs: list[str] = field(default_factory=list)
+    # The nouns of a preset, such as "software". They permit a word as the
+    # nouns of the user do, but rule STE-1.7 reads only the nouns of the user.
+    preset_nouns: list[str] = field(default_factory=list)
     prefer: list[Preferred] = field(default_factory=list)
     disable_rules: list[str] = field(default_factory=list)
     rule_severity: dict[str, str] = field(default_factory=dict)
@@ -133,7 +219,7 @@ class Options:
     warnings_as_errors: bool = False
     dictionary: Dictionary | None = None
     syntax: Syntax | None = None
-    _allowed_key: tuple[tuple[str, ...], tuple[str, ...]] | None = field(
+    _allowed_key: tuple[tuple[str, ...], ...] | None = field(
         default=None, init=False, repr=False, compare=False
     )
     _allowed_words: frozenset[str] = field(
@@ -159,8 +245,8 @@ class Options:
 
     def allowed(self, word: str) -> bool:
         """Return whether the glossary permits this word."""
-        key = (tuple(self.allow_nouns), tuple(self.allow_verbs))
+        key = (tuple(self.allow_nouns), tuple(self.allow_verbs), tuple(self.preset_nouns))
         if key != self._allowed_key:
-            self._allowed_words = frozenset(w.lower() for w in key[0] + key[1])
+            self._allowed_words = frozenset(w.lower() for words in key for w in words)
             self._allowed_key = key
         return word.lower() in self._allowed_words

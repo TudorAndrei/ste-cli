@@ -21,12 +21,22 @@ import typer
 from typer._click.core import Context, ParameterSource
 from typer.core import TyperCommand, TyperGroup, TyperOption
 
-from ste import __version__, analyzer, baseline, config, dictionary, evaluation, report
+from ste import (
+    __version__,
+    analyzer,
+    baseline,
+    config,
+    dictionary,
+    evaluation,
+    grammar_cache,
+    report,
+    review,
+)
 from ste.checker import lint_document
 from ste.document import parse
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
     from typer._click.core import Parameter
 
@@ -458,13 +468,40 @@ def _lint_options(ns: LintOptions, cfg: config.Config) -> Options:
     if ns.warnings_as_errors:
         opts.warnings_as_errors = True
     if ns.preset:
-        opts.allow_nouns.extend(config.preset(ns.preset))
+        opts.preset_nouns.extend(config.preset(ns.preset))
     if ns.use_dict or ns.dict or cfg.dictionary:
         opts.dictionary = dictionary.load(ns.dict or None)
         if opts.dictionary is None:
             msg = 'there is no dictionary index. Run "ste dict import <file>" first.'
             raise ValueError(msg)
     return opts
+
+
+def _read_sources(
+    paths: list[str], proj: Project, cfg: config.Config, stdin: TextIO, *, read_all: bool
+) -> Iterator[tuple[str, str]]:
+    """Read each permitted file one time, and standard input for "-"."""
+    seen: set[Path] = set()
+    stdin_read = False
+    for path in paths:
+        if path == "-":
+            if not stdin_read:
+                stdin_read = True
+                yield STDIN_NAME, stdin.read()
+            continue
+        for file in text_files(path, proj.directory, cfg.exclude, all_files=read_all):
+            # Follow symbolic links before ".." is removed, as the system does.
+            key = Path(os.path.realpath(file))
+            if key in seen:
+                continue
+            seen.add(key)
+            with Path(file).open(encoding="utf-8", newline="") as stream:
+                try:
+                    text = stream.read()
+                except UnicodeDecodeError as err:
+                    msg = f"{file}: the file is not UTF-8 text"
+                    raise ValueError(msg) from err
+            yield file, text
 
 
 def _read_lint(
@@ -479,28 +516,10 @@ def _read_lint(
             raise ValueError(msg) from err
         opts.syntax = client
     try:
-        results = []
-        seen: set[Path] = set()
-        stdin_read = False
-        for path in ns.paths:
-            if path == "-":
-                if not stdin_read:
-                    stdin_read = True
-                    results.append(_lint_one(STDIN_NAME, stdin.read(), opts))
-            else:
-                for file in text_files(path, proj.directory, cfg.exclude, all_files=ns.read_all):
-                    # Follow symbolic links before ".." is removed, as the system does.
-                    key = Path(os.path.realpath(file))
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    with Path(file).open(encoding="utf-8", newline="") as stream:
-                        try:
-                            text = stream.read()
-                        except UnicodeDecodeError as err:
-                            msg = f"{file}: the file is not UTF-8 text"
-                            raise ValueError(msg) from err
-                    results.append(_lint_one(file, text, opts))
+        results = [
+            _lint_one(name, text, opts)
+            for name, text in _read_sources(ns.paths, proj, cfg, stdin, read_all=ns.read_all)
+        ]
     finally:
         if client is not None:
             client.close()
@@ -738,6 +757,8 @@ def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int
                 f"{stats['unapproved']}"
                 "\nalternatives: "
                 f"{stats['alternatives']}"
+                "\nforms:        "
+                f"{stats['forms']}"
                 "\n"
             )
         _write_plan(stdout, ns.output_format, plan, text)
@@ -783,7 +804,16 @@ def _run_dict(command: str, source: str, ns: DictOptions, stdout: TextIO) -> int
     return 0
 
 
-def _run_analyzer(output_format: str, stdout: TextIO) -> int:
+def _run_analyzer(output_format: str, stdout: TextIO, *, clear_cache: bool) -> int:
+    if clear_cache:
+        path = grammar_cache.default_path()
+        removed = grammar_cache.clear(path)
+        data = {"action": "clear-cache", "path": str(path or ""), "removed": removed}
+        text = (
+            f"The grammar cache is clear: {path}\n" if removed else "There is no grammar cache.\n"
+        )
+        _write_plan(stdout, output_format, data, text)
+        return 0
     status = analyzer.check()
     if status["ready"]:
         text = (
@@ -791,6 +821,8 @@ def _run_analyzer(output_format: str, stdout: TextIO) -> int:
             f"{status['python']}"
             "\n  script: "
             f"{status['script']}"
+            "\n  cache:  "
+            f"{status['cache'] or 'off'}"
             '\n\nRun "ste lint --analyze docs/" to use it.\nIt makes rule STE-3.6 '
             "more exact, and it is never necessary.\n"
         )
@@ -803,10 +835,16 @@ def _run_analyzer(output_format: str, stdout: TextIO) -> int:
     return 0
 
 
-def _run_eval(
-    directory: str, output_format: str, fail_under: float, stdout: TextIO, stderr: TextIO
+def _run_eval(  # noqa: PLR0913 - one parameter for each option of the command.
+    directory: str,
+    output_format: str,
+    fail_under: float,
+    stdout: TextIO,
+    stderr: TextIO,
+    *,
+    require_analyzer: bool = False,
 ) -> int:
-    data = evaluation.run(directory)
+    data = evaluation.run(directory, require_analyzer=require_analyzer)
     if output_format == "json":
         stdout.write(json.dumps(data, indent=2) + "\n")
     else:
@@ -969,9 +1007,14 @@ def analyzer_command(
     output_format: Annotated[
         SimpleFormat, typer.Option("--format", help="Output format.")
     ] = SimpleFormat.text,
+    clear_cache: Annotated[
+        bool, typer.Option("--clear-cache", help="Remove the grammar cache.")
+    ] = False,
 ) -> None:
     """Show the grammar analyzer and what it needs."""
-    raise typer.Exit(_run_analyzer(output_format.value, streams(ctx).stdout))
+    raise typer.Exit(
+        _run_analyzer(output_format.value, streams(ctx).stdout, clear_cache=clear_cache)
+    )
 
 
 @app.command("eval", cls=SteCommand)
@@ -985,10 +1028,45 @@ def eval_command(
     fail_under: Annotated[
         float, typer.Option("--fail-under", help="Minimum precision and recall.")
     ] = -1,
+    analyze: Annotated[
+        bool,
+        typer.Option(
+            "--analyze",
+            help="Stop with an error when a fixture needs the analyzer and it cannot start.",
+        ),
+    ] = False,
 ) -> None:
     """Measure rules against a labeled corpus."""
     io = streams(ctx)
-    raise typer.Exit(_run_eval(directory, output_format.value, fail_under, io.stdout, io.stderr))
+    raise typer.Exit(
+        _run_eval(
+            directory,
+            output_format.value,
+            fail_under,
+            io.stdout,
+            io.stderr,
+            require_analyzer=analyze,
+        )
+    )
+
+
+@app.command("review", cls=SteCommand)
+def review_command(
+    ctx: typer.Context,
+    *,
+    paths: Annotated[list[str] | None, typer.Argument(help="Files or directories.")] = None,
+    output_format: Annotated[
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
+) -> None:
+    """Tell an agent how to review the rules that need a reader."""
+    targets = paths or ["."]
+    _write_plan(
+        streams(ctx).stdout,
+        output_format.value,
+        review.plan(targets),
+        review.instruction(targets),
+    )
 
 
 @app.command("schema", cls=SteCommand)

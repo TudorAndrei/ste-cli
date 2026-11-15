@@ -1,0 +1,10 @@
+{
+  "mode": "flavored",
+  "analyze": true,
+  "expect": [
+    { "rule_id": "STE-5.2", "text": "remove" },
+    { "rule_id": "STE-5.4", "text": "before you start the pump" },
+    { "rule_id": "STE-5.5", "text": "Disconnect" },
+    { "rule_id": "STE-7.2", "text": "WARNING:** The surface is hot." }
+  ]
+}

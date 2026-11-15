@@ -1,8 +1,9 @@
 # Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Verb construction checks."""
 
+from ste.grammar import passive_at
 from ste.models import Diagnostic, Document, Options, Sentence
-from ste.rules.common import span
+from ste.rules.common import QUOTE_MARKS, span
 from ste.rules.data import (
     ADJECTIVAL_ING,
     ADJECTIVAL_PARTICIPLES,
@@ -14,10 +15,17 @@ from ste.rules.data import (
     VERB_FORMS,
 )
 
+PLANNED_BE = frozenset({"am", "are", "is", "was", "were"})
 MIN_PARTICIPLE_LENGTH = 3
 MIN_ING_LENGTH = 4
 MIN_ADVERB_LENGTH = 3
 SYNTAX_CONFIDENCE = 0.9
+# "up to" before an amount gives a limit, as in "show up to 10 results".
+# Then "up" is not the particle of a phrasal verb.
+_AMOUNT_WORDS = frozenset(
+    {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"}
+    | {"twenty", "fifty", "hundred", "thousand", "a", "an"}
+)
 PHRASAL_INDEX: dict[str, list[tuple[list[str], str]]] = {}
 for _base, _particles, _suggestion in PHRASAL_VERBS:
     for _form in VERB_FORMS[_base]:
@@ -54,7 +62,7 @@ def joined(s: Sentence, first: int, last: int) -> bool:
         start, end = s.tokens[k].end - s.start, s.tokens[k + 1].start - s.start
         if start < 0 or end > len(s.text) or start > end:
             return False
-        if any(c.isascii() and c.isalnum() for c in s.text[start:end]):
+        if any((c.isascii() and c.isalnum()) or c in QUOTE_MARKS for c in s.text[start:end]):
             return False
     return True
 
@@ -90,6 +98,32 @@ def match_perfect(s: Sentence, i: int) -> Diagnostic | None:
     return None
 
 
+def match_planned(s: Sentence, i: int) -> Diagnostic | None:
+    """Find "is to be" and a participle, a construction of three auxiliaries."""
+    if s.tokens[i].lower not in PLANNED_BE or i + 2 >= len(s.tokens):
+        return None
+    if [s.tokens[i + 1].lower, s.tokens[i + 2].lower] != ["to", "be"]:
+        return None
+    k = next_content(s, i + 3)
+    if k >= len(s.tokens) or not joined(s, i, k) or not is_participle(s.tokens[k].lower):
+        return None
+    confidence = 0.85
+    if s.tagged and s.tokens[k].tag:
+        if s.tokens[k].tag != "VBN":
+            return None
+        confidence = SYNTAX_CONFIDENCE
+    return Diagnostic(
+        "STE-3.4",
+        f'"{span(s, i, k)}" is a complex verb construction. '
+        "ASD-STE100 does not approve more than one auxiliary verb with a verb.",
+        "warning",
+        confidence,
+        s.tokens[i].start,
+        s.tokens[k].end,
+        'Write a command, or write "must" and the active voice.',
+    )
+
+
 def match_progressive(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
     """Find a progressive verb construction at one token."""
     j = next_content(s, i + 1)
@@ -122,12 +156,11 @@ def match_passive(s: Sentence, i: int, opts: Options) -> tuple[Diagnostic, bool]
     if w in ADJECTIVAL_PARTICIPLES and not agent:
         return None
     confidence = 0.95 if agent else 0.85 if w in IRREGULAR_PARTICIPLES else 0.7
-    if opts.syntax is not None:
-        passive, known = opts.syntax.passive_at(s.text, s.tokens[j].start - s.start)
-        if known and not passive:
-            return None
-        if known and passive and confidence < SYNTAX_CONFIDENCE:
-            confidence = SYNTAX_CONFIDENCE
+    passive = passive_at(s, s.tokens[j].start - s.start)
+    if passive is False:
+        return None
+    if passive and confidence < SYNTAX_CONFIDENCE:
+        confidence = SYNTAX_CONFIDENCE
     return Diagnostic(
         "STE-3.6",
         f'"{span(s, i, j)}" is the passive voice.',
@@ -139,12 +172,24 @@ def match_passive(s: Sentence, i: int, opts: Options) -> tuple[Diagnostic, bool]
     ), agent
 
 
+def up_to_amount(s: Sentence, last: int) -> bool:
+    """Return whether the particle "up" starts "up to" and an amount."""
+    after = [t.lower for t in s.tokens[last : last + 3]]
+    return (
+        len(after) == 3  # noqa: PLR2004
+        and after[:2] == ["up", "to"]
+        and (after[2][:1].isdigit() or after[2] in _AMOUNT_WORDS)
+    )
+
+
 def match_phrasal(s: Sentence, i: int, opts: Options) -> Diagnostic | None:
     """Find a phrasal verb that starts at one token."""
     for particles, suggestion in PHRASAL_INDEX.get(s.tokens[i].lower, []):
         if [t.lower for t in s.tokens[i + 1 : i + 1 + len(particles)]] != particles:
             continue
         last = i + len(particles)
+        if up_to_amount(s, last):
+            continue
         phrase = span(s, i, last)
         if opts.allowed(phrase) or opts.allowed(s.tokens[i].lower):
             continue
@@ -173,6 +218,8 @@ def verbs(doc: Document, opts: Options) -> list[Diagnostic]:
             if t.lower in PERFECT_AUX and (d := match_perfect(s, i)):
                 perfect.append(d)
             if t.lower in BE_FORMS:
+                if d := match_planned(s, i):
+                    perfect.append(d)
                 if d := match_progressive(s, i, opts):
                     other.append(d)
                 if p := match_passive(s, i, opts):

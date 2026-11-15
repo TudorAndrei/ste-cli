@@ -59,6 +59,9 @@ testpaths = ["tests"]
 [tool.ty.environment]
 python-version = "3.14"
 
+[tool.ty.src]
+exclude = [".claude/"]
+
 [tool.vulture]
 paths = ["src", "tests"]
 min_confidence = 60
@@ -68,4 +71,6 @@ ignore_decorators = ["@app.command", "@app.callback", "@dict_app.command", "@dic
 ignore_names = [
     "ndjson", "sarif", "github",
     "true_positives", "false_positives", "false_negatives", "precision", "recall", "expect",
+    # A protocol parameter of spaCy, given by keyword.
+    "batch_size",
 ]

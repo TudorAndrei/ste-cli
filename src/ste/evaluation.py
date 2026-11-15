@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import TextIO, TypedDict
 
+from ste import analyzer, dictionary
 from ste.checker import lint
 from ste.models import Options, Preferred
 
@@ -27,6 +28,7 @@ class EvaluationReport(TypedDict):
     """Results of a run against the labeled corpus."""
 
     files: int
+    skipped: list[str]
     rules: list[RuleScore]
     totals: RuleScore
 
@@ -85,7 +87,7 @@ def _expectations(path: Path, value: object) -> list[dict[str, str]]:
     return expectations
 
 
-def _expected(path: Path) -> tuple[Options, list[dict[str, str]]]:
+def _expected(path: Path) -> tuple[Options, bool, list[dict[str, str]]]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -99,16 +101,41 @@ def _expected(path: Path) -> tuple[Options, list[dict[str, str]]]:
     mode = raw.get("mode")
     if mode is not None and not isinstance(mode, str):
         raise _invalid(path, "mode must be a string")
+    analyze = raw.get("analyze", False)
+    if not isinstance(analyze, bool):
+        raise _invalid(path, "analyze must be true or false")
+    limit = raw.get("max_noun_words")
+    if limit is not None and (type(limit) is not int or limit <= 0):
+        raise _invalid(path, "max_noun_words must be a positive number")
     opts = Options(
         mode=mode or "flavored",
+        max_noun_words=limit or 0,
         allow_nouns=_string_list(path, raw.get("allow_nouns"), "allow_nouns"),
+        allow_verbs=_string_list(path, raw.get("allow_verbs"), "allow_verbs"),
         prefer=_preferences(path, raw.get("prefer")),
+        dictionary=_dictionary(path, raw.get("dictionary")),
     )
-    return opts, _expectations(path, raw.get("expect"))
+    return opts, analyze, _expectations(path, raw.get("expect"))
 
 
-def run(directory: str | Path) -> EvaluationReport:
-    """Measure all fixtures in a labeled corpus."""
+def _dictionary(path: Path, value: object) -> dictionary.Index | None:
+    """Load the dictionary index that a label names, by a path from the label file."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise _invalid(path, "dictionary must be the path of an index")
+    index = dictionary.load(path.parent / value)
+    if index is None:
+        raise _invalid(path, f"the dictionary {value} does not exist")
+    return index
+
+
+def run(directory: str | Path, *, require_analyzer: bool = False) -> EvaluationReport:
+    """Measure all fixtures in a labeled corpus.
+
+    Without the analyzer, the run skips a fixture that needs it. With
+    ``require_analyzer``, the run stops with an error instead.
+    """
     root = Path(directory)
     if not root.is_dir():
         msg = f"{root}: the corpus directory does not exist"
@@ -120,37 +147,87 @@ def run(directory: str | Path) -> EvaluationReport:
         msg = f"{root}: the corpus has no fixture files"
         raise ValueError(msg)
     counts: defaultdict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
-    for path in files:
-        source = path.read_text(encoding="utf-8")
-        expected_path = path.with_suffix(".expected.json")
-        opts, want = _expected(expected_path)
-        used: set[int] = set()
-        for diag in lint(source, opts):
-            text = " ".join(source[diag.start : diag.end].split())
-            match = next(
-                (
-                    n
-                    for n, w in enumerate(want)
-                    if n not in used
-                    and w["rule_id"] == diag.rule_id
-                    and (not w.get("text") or w["text"] == text)
-                ),
-                None,
-            )
-            if match is None:
-                counts[diag.rule_id][1] += 1
-            else:
-                used.add(match)
-                counts[diag.rule_id][0] += 1
-        for n, expectation in enumerate(want):
-            if n not in used:
-                counts[expectation["rule_id"]][2] += 1
+    grammar = _Grammar(required=require_analyzer)
+    skipped: list[str] = []
+    try:
+        skipped.extend(
+            path.relative_to(root).as_posix()
+            for path in files
+            if not _measure(path, counts, grammar)
+        )
+    finally:
+        grammar.close()
     totals = [sum(v[n] for v in counts.values()) for n in range(3)]
     return {
         "files": len(files),
+        "skipped": skipped,
         "rules": [_score(k, counts[k]) for k in sorted(counts)],
         "totals": _score("all", totals),
     }
+
+
+class _Grammar:
+    """The analyzer of a run. It starts at the first fixture that needs it."""
+
+    def __init__(self, *, required: bool) -> None:
+        self.required = required
+        self.checked = False
+        self.client: analyzer.Analyzer | None = None
+
+    def get(self) -> analyzer.Analyzer | None:
+        """Return the analyzer, or None when it cannot start on this computer."""
+        if not self.checked:
+            self.checked = True
+            status = analyzer.check()
+            if status["ready"]:
+                self.client = analyzer.create()
+            elif self.required:
+                msg = f"the corpus needs the analyzer. {status['problem']}"
+                raise ValueError(msg)
+        return self.client
+
+    def close(self) -> None:
+        """Stop the analyzer, if it started."""
+        if self.client is not None:
+            self.client.close()
+
+
+def _measure(path: Path, counts: defaultdict[str, list[int]], grammar: _Grammar) -> bool:
+    """Add the results of one fixture, and return False when the run skips it.
+
+    A fixture with ``"analyze": true`` needs the grammar analyzer. Without
+    spaCy, the run skips that fixture, and the report names it.
+    """
+    source = path.read_text(encoding="utf-8")
+    expected_path = path.with_suffix(".expected.json")
+    opts, analyze, want = _expected(expected_path)
+    if analyze:
+        client = grammar.get()
+        if client is None:
+            return False
+        opts.syntax = client
+    used: set[int] = set()
+    for diag in lint(source, opts):
+        text = " ".join(source[diag.start : diag.end].split())
+        match = next(
+            (
+                n
+                for n, w in enumerate(want)
+                if n not in used
+                and w["rule_id"] == diag.rule_id
+                and (not w.get("text") or w["text"] == text)
+            ),
+            None,
+        )
+        if match is None:
+            counts[diag.rule_id][1] += 1
+        else:
+            used.add(match)
+            counts[diag.rule_id][0] += 1
+    for n, expectation in enumerate(want):
+        if n not in used:
+            counts[expectation["rule_id"]][2] += 1
+    return True
 
 
 def write_text(stream: TextIO, data: EvaluationReport) -> None:
@@ -163,3 +240,9 @@ def write_text(stream: TextIO, data: EvaluationReport) -> None:
         for row in [*rows, data["totals"]]
     )
     stream.write(f"\n{data['files']} fixture files\n")
+    if data["skipped"]:
+        stream.write(
+            f"{len(data['skipped'])} fixture files skipped, because they need the analyzer: "
+            + ", ".join(data["skipped"])
+            + "\n"
+        )

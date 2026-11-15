@@ -1,19 +1,13 @@
 # Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Checks that use syntax from an NLP analyzer."""
 
+from ste.grammar import analyzer_text
 from ste.models import Diagnostic, Document, Options, Sentence, SyntaxToken
+from ste.rules.common import quoted
 from ste.rules.data import ADJECTIVAL_ING, BE_FORMS, CONDITION_WORDS, GERUND_DEPS
 
 MIN_PROCEDURE_ITEMS = 2
 MAX_NOUN_WORDS = 3
-
-
-def grammar_of(opts: Options, s: Sentence) -> list[SyntaxToken]:
-    """Return sentence grammar when an analyzer gives a result."""
-    if opts.syntax is None:
-        return []
-    tokens, ok = opts.syntax.grammar(s.text)
-    return tokens if ok else []
 
 
 def syntax_span(s: Sentence, t: SyntaxToken) -> tuple[int, int]:
@@ -54,7 +48,7 @@ def reads_as_command_with_please(s: Sentence, opts: Options, index: int) -> bool
     """Use explicit command context to resolve an ambiguous first word."""
     if opts.syntax is None:
         return False
-    text = s.text
+    _, text = analyzer_text(s)
     if text and "A" <= text[0] <= "Z":
         text = text[0].lower() + text[1:]
     grammar, ok = opts.syntax.grammar("please " + text)
@@ -101,7 +95,7 @@ def imperative(doc: Document, opts: Options) -> list[Diagnostic]:
         items = []
         commands = 0
         for s in group:
-            grammar = grammar_of(opts, s)
+            grammar = s.syntax
             if not grammar:
                 continue
             d = not_imperative(s, grammar, opts)
@@ -119,7 +113,7 @@ def noun_cluster(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report a noun cluster that exceeds its word limit."""
     out = []
     for s in doc.sentences:
-        grammar = grammar_of(opts, s)
+        grammar = s.syntax
         i = 0
         while i < len(grammar):
             if grammar[i].pos not in {"NOUN", "PROPN"}:
@@ -152,16 +146,37 @@ def noun_cluster(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
+_DETERMINER_TAGS = frozenset({"DT", "PDT", "PRP$", "WP$", "POS"})
+
+
+def _has_determiner(t: SyntaxToken, grammar: list[SyntaxToken]) -> bool:
+    """Return whether a determiner or a possessive comes before an -ing word.
+
+    "each" in "Make each warning an error" and "its" in "before its cleaning"
+    show that the -ing word is a noun, also when the tagger gives a verb.
+    """
+    return any(
+        other.head == t.index
+        and other.index < t.index
+        and (other.dep in {"det", "poss"} or other.tag in _DETERMINER_TAGS)
+        for other in grammar
+    )
+
+
 def gerund(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report an ing-form verb outside a permitted noun or modifier."""
     out = []
     for s in doc.sentences:
-        grammar = grammar_of(opts, s)
+        grammar = s.syntax
         for t in grammar:
             if t.tag != "VBG" or t.pos != "VERB" or t.dep not in GERUND_DEPS:
                 continue
             word = t.text.lower()
-            if opts.allowed(word) or word in ADJECTIVAL_ING:
+            if (
+                opts.allowed(word)
+                or word in ADJECTIVAL_ING
+                or quoted(s.text, t.start, t.start + len(t.text))
+            ):
                 continue
             if any(
                 other.head == t.index
@@ -169,6 +184,8 @@ def gerund(doc: Document, opts: Options) -> list[Diagnostic]:
                 and other.text.lower() in BE_FORMS
                 for other in grammar
             ):
+                continue
+            if _has_determiner(t, grammar):
                 continue
             start, end = syntax_span(s, t)
             out.append(

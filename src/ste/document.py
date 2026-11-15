@@ -21,7 +21,7 @@ from markdown_it.rules_inline import (
 from ste.models import Document, Sentence, Token
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterator, Mapping
 
     from markdown_it.rules_inline.state_inline import StateInline
     from markdown_it.token import Token as MarkdownToken
@@ -157,6 +157,7 @@ class _Block:
     procedural: bool = False
     kind: str = "paragraph"
     admonition: str = ""
+    code: list[tuple[int, int]] = field(default_factory=list)
 
 
 def _front_matter_end(src: str) -> int:
@@ -197,9 +198,11 @@ class _InlineTracker:
     """Record which characters of the current inline block are prose.
 
     ``visible`` holds one byte for each character: 1 for prose, 0 for syntax.
+    ``code`` holds 1 for each character of an inline code span.
     """
 
     visible: bytearray = field(default_factory=bytearray)
+    code: bytearray = field(default_factory=bytearray)
     root_state: StateInline | None = None
     delimiters: list[tuple[MarkdownToken, int, int]] = field(default_factory=list)
 
@@ -243,8 +246,11 @@ class _InlineTracker:
                 self.hide(label_end, end)
         elif name in {"emphasis", "strikethrough"}:
             self.record_delimiters(state, start, count)
-        elif name != "backticks" or any(t.type == "code_inline" for t in state.tokens[count:]):
+        elif name != "backticks":
             self.hide(start, end)
+        elif any(t.type == "code_inline" for t in state.tokens[count:]):
+            self.hide(start, end)
+            self.code[start:end] = b"\x01" * (end - start)
 
     def record_delimiters(self, state: StateInline, start: int, count: int) -> None:
         """Keep delimiter spans until the parser resolves emphasis pairs."""
@@ -265,6 +271,7 @@ class _InlineTracker:
         state, whose source positions must not enter the outer document.
         """
         self.visible = bytearray(b"\x01") * len(content)
+        self.code = bytearray(len(content))
         self.root_state = None
         self.delimiters = []
         children: list[MarkdownToken] = []
@@ -341,6 +348,26 @@ def _copy_segments(
     return segments
 
 
+def _code_spans(runs: list[tuple[int, int]], code: bytearray) -> list[tuple[int, int]]:
+    """Map the inline code characters of block content to source spans."""
+    spans: list[tuple[int, int]] = []
+    offset = 0
+    for pos, length in runs:
+        index, stop = offset, offset + length
+        shift = pos - offset
+        offset = stop
+        while (index := code.find(1, index, stop)) >= 0:
+            end = code.find(0, index, stop)
+            end = stop if end < 0 else end
+            first, last = index + shift, end + shift
+            if spans and first == spans[-1][1]:
+                spans[-1] = (spans[-1][0], last)
+            else:
+                spans.append((first, last))
+            index = end
+    return spans
+
+
 def _block_kind(stack: list[str]) -> str:
     if "heading_open" in stack:
         return "heading"
@@ -381,6 +408,7 @@ def _collect_blocks(src: str, md: MarkdownIt, env: dict, masked: list[str]) -> l
                         "ordered_list_open" in stack,
                         _block_kind(stack),
                         _admonition_word(src[start : start + 48]),
+                        _code_spans(runs, tracker.code),
                     )
                 )
         if token.nesting == -1 and stack:
@@ -508,13 +536,23 @@ def _quantity_end(masked: str, start: int, pos: int, end: int) -> int:
     return pos
 
 
-def count_words(masked: str, start: int = 0, end: int | None = None) -> int:
-    """Apply word-count rules for quantities, quotations, and parentheses."""
+def count_words(
+    masked: str, start: int = 0, end: int | None = None, names: Mapping[int, int] | None = None
+) -> int:
+    """Apply word-count rules for quantities, quotations, and parentheses.
+
+    ``names`` maps the start of a name of many words to its end. Such a name
+    counts as one word (rule 8.6).
+    """
     end = len(masked) if end is None else end
     count = 0
     pos = start
     while match := _COUNT_START.search(masked, pos, end):
         pos = match.start()
+        if names and (name_end := names.get(pos, -1)) > pos:
+            count += 1
+            pos = name_end
+            continue
         if masked[pos] in '("“':
             group_end = _group_end(masked, pos, end)
             if group_end > pos:
@@ -586,6 +624,11 @@ def _sentences(doc: Document, block: _Block, number: int) -> list[Sentence]:
         right = left + len(masked[left:right].rstrip(_SPACE))
         tokens = tokenize(masked, left, right)
         if tokens:
+            code = [
+                (max(a, left) - left, min(b, right) - left)
+                for a, b in block.code
+                if a < right and b > left
+            ]
             out.append(
                 Sentence(
                     src[left:right],
@@ -598,6 +641,7 @@ def _sentences(doc: Document, block: _Block, number: int) -> list[Sentence]:
                     number,
                     block.kind,
                     block.admonition,
+                    code=code,
                 )
             )
         segment_start = stop

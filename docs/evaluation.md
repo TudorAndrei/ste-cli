@@ -27,35 +27,81 @@ The corpus is in `testdata/`. Each fixture file can have a
 `<name>.expected.json` file that lists the findings that the checker must
 give. A file with no expectation file must give no findings.
 
+The expectation file can also give settings for its fixture:
+
+| Key | Use |
+|---|---|
+| `mode` | `flavored` or `strict` |
+| `allow_nouns`, `allow_verbs` | The technical words of the fixture |
+| `prefer` | The preferred names, as in the config |
+| `max_noun_words` | The limit of rule 1.9 |
+| `analyze` | `true` runs the fixture with the grammar analyzer. The run stops with an error when the analyzer cannot start. |
+| `dictionary` | The path of a dictionary index, from the directory of the label file. The fixture then runs with the dictionary. The corpus uses an index of invented words only. |
+
 | Rule | TP | FP | FN | Precision | Recall |
 |---|---|---|---|---|---|
-| `STE-1.1` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.1` | 3 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.2` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.4` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.7` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.9` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-1.11` | 3 | 0 | 0 | 1.00 | 1.00 |
-| `STE-1.14` | 2 | 0 | 0 | 1.00 | 1.00 |
-| `STE-3.4` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.13` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-1.14` | 4 | 0 | 0 | 1.00 | 1.00 |
+| `STE-2.1` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-3.1` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-3.2` | 7 | 0 | 0 | 1.00 | 1.00 |
+| `STE-3.3` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-3.4` | 4 | 0 | 0 | 1.00 | 1.00 |
 | `STE-3.5` | 2 | 0 | 0 | 1.00 | 1.00 |
-| `STE-3.6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-3.7` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-4.2` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-3.6` | 4 | 0 | 0 | 1.00 | 1.00 |
+| `STE-3.7` | 3 | 0 | 0 | 1.00 | 1.00 |
+| `STE-4.2` | 5 | 0 | 0 | 1.00 | 1.00 |
 | `STE-4.3` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-5.1` | 2 | 0 | 0 | 1.00 | 1.00 |
-| `STE-5.4` | 2 | 0 | 0 | 1.00 | 1.00 |
-| `STE-5.5` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.1` | 3 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.2` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.3` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.4` | 3 | 0 | 0 | 1.00 | 1.00 |
+| `STE-5.5` | 2 | 0 | 0 | 1.00 | 1.00 |
 | `STE-6.6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-7.1` | 1 | 0 | 0 | 1.00 | 1.00 |
+| `STE-7.1` | 2 | 0 | 0 | 1.00 | 1.00 |
+| `STE-7.2` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-7.3` | 1 | 0 | 0 | 1.00 | 1.00 |
 | `STE-8.1` | 1 | 0 | 0 | 1.00 | 1.00 |
-| `STE-9.3` | 4 | 0 | 0 | 1.00 | 1.00 |
+| `STE-8.2` | 3 | 0 | 0 | 1.00 | 1.00 |
+| `STE-9.3` | 8 | 0 | 0 | 1.00 | 1.00 |
 | `STE-GR-6` | 1 | 0 | 0 | 1.00 | 1.00 |
-| **all** | **30** | **0** | **0** | **1.00** | **1.00** |
+| **all** | **75** | **0** | **0** | **1.00** | **1.00** |
 
-10 fixture files, 4 valid and 6 invalid. Each of the 16 rules that need no
-analyzer has at least one labeled example. The corpus does not measure the 4
-rules that need the analyzer, because the corpus runs with no Python.
+The table comes from a run with the analyzer, on 25 fixture files: 10 valid
+and 15 invalid. Each rule in the table has at least one labeled example. The fixtures
+for rules 1.2, 1.4, and 3.1 use an index of invented words, and not the
+dictionary.
 
-The 4 valid files test for wrong findings. Each of them must give 0
-findings. They hold the constructions that gave a wrong finding
-before:
+A fixture with `"analyze": true` needs the analyzer, and the analyzer needs
+spaCy. 12 fixture files set it. CI does not install spaCy.
+
+Without the analyzer, `ste eval` skips each of these fixtures. The text report then
+gives a line such as "12 fixture files skipped, because they need the
+analyzer", with the names of the files. The JSON report gives them in the
+`skipped` field. `ste eval --analyze` does not skip a fixture. It stops
+with exit code 2 when a fixture needs the analyzer and the analyzer cannot
+start.
+
+Thus a contributor measures the analyzer fixtures on the computer, before
+a push:
+
+```bash
+mise run nlp        # install spaCy and its English model
+mise run hooks      # install a git pre-push hook
+mise run pre-push   # the tests, and the corpus with --analyze
+```
+
+The pre-push hook runs `mise run pre-push`. That task runs the tests and
+`ste eval --analyze --fail-under 1.0 testdata`.
+
+The valid files test for wrong findings. Each of them must give 0
+findings. They hold the constructions that gave a wrong finding before:
 
 - YAML front matter.
 - Code or a link between two words.
@@ -65,8 +111,8 @@ before:
 - A note with a label.
 - A list that starts each item with a small letter.
 
-`mise run ci` measures the corpus and fails when the precision or the
-recall goes below 1.00:
+`mise run ci` measures the corpus without the analyzer. It fails when the
+precision or the recall goes below 1.00:
 
 ```bash
 uv run ste eval --fail-under 1.0 testdata
@@ -99,7 +145,7 @@ word.
 
 **This measurement gives no recall.** The documents have no labels, and
 nobody knows how many violations the tool did not find. The true recall on
-new text is much less than 1.00. The tool has 20 checks, and the standard
+new text is much less than 1.00. The tool has 31 checks, and the standard
 has 53 rules.
 
 ### The false positives that this measurement found
@@ -116,9 +162,10 @@ defect, and each defect now has a test:
 
 ## 3. The analyzer rules on two repositories
 
-Rules 2.1, 3.5, 5.3, and part of 3.6 need the grammar of a sentence. A
-person read the findings of `--analyze` on two repositories of software
-documentation.
+At the time of this measurement, rules 2.1, 3.5, 5.3, and part of 3.6 used
+the grammar of a sentence. A person read the findings of `--analyze` on two
+repositories of software documentation. [rules.md](rules.md) gives the
+measurements of the rules that came later.
 
 | Repository | Files | Without the analyzer | With the analyzer |
 |---|---|---|---|
@@ -207,15 +254,17 @@ each rule, and the directives in the text give a team a way to start.
 
 ## 5. Known limits of the measurement
 
-- The corpus is small. It has 10 files and 30 labeled findings.
+- The corpus is small. It has 25 files and 75 labeled findings.
 - The unlabeled documents are all software documentation in English. Nobody
   measured the tool on aircraft maintenance procedures, which is the first
   purpose of ASD-STE100.
 - This evaluation does not measure recall on new text.
-- The tool has no dictionary rule. This evaluation says nothing about the
-  approved-word list, which is the largest part of ASD-STE100.
-- The labeled corpus does not measure the rules that need the analyzer.
-  Section 3 gives what a person read on two real repositories.
+- The corpus has no dictionary. The dictionary fixtures use invented words.
+  Thus this evaluation says nothing about the approved-word list, which is
+  the largest part of ASD-STE100.
+- CI does not measure the rules that need the analyzer. Only the pre-push
+  hook measures them. Section 3 and [rules.md](rules.md) give what a person
+  read on real repositories.
 
 ## 6. The rule for a new rule
 

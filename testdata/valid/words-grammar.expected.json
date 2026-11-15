@@ -1,0 +1,7 @@
+{
+  "mode": "flavored",
+  "analyze": true,
+  "allow_nouns": ["shim", "bracket"],
+  "allow_verbs": ["install"],
+  "expect": []
+}

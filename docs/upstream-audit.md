@@ -39,7 +39,7 @@ before the first import of an upstream data file.
 | Commit | `e193ecdd66b0` (2026-07-24) |
 | Language | Python |
 | Code license | Apache-2.0 |
-| Vocabulary path | `ste100/` data modules, extracted from the specification |
+| Vocabulary path | `ste100/` data modules that come from the specification |
 | Result | `do not use` (data), `borrow design only` (interfaces) |
 
 The repository holds `ASD-STE100-ISSUE-9.pdf` at its root. This is the
@@ -57,7 +57,7 @@ the later MCP and LSP interfaces.
 |---|---|
 | Commit | `3adb827991ee` (2026-08-21) |
 | Language | Rust |
-| Code license | Blue Oak Model License 1.0.0 |
+| Code license | Blue Oak Model License 1.0.0 <!-- ste-disable-line STE-2.1 --> |
 | Vocabulary path | `ste_checker/src/wordset.rs` with the openste word list |
 | Result | `borrow design only` |
 
@@ -180,7 +180,7 @@ that directory.
 The copyright page of Issue 9 gives three statements that decide what this
 repository can hold:
 
-<!-- ste-disable STE-3.6 -->
+<!-- ste-disable STE-3.2 STE-3.6 -->
 
 1. **The ban.** "no reproduction or publication of it, in whole or in part,
    shall be made without the written authority of an officer" of ASD.
@@ -243,7 +243,7 @@ April 2025.
 
 | File | Source | Risk |
 |---|---|---|
-| `src/ste/rules/data.py` (verb data) | Written by hand. English irregular participles, auxiliary verbs, and a list of 24 phrasal verbs. | Low. English grammar is not under copyright. |
+| `src/ste/rules/data.py` (verb data) | Written by hand. English irregular participles, auxiliary verbs, and a list of 51 phrasal verbs. | Low. English grammar is not under copyright. |
 | `src/ste/rules/data.py` (term data) | Written by hand. 27 words and 11 word groups that have a shorter replacement. | Low. It is not the ASD-STE100 dictionary and it does not come from it. |
 | `src/ste/rules/data.py` (spelling data) | Written by hand. 54 British spellings, 17 word groups that use a noun for an action, and 8 Latin abbreviations. | Low. The lists are examples of the rule, and not the dictionary. |
 | `docs/glossary.yml` | Written by hand for this repository. | None. |

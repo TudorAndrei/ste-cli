@@ -1,11 +1,12 @@
 # Copyright (c) 2026 Tudor Andrei Dumitrascu
 """Rules for document structure and conditions."""
 
-from ste.models import Diagnostic, Document, Options, Sentence
+from ste.models import Diagnostic, Document, Options, Sentence, Token
 from ste.rules.data import (
     CLAUSE_MARKERS,
     CLAUSE_VERBS,
     CONDITION_WORDS,
+    INJURY_WORDS,
     INSTRUCTION_WORDS,
     RISK_WORDS,
     SAFETY_WORDS,
@@ -49,17 +50,24 @@ def paragraph_length(doc: Document, _opts: Options) -> list[Diagnostic]:
     ]
 
 
+def instruction_word(s: Sentence) -> Token | None:
+    """Return the first word of a sentence that makes it an instruction."""
+    for i, t in enumerate(s.tokens):
+        if t.lower not in INSTRUCTION_WORDS:
+            continue
+        if t.lower == "do" and (i + 1 >= len(s.tokens) or s.tokens[i + 1].lower != "not"):
+            continue
+        return t
+    return None
+
+
 def note_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
     """Report an instruction in an information note."""
     out = []
     for s in doc.sentences:
         if s.admonition not in {"note", "notes"}:
             continue
-        for i, t in enumerate(s.tokens):
-            if t.lower not in INSTRUCTION_WORDS:
-                continue
-            if t.lower == "do" and (i + 1 >= len(s.tokens) or s.tokens[i + 1].lower != "not"):
-                continue
+        if (t := instruction_word(s)) is not None:
             out.append(
                 Diagnostic(
                     "STE-5.5",
@@ -72,7 +80,6 @@ def note_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
                     "Move the instruction to a step of the procedure.",
                 )
             )
-            break
     return out
 
 
@@ -100,11 +107,33 @@ def safety_instruction(doc: Document, _opts: Options) -> list[Diagnostic]:
     return out
 
 
+def _injury_in_caution(s: Sentence) -> Diagnostic | None:
+    """Make a finding for a caution that tells of a risk to a person."""
+    t = next((t for t in s.tokens if t.lower in INJURY_WORDS), None)
+    if t is None:
+        return None
+    return Diagnostic(
+        "STE-7.1",
+        f'The caution tells of a risk to a person ("{t.text}"). '
+        "A caution gives a risk of damage only.",
+        "warning",
+        0.7,
+        t.start,
+        t.end,
+        'Use "warning" for a risk of injury or death.',
+    )
+
+
 def safety_word(doc: Document, _opts: Options) -> list[Diagnostic]:
-    """Report a risk under a label that gives no risk level."""
+    """Report a risk under a label that gives no risk level, or a lower level."""
     out = []
     reported = set()
     for s in doc.sentences:
+        if s.admonition == "caution" and s.block not in reported:
+            if (finding := _injury_in_caution(s)) is not None:
+                reported.add(s.block)
+                out.append(finding)
+            continue
         if not s.admonition or s.admonition in SAFETY_WORDS or s.block in reported:
             continue
         for i, t in enumerate(s.tokens):

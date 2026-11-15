@@ -3,7 +3,7 @@
 `ste` finds high-confidence ASD-STE100 (Simplified Technical English)
 violations in Markdown and plain text.
 
-It is a Python command with optional NLP analysis. It has 20 checks. The standard has
+It is a Python command with optional NLP analysis. It has 31 checks. The standard has
 53 rules and a dictionary. The rule numbers agree with ASD-STE100 Issue 9.
 It is an aid for a writer. **It is not an ASD-certified checker.**
 
@@ -93,7 +93,7 @@ each changed file by its path. `--all` removes the other filters.
 | `--mode` | `flavored` (default) or `strict` |
 | `--format` | `text` (default), `json`, `ndjson`, `sarif`, or `github` |
 | `--limit` | Maximum number of findings in the output |
-| `--fields` | The fields of a finding to give, separated by a comma |
+| `--fields` | The fields of a finding to give, with a comma between two fields |
 | `--summary` | Give only the summary |
 | `--fail-over` | Exit with code 1 when the score is more than this value |
 | `--max-words` | Replace the sentence limit of both sentence types |
@@ -102,7 +102,7 @@ each changed file by its path. `--all` removes the other filters.
 | `--baseline` | Path of the file of accepted findings |
 | `--no-baseline` | Report every finding, and not only the new ones |
 | `--fail-on-new` | Exit with code 1 when a finding is not in the baseline |
-| `--warnings-as-errors` | Make each warning an error, and exit with code 1 |
+| `--warnings-as-errors` | Change each warning to an error, and exit with code 1 |
 | `--use-dict` | Use the imported ASD-STE100 dictionary for rule STE-1.1 |
 | `--preset` | Add the technical nouns of a subject field: `software` |
 | `--analyze` | Use the analyzer for the rules that need the grammar of a sentence |
@@ -158,7 +158,7 @@ ste baseline .                # accept it, and write .ste-baseline.json
 ste lint --fail-on-new .      # from now, only a new violation fails
 ```
 
-The number in the baseline goes down when you correct the text. Write the
+The number in the baseline becomes lower when you correct the text. Write the
 file again with `ste baseline .` to record the new, lower number. The
 report gives the number of accepted findings that the text no longer has.
 
@@ -328,6 +328,7 @@ prefer:                 # rule STE-1.11: one name for each item
 
 min_confidence: 0.6     # remove each finding below this value
 max_words: 25           # replace the sentence limits of the standard
+max_noun_words: 3       # rule STE-1.9: the word limit of a technical noun
 baseline: .ste-baseline.json
 fail_over: 2.5          # without this key, the tool never blocks
 warnings_as_errors: false
@@ -404,23 +405,34 @@ and its limits. The numbers are the rule numbers of Issue 9.
 | Rule | Name |
 |---|---|
 | `STE-1.1` | Unapproved word or word group |
+| `STE-1.2` | A word that is not the approved part of speech (needs the analyzer and the dictionary) |
+| `STE-1.4` | An adjective form that the dictionary does not give (needs the analyzer and the dictionary) |
+| `STE-1.7` | A technical noun as a verb (needs the analyzer) |
+| `STE-1.9` | A technical noun that is too long |
 | `STE-1.11` | Two names for the same item |
+| `STE-1.13` | A technical verb as a noun (needs the analyzer) |
 | `STE-1.14` | British spelling |
 | `STE-2.1` | A noun of more than three words (needs the analyzer) |
-| `STE-3.4` | Complex verb construction (perfect tense) |
+| `STE-3.1` | A verb form that the dictionary does not give (needs the analyzer and the dictionary) |
+| `STE-3.2` | A verb form that is not an approved tense |
+| `STE-3.3` | A past participle that is not an adjective (needs the analyzer) |
+| `STE-3.4` | Complex verb construction |
 | `STE-3.5` | Progressive "-ing" form |
 | `STE-3.6` | Passive voice |
 | `STE-3.7` | A noun for an action |
-| `STE-4.2` | Contraction |
+| `STE-4.2` | Contraction, or an omitted article |
 | `STE-4.3` | A list with two constructions |
 | `STE-5.1` | Sentence too long |
+| `STE-5.2` | More than one instruction in a step (needs the analyzer) |
 | `STE-5.3` | An instruction that is not a command (needs the analyzer) |
 | `STE-5.4` | A condition after the command |
 | `STE-5.5` | An instruction in a note |
 | `STE-6.6` | Paragraph too long |
 | `STE-7.1` | A safety instruction with no word for the level of the risk |
+| `STE-7.2` | A safety instruction that does not start with a command (needs the analyzer) |
 | `STE-7.3` | A safety instruction with no explanation |
 | `STE-8.1` | Semicolon |
+| `STE-8.2` | A compound modifier with no hyphen (needs the analyzer) |
 | `STE-9.3` | Phrasal verb |
 | `STE-GR-6` | Latin abbreviation (a general recommendation, not a rule) |
 
@@ -453,12 +465,13 @@ ste analyzer                 # what it needs, and how to install it
 ste lint --analyze docs/     # use it
 ```
 
-The command sends only the sentences of a possible finding, and it keeps
-each answer. On a repository of 180 files, the analyzer removed 26 wrong
-findings of rule 3.6, and the run went from 0.24s to 1.30s.
+The command sends the sentences of a file to the model in one batch. A
+cache on the disk keeps each answer for the next run. The analyzer removes
+wrong findings of rule 3.6. See [the analyzer](docs/analyzer.md) for the times.
 
-The analyzer is optional. Basic checks need no model. Rules 2.1 and 5.3
-need the analyzer. Rules 3.5 and 3.6 can use it for more exact results.
+The analyzer is optional. Basic checks need no model. 11 rules need the
+analyzer, and they give no finding without it. 12 more rules use it for
+more exact results. [docs/coverage.md](docs/coverage.md#the-analyzer) gives the list.
 
 ## For an agent
 
@@ -472,6 +485,7 @@ ste lint --format json --summary docs/         # 226 bytes, not 4 MB
 ste lint --format json --limit 20 --fields rule_id,file,line,text docs/
 ste lint --format ndjson docs/                 # one object for each line
 ste baseline --dry-run --format json .         # the plan, and no change
+ste review docs/                               # how to review the other rules
 ```
 
 [AGENTS.md](https://github.com/TudorAndrei/ste-cli/blob/main/AGENTS.md)
@@ -509,7 +523,17 @@ uv run pytest
 uv run ste eval --fail-under 1.0 testdata
 ```
 
-`mise run ci` runs these checks and the documentation check.
+`mise run ci` runs these checks and the documentation check. CI does not
+install spaCy. Thus `ste eval` skips each fixture that needs the analyzer,
+and the report names it. To measure these fixtures before a push:
+
+```bash
+mise run nlp        # install spaCy and its English model
+mise run hooks      # install a git pre-push hook that runs "mise run pre-push"
+mise run pre-push   # the tests, and "ste eval --analyze --fail-under 1.0 testdata"
+```
+
+`ste eval --analyze` stops with exit code 2 when the analyzer cannot start.
 
 ## Release
 
@@ -524,9 +548,8 @@ mise run dist       # writes dist/
 
 ## What the tool does not check
 
-ASD-STE100 has 53 rules. This tool checks 21 of them today, and about 31 can
-have a mechanical answer. The other rules need a reader: "Make sure that each
-paragraph has only one topic" is an example.
+ASD-STE100 has 53 rules. This tool checks 39 of them today, 10 in full and
+29 in part. The other 14 rules need a reader: "Make sure that each paragraph has only one topic" is an example.
 
 [docs/coverage.md](docs/coverage.md) gives each rule and its group. The
 [ste-review skill](https://github.com/TudorAndrei/ste-cli/tree/main/skill)
@@ -544,7 +567,7 @@ not as a defect.
   See [docs/upstream-audit.md](docs/upstream-audit.md) for the reason that
   the tool cannot ship it.
 - Precision and recall are in [docs/evaluation.md](docs/evaluation.md).
-  Recall on new text is low, because the tool has 20 checks and the standard
+  Recall on new text is low, because the tool has 31 checks and the standard
   has 53 rules.
 - ASD-STE100 is a specification of the AeroSpace and Defence Industries
   Association of Europe. This project is not part of ASD, and it does not

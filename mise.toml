@@ -60,3 +60,21 @@ run = "uv build"
 [tasks.dist]
 description = "Build the release files and checksums"
 run = "./scripts/dist.sh"
+
+[tasks.nlp]
+description = "Install spaCy and its English model for the analyzer"
+run = [
+  "uv sync --locked --extra nlp",
+  "uv pip install 'en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl'",
+]
+
+[tasks.pre-push]
+description = "Run the tests and the corpus with the analyzer. CI has no spaCy."
+run = [
+  "uv run --locked --extra nlp pytest",
+  "uv run --locked --extra nlp ste eval --analyze --fail-under 1.0 testdata",
+]
+
+[tasks.hooks]
+description = "Install the git pre-push hook"
+run = "mise generate git-pre-commit --write --hook pre-push --task pre-push"
