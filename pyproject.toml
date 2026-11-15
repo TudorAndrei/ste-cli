@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ste-cli"
+version = "0.11.0"
+description = "ASD-STE100 checks for Markdown and plain text"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{name = "TudorAndrei"}]
+dependencies = [
+    "markdown-it-py>=3.0,<5",
+    "PyYAML>=6.0,<7",
+    "platformdirs>=4.3,<5",
+    "typer>=0.29.1,<0.30",
+]
+
+[project.optional-dependencies]
+nlp = ["spacy>=3.8,<4"]
+
+[project.scripts]
+ste = "ste.cli:main"
+
+[project.urls]
+Homepage = "https://tudorandrei.github.io/ste-cli/"
+Repository = "https://github.com/TudorAndrei/ste-cli"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.14",
+    "ty>=0.0.1",
+    "vulture>=2.16",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ste"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+# These rules conflict with D211, D212, or the Ruff formatter.
+ignore = ["D203", "D213", "COM812"]
+
+[tool.ruff.lint.per-file-ignores]
+# Assertions are the pytest assertion interface, not production security checks.
+"tests/**/*.py" = ["S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.vulture]
+paths = ["src", "tests"]
+min_confidence = 60
+# Typer calls these functions through its command registry.
+ignore_decorators = ["@app.command", "@app.callback", "@dict_app.command", "@dict_app.callback"]
+# Enum values and TypedDict fields use value conversion or string-key access.
+ignore_names = [
+    "ndjson", "sarif", "github",
+    "true_positives", "false_positives", "false_negatives", "precision", "recall", "expect",
+]

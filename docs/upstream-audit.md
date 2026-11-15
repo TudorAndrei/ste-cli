@@ -16,7 +16,7 @@ files of each repository, at the commit that this document gives below.
 ## Result
 
 **This project adopts no upstream code and no upstream data.** A person
-wrote all the rule data in `internal/checker/rules/` by hand for this
+wrote all the rule data in `src/ste/rules/` by hand for this
 project. Thus there is no `THIRD_PARTY_NOTICES.md` file. Make that file
 before the first import of an upstream data file.
 
@@ -227,7 +227,11 @@ This is not legal advice.
 | `github.com/spf13/pflag` | v1.0.10 | BSD-3-Clause | Reads the command flags |
 | `github.com/adrg/xdg` | v0.5.3 | MIT | Gives the data directory of the user |
 
-Each of the 4 is code, and not data. None of them has ASD-STE100 data. The
+These dependencies describe the earlier Go implementation. The Python
+port uses markdown-it-py, PyYAML, and platformdirs, with optional spaCy.
+The dependency versions are in `uv.lock`.
+
+Each of the 4 earlier dependencies is code, and not data. None of them has ASD-STE100 data. The
 tool used its own reader for Markdown and for YAML before version 0.4.0. A
 CommonMark parser is better, because 5 of the 8 defects of the first
 versions came from that hand-written reader.
@@ -239,9 +243,9 @@ April 2025.
 
 | File | Source | Risk |
 |---|---|---|
-| `internal/checker/rules/verbdata.go` | Written by hand. English irregular participles, auxiliary verbs, and a list of 24 phrasal verbs. | Low. English grammar is not under copyright. |
-| `internal/checker/rules/terms.go` | Written by hand. 27 words and 11 word groups that have a shorter replacement. | Low. It is not the ASD-STE100 dictionary and it does not come from it. |
-| `internal/checker/rules/spelling.go` | Written by hand. 54 British spellings, 17 word groups that use a noun for an action, and 8 Latin abbreviations. | Low. The lists are examples of the rule, and not the dictionary. |
+| `src/ste/rules/data.py` (verb data) | Written by hand. English irregular participles, auxiliary verbs, and a list of 24 phrasal verbs. | Low. English grammar is not under copyright. |
+| `src/ste/rules/data.py` (term data) | Written by hand. 27 words and 11 word groups that have a shorter replacement. | Low. It is not the ASD-STE100 dictionary and it does not come from it. |
+| `src/ste/rules/data.py` (spelling data) | Written by hand. 54 British spellings, 17 word groups that use a noun for an action, and 8 Latin abbreviations. | Low. The lists are examples of the rule, and not the dictionary. |
 | `docs/glossary.yml` | Written by hand for this repository. | None. |
 
 This tool does not ship the ASD-STE100 approved-word dictionary. It cannot

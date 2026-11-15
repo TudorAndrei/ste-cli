@@ -82,9 +82,8 @@ rule 3.6, and the other 3 rules gave 502 more findings. The run went from
 0.11s to 14.9s, because each sentence goes to the model.
 Refer to [the analyzer](analyzer.md).
 
-Each rule of this group can use the analyzer in the same way. A rule must
-also work without the analyzer, because the command must stay one binary
-with no runtime.
+Each rule of this group can use the analyzer in the same way. The basic checks work without a model. Rules 2.1 and 5.3 give no finding
+without the analyzer.
 
 ## A judgment of a reader
 

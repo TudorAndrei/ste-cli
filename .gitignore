@@ -5,3 +5,10 @@ dist/
 # The ASD-STE100 specification is under copyright. Keep a local copy here
 # for work, but never commit it or any text that comes from it.
 .standard/
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
