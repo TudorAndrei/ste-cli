@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
+import errno
 import fnmatch
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -138,6 +138,8 @@ class SteCommand(TyperCommand):
         """Run the command and convert input failures to usage errors."""
         try:
             return super().invoke(ctx)
+        except BrokenPipeError:
+            raise
         except (OSError, ValueError) as err:
             raise typer.BadParameter(str(err), ctx=ctx) from err
 
@@ -238,12 +240,28 @@ def _absolute(path: str | Path) -> Path:
     return Path(os.path.normpath(path)).absolute()
 
 
+def _config_directory(path: Path) -> Path:
+    """Get the project directory of a configuration file, as auto-discovery does."""
+    # The longest name first, so that docs/glossary.yml wins over glossary.yml.
+    for name in sorted(config.DEFAULT_NAMES, key=lambda n: len(Path(n).parts), reverse=True):
+        parts = Path(name).parts
+        if len(path.parts) > len(parts) and path.parts[-len(parts) :] == parts:
+            return Path(*path.parts[: -len(parts)])
+    return path.parent
+
+
 def find_project(config_path: str = "", *, no_config: bool = False) -> Project:
     """Find the project directory and its optional configuration."""
     cwd = Path.cwd()
     if config_path and not no_config:
         path = Path(_absolute(config_path))
-        return Project(path.parent, path)
+        # The directory where discovery from here would find this file, if any.
+        for directory in (cwd, *cwd.parents):
+            if any(path == directory / name for name in config.DEFAULT_NAMES):
+                return Project(directory, path)
+            if (directory / ".git").exists():
+                break
+        return Project(_config_directory(path), path)
     for directory in (cwd, *cwd.parents):
         if not no_config and (found := config.find(directory)):
             return Project(directory, found)
@@ -270,39 +288,51 @@ def display_path(path: str) -> str:
     return path if relative.startswith("..") else relative
 
 
-def match_pattern(pattern: str, path: str) -> bool:
-    """Match a project exclusion pattern against a path."""
+def _match_segments(pattern: list[str], path: list[str]) -> bool:
+    """Match the segments of a pattern against the segments of a path."""
     if not pattern:
-        return False
-    if "**" in pattern:
-        position = 0
-        for n, segment in enumerate(pattern.split("**")):
-            part = segment.strip("/")
-            if not part:
-                continue
-            match = re.search(
-                ("^" if n == 0 else r"(?:^|/)") + re.escape(part) + r"(?=/|$)", path[position:]
-            )
-            if not match:
-                return False
-            position += match.end()
+        # A pattern that names a directory also excludes the files below it.
         return True
-    # A single star cannot cross a directory boundary.
-    if len(pattern.split("/")) != len(path.split("/")):
+    head, rest = pattern[0], pattern[1:]
+    if head == "**":
+        return any(_match_segments(rest, path[n:]) for n in range(len(path) + 1))
+    return bool(path) and fnmatch.fnmatchcase(path[0], head) and _match_segments(rest, path[1:])
+
+
+def match_pattern(pattern: str, path: str) -> bool:
+    """Match a project exclusion pattern against a path, one directory segment at a time."""
+    wanted = pattern.rstrip("/")
+    if not wanted:
         return False
-    return all(
-        fnmatch.fnmatchcase(s, p) for p, s in zip(pattern.split("/"), path.split("/"), strict=True)
+    return _match_segments(wanted.split("/"), path.split("/"))
+
+
+def _pattern_matches(pattern: str, relative: str) -> bool:
+    """Match one exclusion pattern, as gitignore does, against a path relative to the project."""
+    if pattern.startswith("/"):
+        # A leading slash anchors the pattern at the project directory.
+        return match_pattern(pattern.removeprefix("/"), relative)
+    wanted = pattern.rstrip("/")
+    if "/" in wanted:
+        return match_pattern(wanted, relative)
+    # A pattern without a slash matches a segment at any depth.
+    return bool(wanted) and any(
+        fnmatch.fnmatchcase(segment, wanted) for segment in relative.split("/")
     )
 
 
 def matches_any(path: str | Path, root: str | Path, patterns: list[str]) -> bool:
     """Check a file against all project exclusion patterns."""
     relative = relative_to(root, path)
-    return any(
-        match_pattern(p.removeprefix("./").replace("\\", "/"), relative)
-        or match_pattern(p.removeprefix("./").replace("\\", "/"), Path(relative).name)
-        for p in patterns
-    )
+    return any(_pattern_matches(_normalize_pattern(p), relative) for p in patterns)
+
+
+def _normalize_pattern(pattern: str) -> str:
+    """Turn a configured pattern into a slash-separated pattern; a leading "./" anchors it."""
+    normalized = pattern.replace("\\", "/")
+    if normalized.startswith("./"):
+        return "/" + normalized.removeprefix("./")
+    return normalized
 
 
 def git_visible(directory: str) -> set[str] | None:
@@ -429,7 +459,7 @@ def _lint_options(ns: LintOptions, cfg: config.Config) -> Options:
         opts.warnings_as_errors = True
     if ns.preset:
         opts.allow_nouns.extend(config.preset(ns.preset))
-    if ns.use_dict or cfg.dictionary:
+    if ns.use_dict or ns.dict or cfg.dictionary:
         opts.dictionary = dictionary.load(ns.dict or None)
         if opts.dictionary is None:
             msg = 'there is no dictionary index. Run "ste dict import <file>" first.'
@@ -450,13 +480,27 @@ def _read_lint(
         opts.syntax = client
     try:
         results = []
+        seen: set[Path] = set()
+        stdin_read = False
         for path in ns.paths:
             if path == "-":
-                results.append(_lint_one(STDIN_NAME, stdin.read(), opts))
+                if not stdin_read:
+                    stdin_read = True
+                    results.append(_lint_one(STDIN_NAME, stdin.read(), opts))
             else:
                 for file in text_files(path, proj.directory, cfg.exclude, all_files=ns.read_all):
+                    # Follow symbolic links before ".." is removed, as the system does.
+                    key = Path(os.path.realpath(file))
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     with Path(file).open(encoding="utf-8", newline="") as stream:
-                        results.append(_lint_one(file, stream.read(), opts))
+                        try:
+                            text = stream.read()
+                        except UnicodeDecodeError as err:
+                            msg = f"{file}: the file is not UTF-8 text"
+                            raise ValueError(msg) from err
+                    results.append(_lint_one(file, text, opts))
     finally:
         if client is not None:
             client.close()
@@ -1061,9 +1105,17 @@ def run(args: list[str], stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 obj=Streams(stdin, stdout, stderr),
             )
         return int(result or 0)
+    except SystemExit as err:
+        # Typer exits with status 1 when the reader of a pipe has closed it. Raise the cause again.
+        cause = err.__context__
+        if isinstance(cause, OSError) and cause.errno == errno.EPIPE:
+            raise BrokenPipeError(errno.EPIPE, os.strerror(errno.EPIPE)) from err
+        raise
     except typer.TyperException as err:
         stderr.write(f"ste: {err.format_message()}\n")
         return err.exit_code
+    except BrokenPipeError:
+        raise
     except (OSError, ValueError) as err:
         stderr.write(f"ste: {err}\n")
         return 2
@@ -1071,9 +1123,27 @@ def run(args: list[str], stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
         return err.exit_code
 
 
+def _silence_stdout() -> None:
+    """Point standard output at the null device so that the exit does not flush it."""
+    try:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    except OSError, ValueError, AttributeError:
+        return
+
+
 def main() -> int:
     """Run the command with the process arguments and standard streams."""
-    try:
-        return run(sys.argv[1:], sys.stdin, sys.stdout, sys.stderr)
-    except BrokenPipeError:
-        return 0
+    # A stream is None when the caller closed its file descriptor.
+    with (
+        open(os.devnull, encoding="utf-8") as empty,  # noqa: PTH123 - os.devnull is a name.
+        open(os.devnull, "w", encoding="utf-8") as null,  # noqa: PTH123 - os.devnull is a name.
+    ):
+        stdout = sys.stdout or null
+        try:
+            code = run(sys.argv[1:], sys.stdin or empty, stdout, sys.stderr or null)
+            # Flush here so that a closed pipe is caught, and not at interpreter exit.
+            stdout.flush()
+        except BrokenPipeError:
+            _silence_stdout()
+            return 0
+    return code

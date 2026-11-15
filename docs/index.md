@@ -26,7 +26,7 @@ and this tool does not contain that dictionary. Read
 
 ## Installation
 
-Python 3.14 or later is necessary. Install from the repository with uv:
+Python 3.14 is necessary. Python 3.15 is not supported yet. Install from the repository with uv:
 
 ```bash
 uv tool install git+https://github.com/TudorAndrei/ste-cli

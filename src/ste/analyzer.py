@@ -12,6 +12,7 @@ import shlex
 import subprocess
 import sys
 import threading
+import time
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
@@ -208,6 +209,26 @@ class ExternalAnalyzer(Analyzer):
             raise _ProtocolError(msg)
         return result
 
+    def _response_for(self, request_id: int) -> dict[str, object]:
+        """Read until the answer to one request, discarding stale earlier answers."""
+        deadline = time.monotonic() + RESPONSE_TIMEOUT
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                msg = "the analyzer did not answer before the timeout"
+                raise ValueError(msg)
+            result = self._receive(remaining)
+            response_id = result.get("id")
+            # An earlier request timed out, and its late answer arrives now.
+            if type(response_id) is int and response_id < request_id:
+                continue
+            if type(response_id) is int and response_id == request_id:
+                return result
+            if response_id is None and result.get("error"):
+                return result
+            msg = "the analyzer gave a different request ID"
+            raise ValueError(msg)
+
     def analyze(self, text: str) -> list[SyntaxToken]:
         """Request a sentence and retain its validated token response."""
         with self._lock:
@@ -220,12 +241,9 @@ class ExternalAnalyzer(Analyzer):
                 raise RuntimeError(msg)
             stdin.write(json.dumps({"id": self._next, "text": text}) + "\n")
             stdin.flush()
-            result = self._receive(RESPONSE_TIMEOUT)
+            result = self._response_for(self._next)
             if result.get("error"):
                 raise ValueError(str(result["error"]))
-            if result.get("id") != self._next:
-                msg = "the analyzer gave a different request ID"
-                raise ValueError(msg)
             tokens = _parse_tokens(result.get("tokens", []))
             self._cache[text] = tokens
             return tokens

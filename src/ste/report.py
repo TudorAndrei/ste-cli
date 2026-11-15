@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import bisect
+import functools
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,11 +42,47 @@ class Finding:
         return {name: value for name, value in self.data.items() if name != "suggestion" or value}
 
 
+@dataclass(frozen=True)
+class _LineIndex:
+    """Offsets of each line start, in characters and in UTF-8 bytes."""
+
+    starts: list[int]
+    byte_starts: list[int]
+
+
+@functools.lru_cache(maxsize=2)
+def _line_index(source: str) -> _LineIndex:
+    """Index the line starts of a source. Lines split on newline characters only."""
+    starts = [0]
+    byte_starts = [0]
+    byte = 0
+    prev = 0
+    newline = source.find("\n")
+    while newline != -1:
+        byte += len(source[prev : newline + 1].encode("utf-8"))
+        prev = newline + 1
+        starts.append(prev)
+        byte_starts.append(byte)
+        newline = source.find("\n", prev)
+    return _LineIndex(starts, byte_starts)
+
+
 def position(source: str, offset: int, *, byte_column: bool = False) -> tuple[int, int]:
     """Return the source line and column for a character offset."""
-    prefix = source[: max(0, min(len(source), offset))]
-    tail = prefix.rsplit("\n", 1)[-1]
-    return prefix.count("\n") + 1, len(tail.encode("utf-8") if byte_column else tail) + 1
+    index = _line_index(source)
+    clamped = max(0, min(len(source), offset))
+    line = bisect.bisect_right(index.starts, clamped) - 1
+    tail = source[index.starts[line] : clamped]
+    return line + 1, len(tail.encode("utf-8") if byte_column else tail) + 1
+
+
+def _byte_offset(source: str, offset: int) -> int:
+    """Return the UTF-8 byte length of source[:offset], using slice-end rules."""
+    index = _line_index(source)
+    end = max(0, len(source) + offset) if offset < 0 else min(len(source), offset)
+    line = bisect.bisect_right(index.starts, end) - 1
+    tail = source[index.starts[line] : end]
+    return index.byte_starts[line] + len(tail.encode("utf-8"))
 
 
 def make_finding(path: str, source: str, diag: Diagnostic) -> Finding:
@@ -59,8 +97,8 @@ def make_finding(path: str, source: str, diag: Diagnostic) -> Finding:
             "message": diag.message,
             "severity": diag.severity,
             "confidence": diag.confidence,
-            "start": len(source[: diag.start].encode("utf-8")),
-            "end": len(source[: diag.end].encode("utf-8")),
+            "start": _byte_offset(source, diag.start),
+            "end": _byte_offset(source, diag.end),
             "suggestion": diag.suggestion,
             "file": path,
             "line": line,

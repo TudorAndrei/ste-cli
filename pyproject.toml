@@ -7,7 +7,7 @@ name = "ste-cli"
 version = "0.11.0"
 description = "ASD-STE100 checks for Markdown and plain text"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.14,<3.15"
 license = "MIT"
 authors = [{name = "TudorAndrei"}]
 dependencies = [
@@ -15,6 +15,7 @@ dependencies = [
     "PyYAML>=6.0,<7",
     "platformdirs>=4.3,<5",
     "typer>=0.29.1,<0.30",
+    "ahocorasick-rs>=1,<2",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,7 @@ Repository = "https://github.com/TudorAndrei/ste-cli"
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.170.15",
     "pytest>=8.3",
     "ruff>=0.14",
     "ty>=0.0.1",

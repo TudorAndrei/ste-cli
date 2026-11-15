@@ -133,6 +133,12 @@ class Options:
     warnings_as_errors: bool = False
     dictionary: Dictionary | None = None
     syntax: Syntax | None = None
+    _allowed_key: tuple[tuple[str, ...], tuple[str, ...]] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    _allowed_words: frozenset[str] = field(
+        default=frozenset(), init=False, repr=False, compare=False
+    )
 
     def confidence(self) -> float:
         """Return the minimum confidence for the current mode."""
@@ -153,4 +159,8 @@ class Options:
 
     def allowed(self, word: str) -> bool:
         """Return whether the glossary permits this word."""
-        return word.lower() in {w.lower() for w in self.allow_nouns + self.allow_verbs}
+        key = (tuple(self.allow_nouns), tuple(self.allow_verbs))
+        if key != self._allowed_key:
+            self._allowed_words = frozenset(w.lower() for w in key[0] + key[1])
+            self._allowed_key = key
+        return word.lower() in self._allowed_words
