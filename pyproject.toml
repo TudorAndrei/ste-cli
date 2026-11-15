@@ -20,9 +20,6 @@ dependencies = [
 
 [project.optional-dependencies]
 nlp = ["spacy>=3.8,<4"]
-llm = [
-    "anthropic>=2.8,<3",
-]
 
 [project.scripts]
 ste = "ste.cli:main"
@@ -33,7 +30,6 @@ Repository = "https://github.com/TudorAndrei/ste-cli"
 
 [dependency-groups]
 dev = [
-    "anthropic>=2.8,<3",
     "hypothesis>=6.170.15",
     "pytest>=8.3",
     "ruff>=0.14",

@@ -175,14 +175,6 @@ class OutputFormat(StrEnum):
     github = "github"
 
 
-class ReviewFormat(StrEnum):
-    """List the report formats accepted by the review command."""
-
-    text = "text"
-    json = "json"
-    ndjson = "ndjson"
-
-
 class SimpleFormat(StrEnum):
     """List formats accepted by status and data commands."""
 
@@ -231,25 +223,6 @@ class LintOptions:
     limit: int = 0
     max_words: int = 0
     fail_over: float = -1
-
-
-@dataclass
-class ReviewOptions:
-    """Hold the parsed review command options."""
-
-    paths: list[str] = field(default_factory=list)
-    output_format: str = "text"
-    model: str = review.DEFAULT_MODEL
-    fields: str = ""
-    config: str = ""
-    summary: bool = False
-    no_config: bool = False
-    read_all: bool = False
-    no_cache: bool = False
-    dry_run: bool = False
-    limit: int = 0
-    jobs: int = review.DEFAULT_JOBS
-    timeout: float = review.DEFAULT_TIMEOUT
 
 
 @dataclass
@@ -714,87 +687,6 @@ def _run_lint(ns: LintOptions, io: Streams, *, write: bool) -> int:
     return _lint_gate(ns, cfg, rep, opts, io.stderr)
 
 
-def _validate_review(ns: ReviewOptions, stdin: TextIO) -> list[str]:
-    fields = [f.strip() for f in ns.fields.split(",")] if ns.fields else []
-    if unknown := set(fields) - set(review.FIELDS):
-        msg = (
-            "no field is named "
-            f"{', '.join(sorted(unknown))}"
-            ". The fields are: "
-            f"{', '.join(review.FIELDS)}"
-        )
-        raise ValueError(msg)
-    if not ns.model.strip():
-        msg = "--model must name a model"
-        raise ValueError(msg)
-    if ns.timeout <= 0:
-        msg = "--timeout must be more than 0"
-        raise ValueError(msg)
-    if not ns.paths:
-        if stdin.isatty():
-            msg = 'give a file or a directory. Give "-" to read standard input.'
-            raise ValueError(msg)
-        ns.paths = ["-"]
-    return fields
-
-
-def _run_review(ns: ReviewOptions, io: Streams) -> int:
-    fields = _validate_review(ns, io.stdin)
-    proj = find_project(ns.config, no_config=ns.no_config)
-    cfg = config.load(proj.config_path)
-    sources = [
-        review.read_source(name, text)
-        for name, text in _read_sources(ns.paths, proj, cfg, io.stdin, read_all=ns.read_all)
-    ]
-    cache = review.Cache(None if ns.no_cache else review.cache_directory())
-    work = review.plan(sources, ns.model, cache)
-    counts = work.counts()
-    if ns.dry_run:
-        data: dict[str, object] = {
-            "action": "review",
-            "dry_run": True,
-            "model": ns.model,
-            **counts,
-        }
-        text = (
-            f"A real run sends {counts['requests']} requests to {ns.model}, "
-            f"for {counts['paragraphs']} paragraphs of {counts['files']} files.\n"
-            f"The cache has an answer for {counts['cached']} paragraphs.\n"
-            f"The input is approximately {counts['approx_input_tokens']} tokens.\n"
-        )
-        _write_plan(io.stdout, ns.output_format, data, text)
-        return 0
-    outcome = review.run(
-        work, cache, lambda: review.make_client(ns.model, ns.timeout), jobs=ns.jobs
-    )
-    for error in outcome.errors:
-        io.stderr.write(f"ste: a review request failed: {error}\n")
-    rep = review.ReviewReport(
-        "review",
-        outcome.results,
-        extra={
-            "model": ns.model,
-            "paragraphs": counts["paragraphs"],
-            "requests": counts["requests"],
-            "cached": counts["cached"],
-            "failed": outcome.failed,
-        },
-    )
-    report.write(
-        io.stdout,
-        rep,
-        report.Options(
-            format=ns.output_format, limit=ns.limit, fields=fields, summary_only=ns.summary
-        ),
-    )
-    if ns.output_format == "text":
-        io.stdout.write(
-            "Each finding is advice from a language model, and not a defect. "
-            "A second run can give different advice.\n"
-        )
-    return 0
-
-
 def _schema() -> dict:
     data = json.loads(Path(__file__).with_name("schema.json").read_text(encoding="utf-8"))
     data["version"] = __version__
@@ -1159,60 +1051,22 @@ def eval_command(
 
 
 @app.command("review", cls=SteCommand)
-def review_command(  # noqa: PLR0913 - Typer needs one typed parameter per CLI option.
+def review_command(
     ctx: typer.Context,
     *,
-    paths: Annotated[
-        list[str] | None, typer.Argument(help="Files, directories, or - for standard input.")
-    ] = None,
+    paths: Annotated[list[str] | None, typer.Argument(help="Files or directories.")] = None,
     output_format: Annotated[
-        ReviewFormat, typer.Option("--format", help="Output format.")
-    ] = ReviewFormat.text,
-    model: Annotated[
-        str, typer.Option("--model", help="The Anthropic model.")
-    ] = review.DEFAULT_MODEL,
-    fields: Annotated[
-        str, typer.Option("--fields", help="Finding fields separated by a comma.")
-    ] = "",
-    config: Annotated[str, typer.Option("--config", help="Path of the configuration file.")] = "",
-    summary: Annotated[bool, typer.Option("--summary", help="Give only the summary.")] = False,
-    no_config: Annotated[
-        bool, typer.Option("--no-config", help="Do not read a configuration file.")
-    ] = False,
-    read_all: Annotated[bool, typer.Option("--all", help="Read files that git ignores.")] = False,
-    no_cache: Annotated[
-        bool, typer.Option("--no-cache", help="Do not read or write the cached answers.")
-    ] = False,
-    dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Show the requests without a request.")
-    ] = False,
-    limit: Annotated[
-        int, typer.Option("--limit", min=0, help="Maximum findings to show. 0 gives all.")
-    ] = 0,
-    jobs: Annotated[
-        int, typer.Option("--jobs", min=1, max=32, help="Requests at the same time.")
-    ] = review.DEFAULT_JOBS,
-    timeout: Annotated[
-        float, typer.Option("--timeout", help="Seconds for each request.")
-    ] = review.DEFAULT_TIMEOUT,
+        SimpleFormat, typer.Option("--format", help="Output format.")
+    ] = SimpleFormat.text,
 ) -> None:
-    """Get advice from a language model for the rules that need a reader."""
-    opts = ReviewOptions(
-        paths=paths or [],
-        output_format=output_format.value,
-        model=model,
-        fields=fields,
-        config=config,
-        summary=summary,
-        no_config=no_config,
-        read_all=read_all,
-        no_cache=no_cache,
-        dry_run=dry_run,
-        limit=limit,
-        jobs=jobs,
-        timeout=timeout,
+    """Tell an agent how to review the rules that need a reader."""
+    targets = paths or ["."]
+    _write_plan(
+        streams(ctx).stdout,
+        output_format.value,
+        review.plan(targets),
+        review.instruction(targets),
     )
-    raise typer.Exit(_run_review(opts, streams(ctx)))
 
 
 @app.command("schema", cls=SteCommand)
