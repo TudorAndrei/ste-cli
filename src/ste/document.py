@@ -21,7 +21,7 @@ from markdown_it.rules_inline import (
 from ste.models import Document, Sentence, Token
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterator, Mapping
 
     from markdown_it.rules_inline.state_inline import StateInline
     from markdown_it.token import Token as MarkdownToken
@@ -508,13 +508,23 @@ def _quantity_end(masked: str, start: int, pos: int, end: int) -> int:
     return pos
 
 
-def count_words(masked: str, start: int = 0, end: int | None = None) -> int:
-    """Apply word-count rules for quantities, quotations, and parentheses."""
+def count_words(
+    masked: str, start: int = 0, end: int | None = None, names: Mapping[int, int] | None = None
+) -> int:
+    """Apply word-count rules for quantities, quotations, and parentheses.
+
+    ``names`` maps the start of a name of many words to its end. Such a name
+    counts as one word (rule 8.6).
+    """
     end = len(masked) if end is None else end
     count = 0
     pos = start
     while match := _COUNT_START.search(masked, pos, end):
         pos = match.start()
+        if names and (name_end := names.get(pos, -1)) > pos:
+            count += 1
+            pos = name_end
+            continue
         if masked[pos] in '("“':
             group_end = _group_end(masked, pos, end)
             if group_end > pos:
