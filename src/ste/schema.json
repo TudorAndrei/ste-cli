@@ -1,0 +1,523 @@
+{
+  "agent_notes": [
+    "The output can be large: a repository of 180 files gave 4 MB of JSON with the dictionary. Give --limit, --fields, or --summary first.",
+    "Findings alone never change the exit code. Ask for a gate when you want one.",
+    "A rule identifier is stable. Read it from this document, and not from the text of a message.",
+    "The dictionary is off by default, because it reports about 1 word in 10 of general software documentation."
+  ],
+  "command_flags": {
+    "analyzer": {
+      "--format": {
+        "default": "text",
+        "type": "string",
+        "values": [
+          "text",
+          "json"
+        ]
+      }
+    },
+    "baseline": {
+      "--dry-run": {
+        "type": "boolean"
+      },
+      "note": "the baseline command takes each flag of lint, and --dry-run. The dry run gives the plan: the path, the findings, the files, and the accepted findings that the new file keeps and removes."
+    },
+    "dict": {
+      "--dry-run": {
+        "note": "for import and remove",
+        "type": "boolean"
+      },
+      "--format": {
+        "default": "text",
+        "type": "string",
+        "values": [
+          "text",
+          "json"
+        ]
+      },
+      "--out": {
+        "note": "the path of the index",
+        "type": "path"
+      },
+      "subcommands": [
+        "import \u003cfile\u003e",
+        "info",
+        "path",
+        "remove"
+      ]
+    },
+    "eval": {
+      "--fail-under": {
+        "note": "exit 1 when the precision or the recall is less",
+        "type": "number"
+      },
+      "--format": {
+        "default": "text",
+        "type": "string",
+        "values": [
+          "text",
+          "json"
+        ]
+      }
+    },
+    "init": {
+      "--dry-run": {
+        "type": "boolean"
+      },
+      "--force": {
+        "note": "write the file also when a config exists",
+        "type": "boolean"
+      },
+      "--format": {
+        "default": "text",
+        "type": "string",
+        "values": [
+          "text",
+          "json"
+        ]
+      }
+    }
+  },
+  "commands": {
+    "analyzer": "Show the analyzer of the grammar and what it needs.",
+    "baseline": "Accept the findings of today, and report only the new ones after that.",
+    "dict": "Make a local index of the ASD-STE100 dictionary from your own copy.",
+    "eval": "Measure the rules against a labeled corpus.",
+    "init": "Write a start config, .ste.yml, in the current directory. It takes --dry-run, --force, and --format.",
+    "lint": "Check files, directories, or standard input.",
+    "schema": "Print this document.",
+    "version": "Print the version."
+  },
+  "config_files": [
+    ".ste.yml",
+    ".ste.yaml",
+    "glossary.yml",
+    "docs/glossary.yml"
+  ],
+  "config_keys": {
+    "allow.nouns": {
+      "type": "list of strings"
+    },
+    "allow.verbs": {
+      "type": "list of strings"
+    },
+    "analyzer": {
+      "note": "start the analyzer of the grammar for each run",
+      "type": "boolean"
+    },
+    "baseline": {
+      "type": "path"
+    },
+    "dictionary": {
+      "type": "boolean"
+    },
+    "disable_rules": {
+      "type": "list of rule identifiers"
+    },
+    "exclude": {
+      "type": "list of path patterns"
+    },
+    "fail_over": {
+      "type": "number"
+    },
+    "max_words": {
+      "type": "integer"
+    },
+    "min_confidence": {
+      "range": [
+        0,
+        1
+      ],
+      "type": "number"
+    },
+    "mode": {
+      "type": "string",
+      "values": [
+        "flavored",
+        "strict"
+      ]
+    },
+    "prefer": {
+      "note": "the key is the name to use, and the list holds the other names of the same item. Rule STE-1.11 reads it.",
+      "type": "map"
+    },
+    "presets": {
+      "type": "list",
+      "values": [
+        "software"
+      ]
+    },
+    "rules": {
+      "type": "map",
+      "values": [
+        "off",
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "warnings_as_errors": {
+      "type": "boolean"
+    }
+  },
+  "description": "A deterministic ASD-STE100 checker for Markdown and plain text.",
+  "exit_codes": {
+    "0": "The tool ran. Findings alone do not change this code.",
+    "1": "A gate failed: --fail-on-new, --warnings-as-errors, or --fail-over.",
+    "2": "A flag, a file, or the config has an error."
+  },
+  "lint_flags": {
+    "--all": {
+      "note": "read every file, including the files that git ignores",
+      "type": "boolean"
+    },
+    "--analyze": {
+      "note": "use the analyzer of the grammar. Rules 2.1 and 5.3 need it, and it makes rules 3.5 and 3.6 more exact. Run \"ste analyzer\" to see what it needs.",
+      "type": "boolean"
+    },
+    "--analyzer": {
+      "note": "command of a different analyzer",
+      "type": "string"
+    },
+    "--baseline": {
+      "type": "path"
+    },
+    "--config": {
+      "type": "path"
+    },
+    "--dict": {
+      "type": "path"
+    },
+    "--dry-run": {
+      "note": "for the baseline command: show the plan and write nothing",
+      "type": "boolean"
+    },
+    "--fail-on-new": {
+      "note": "exit 1 when a finding is not in the baseline",
+      "type": "boolean"
+    },
+    "--fail-over": {
+      "note": "exit 1 when the score for each 100 words is higher",
+      "type": "number"
+    },
+    "--fields": {
+      "note": "separated by a comma",
+      "type": "string",
+      "values": [
+        "rule_id",
+        "message",
+        "severity",
+        "confidence",
+        "start",
+        "end",
+        "suggestion",
+        "file",
+        "line",
+        "column",
+        "text"
+      ]
+    },
+    "--format": {
+      "default": "text",
+      "type": "string",
+      "values": [
+        "text",
+        "json",
+        "ndjson",
+        "sarif",
+        "github"
+      ]
+    },
+    "--limit": {
+      "default": 0,
+      "note": "0 gives every finding",
+      "type": "integer"
+    },
+    "--max-words": {
+      "note": "replaces the limit of the standard",
+      "type": "integer"
+    },
+    "--mode": {
+      "default": "flavored",
+      "type": "string",
+      "values": [
+        "flavored",
+        "strict"
+      ]
+    },
+    "--no-baseline": {
+      "type": "boolean"
+    },
+    "--no-config": {
+      "type": "boolean"
+    },
+    "--preset": {
+      "note": "add the technical nouns of a subject field",
+      "type": "string",
+      "values": [
+        "software"
+      ]
+    },
+    "--summary": {
+      "note": "give only the summary",
+      "type": "boolean"
+    },
+    "--use-dict": {
+      "note": "use the imported dictionary for STE-1.1",
+      "type": "boolean"
+    },
+    "--warnings-as-errors": {
+      "note": "exit 1 when a warning exists; info stays advice",
+      "type": "boolean"
+    }
+  },
+  "output": {
+    "finding_fields": [
+      "rule_id",
+      "message",
+      "severity",
+      "confidence",
+      "start",
+      "end",
+      "suggestion",
+      "file",
+      "line",
+      "column",
+      "text"
+    ],
+    "note": "json gives one object with a flat findings list. ndjson gives one object for each line, each with a type of finding or summary. sarif gives SARIF 2.1.0 for code scanning. github gives one workflow command of GitHub Actions for each finding. sarif and github give each path from the top of the git work tree, and they do not use --fields.",
+    "summary_fields": [
+      "files",
+      "words",
+      "findings",
+      "score",
+      "shown",
+      "truncated",
+      "accepted",
+      "stale",
+      "errors"
+    ]
+  },
+  "paths": "The project directory is the first directory, from the current directory upward, that holds a config file. The search stops at the top of the git work tree. A path in the config, each exclude pattern, and the default baseline start from the project directory. A key of the baseline is the path from the directory of the baseline file.",
+  "rules": [
+    {
+      "id": "STE-1.1",
+      "name": "Unapproved word or word group",
+      "standard_rule": "1.1",
+      "default_severity": "warning",
+      "confidence": [
+        0.9,
+        0.95,
+        0.6
+      ],
+      "note": "0.95 and 0.6 come from the dictionary. 0.6 means that the dictionary has the word only as a verb, and the tool has no part-of-speech tagger."
+    },
+    {
+      "id": "STE-1.14",
+      "name": "British spelling",
+      "standard_rule": "1.14",
+      "default_severity": "warning",
+      "confidence": [
+        0.9
+      ],
+      "note": "A capitalized word that does not start a sentence is a name, thus the rule does not report it."
+    },
+    {
+      "id": "STE-3.4",
+      "name": "Complex verb construction",
+      "standard_rule": "3.4",
+      "default_severity": "warning",
+      "confidence": [
+        0.9,
+        0.55
+      ]
+    },
+    {
+      "id": "STE-3.5",
+      "name": "Progressive -ing form",
+      "standard_rule": "3.5",
+      "default_severity": "warning",
+      "confidence": [
+        0.9
+      ]
+    },
+    {
+      "id": "STE-3.6",
+      "name": "Passive voice",
+      "standard_rule": "3.6",
+      "default_severity": "warning",
+      "confidence": [
+        0.95,
+        0.85,
+        0.7
+      ],
+      "note": "0.95 with a by-agent, 0.85 for an irregular participle, 0.7 for a participle that ends with ed."
+    },
+    {
+      "id": "STE-3.7",
+      "name": "A noun for an action",
+      "standard_rule": "3.7",
+      "default_severity": "warning",
+      "confidence": [
+        0.9
+      ]
+    },
+    {
+      "id": "STE-4.2",
+      "name": "Contraction",
+      "standard_rule": "4.2",
+      "default_severity": "warning",
+      "confidence": [
+        0.98
+      ],
+      "note": "The tool checks only the contraction part of rule 4.2."
+    },
+    {
+      "id": "STE-5.1",
+      "name": "Sentence too long",
+      "standard_rule": "5.1",
+      "default_severity": "warning",
+      "confidence": [
+        0.9
+      ],
+      "note": "20 words for a numbered step, and 25 for other text."
+    },
+    {
+      "id": "STE-8.1",
+      "name": "Semicolon",
+      "standard_rule": "8.1",
+      "default_severity": "warning",
+      "confidence": [
+        1
+      ]
+    },
+    {
+      "id": "STE-9.3",
+      "name": "Phrasal verb",
+      "standard_rule": "9.3",
+      "default_severity": "warning",
+      "confidence": [
+        0.85
+      ]
+    },
+    {
+      "id": "STE-GR-6",
+      "name": "Latin abbreviation",
+      "standard_rule": "GR-6",
+      "default_severity": "info",
+      "confidence": [
+        0.9
+      ],
+      "note": "A general recommendation is advice and not a rule, thus no mode and no flag makes it an error."
+    },
+    {
+      "id": "STE-4.3",
+      "name": "A list with two constructions",
+      "standard_rule": "4.3",
+      "default_severity": "info",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule reports a list that starts some items with a capital letter and other items with a small letter."
+    },
+    {
+      "id": "STE-5.5",
+      "name": "An instruction in a note",
+      "standard_rule": "5.5",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ]
+    },
+    {
+      "id": "STE-6.6",
+      "name": "Paragraph too long",
+      "standard_rule": "6.6",
+      "default_severity": "warning",
+      "confidence": [
+        1
+      ],
+      "note": "6 sentences maximum."
+    },
+    {
+      "id": "STE-7.3",
+      "name": "A safety instruction with no explanation",
+      "standard_rule": "7.3",
+      "default_severity": "warning",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule reads a warning, a caution, and a danger block."
+    },
+    {
+      "id": "STE-7.1",
+      "name": "A safety instruction with no word for the level of the risk",
+      "standard_rule": "7.1",
+      "default_severity": "warning",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule reads a note, a tip, an info, an attention, and an important block. It reports one that tells of an injury, of damage, or of a loss of data."
+    },
+    {
+      "id": "STE-5.4",
+      "name": "A condition after the command",
+      "standard_rule": "5.4",
+      "default_severity": "info",
+      "confidence": [
+        0.7
+      ],
+      "note": "The rule reads a numbered step only. A condition that follows an infinitive belongs to the infinitive, and the rule does not report it."
+    },
+    {
+      "id": "STE-1.11",
+      "name": "Two names for the same item",
+      "standard_rule": "1.11",
+      "default_severity": "warning",
+      "confidence": [
+        0.95
+      ],
+      "note": "The rule reports nothing until the prefer key of the config gives the names. No tool can know that two nouns mean the same item."
+    },
+    {
+      "id": "STE-5.3",
+      "name": "An instruction that is not a command",
+      "standard_rule": "5.3",
+      "default_severity": "warning",
+      "confidence": [
+        0.75
+      ],
+      "note": "The rule needs the analyzer. It reads a numbered step, and it steps over a condition clause."
+    },
+    {
+      "id": "STE-2.1",
+      "name": "A noun of more than three words",
+      "standard_rule": "2.1",
+      "default_severity": "warning",
+      "confidence": [
+        0.8
+      ],
+      "note": "The rule needs the analyzer. A name of many words is one unit by rule 8.6, thus the rule does not report it."
+    }
+  ],
+  "schema_version": 1,
+  "severities": [
+    "off",
+    "info",
+    "warning",
+    "error"
+  ],
+  "standard": "ASD-STE100 Issue 9",
+  "suppression": {
+    "note": "A directive with no rule identifier applies to every rule.",
+    "syntax": [
+      "\u003c!-- ste-disable --\u003e",
+      "\u003c!-- ste-disable STE-3.6 --\u003e",
+      "\u003c!-- ste-enable STE-3.6 --\u003e",
+      "\u003c!-- ste-disable-next-line --\u003e",
+      "\u003c!-- ste-disable-line --\u003e"
+    ]
+  },
+  "tool": "ste",
+  "version": "0.11.0"
+}
