@@ -150,6 +150,9 @@ permits. On a repository of 180 files, this part gave 354 more findings.
   "missing" and "existing". It does not report them.
 - The tool does not report "is being", because that is the passive voice,
   and rule 3.6 reports it.
+- A determiner or a possessive before an "-ing" word shows a noun, also
+  when the analyzer gives a verb. The tool does not report "warning" in
+  "Make each warning an error", or "cleaning" in "before its cleaning".
 - Without the analyzer, the tool finds only the form after "to be".
 
 ## STE-3.6 Passive voice

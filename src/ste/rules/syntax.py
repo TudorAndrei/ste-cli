@@ -146,6 +146,23 @@ def noun_cluster(doc: Document, opts: Options) -> list[Diagnostic]:
     return out
 
 
+_DETERMINER_TAGS = frozenset({"DT", "PDT", "PRP$", "WP$", "POS"})
+
+
+def _has_determiner(t: SyntaxToken, grammar: list[SyntaxToken]) -> bool:
+    """Return whether a determiner or a possessive comes before an -ing word.
+
+    "each" in "Make each warning an error" and "its" in "before its cleaning"
+    show that the -ing word is a noun, also when the tagger gives a verb.
+    """
+    return any(
+        other.head == t.index
+        and other.index < t.index
+        and (other.dep in {"det", "poss"} or other.tag in _DETERMINER_TAGS)
+        for other in grammar
+    )
+
+
 def gerund(doc: Document, opts: Options) -> list[Diagnostic]:
     """Report an ing-form verb outside a permitted noun or modifier."""
     out = []
@@ -167,6 +184,8 @@ def gerund(doc: Document, opts: Options) -> list[Diagnostic]:
                 and other.text.lower() in BE_FORMS
                 for other in grammar
             ):
+                continue
+            if _has_determiner(t, grammar):
                 continue
             start, end = syntax_span(s, t)
             out.append(
