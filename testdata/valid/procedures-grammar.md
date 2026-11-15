@@ -5,6 +5,8 @@
 3. Hold the button and at the same time turn the knob.
 4. Before you start the pump, close the valve.
 5. If the pressure is low, stop the pump.
+6. Use oxlint for linting and oxfmt for formatting.
+7. Keep the count, otherwise return the default.
 
 **NOTE:** The pump keeps the pressure.
 
